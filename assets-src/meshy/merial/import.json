@@ -1,0 +1,25 @@
+{
+  "out": "public/assets/meshy/Merial.glb",
+  "rigged": "assets-src/meshy/merial/rigged_598d93e8.glb",
+  "anims": [
+    "assets-src/meshy/merial/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": { "src": "Idle_02" },
+    "Run": { "src": "Run_02" },
+    "Attack": { "src": "Right_Hand_Sword_Slash", "start": 0.2, "end": 1.1 },
+    "Attack2": { "src": "Left_Slash", "start": 0.45, "end": 1.35 },
+    "CastQ": { "src": "Thrust_Slash", "start": 0.5, "end": 1.3 },
+    "CastW": { "src": "Formal_Bow", "start": 1.3, "end": 3.2 },
+    "CastE": { "src": "Charged_Slash", "start": 0.95, "end": 1.8 },
+    "CastR": { "src": "Crouch_Pull_and_Throw", "start": 3.0, "end": 4.4 },
+    "Death": { "src": "Shot_and_Slow_Fall_Backward", "start": 1.9, "end": 3.6 },
+    "Hit": { "src": "Hit_Reaction", "start": 0.3, "end": 1.2 },
+    "Select": { "src": "Formal_Bow", "start": 1.2, "end": 4.6 }
+  }
+}

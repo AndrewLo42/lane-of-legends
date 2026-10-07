@@ -77,11 +77,14 @@ function teamTint(mat: THREE.MeshStandardMaterial, team: THREE.Color) {
  * - `float`: not held at all. It hangs from a glowing pivot at `offset` (root space, metres at
  *   `refHeight`), sways and bobs on its own, and strikes forward on `swingProp()`
  *   (attacks and casts). For hands that can't convincingly grip (Tock's open gauntlets).
+ * - `twin`: two copies hovering at her sides (`offset`, mirrored across z), points forward. They bob
+ *   out of step and lunge forward one after the other on `swingProp()` (Merial's flying blades).
  */
 type PropSpec = { refHeight: number; build: () => THREE.Object3D } & (
   | { mode: 'upright'; bone: string; lean: number }
   | { mode: 'held'; bone: string; dir: [number, number, number]; grip: number }
   | { mode: 'float'; offset: [number, number, number] }
+  | { mode: 'twin'; offset: [number, number, number]; glow: number }
 );
 
 const brass = () => new THREE.MeshStandardMaterial({ color: 0xb8893a, metalness: 0.7, roughness: 0.35 });
@@ -166,6 +169,34 @@ const PROPS: Partial<Record<ModelName, PropSpec>> = {
       return g;
     },
   },
+  // Merial's blades: slender jian with blossom-pink guards and a faint pink edge glow.
+  champ_merial: {
+    mode: 'twin',
+    // Beside her hips and a little ahead: measured clear of her wide sleeves in every clip, idle or mid-lunge.
+    offset: [0.3, 1.25, 0.95],
+    glow: 0xe86f9a,
+    refHeight: 2.5,
+    build: () => {
+      const g = new THREE.Group();
+      const steel = new THREE.MeshStandardMaterial({ color: 0xe9e4ea, metalness: 0.85, roughness: 0.2, emissive: 0xe86f9a, emissiveIntensity: 0.45 });
+      const lacquer = new THREE.MeshStandardMaterial({ color: 0x8e2f57, roughness: 0.5 });
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.028, 0.2, 8), lacquer);
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), glow(0xe86f9a));
+      pommel.position.y = -0.11;
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.06), lacquer);
+      guard.position.y = 0.11;
+      const blossom = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 5), glow(0xe86f9a));
+      blossom.rotation.x = Math.PI / 2;
+      blossom.position.y = 0.11;
+      // A flat, double-edged blade with a diamond cross-section, tapering to the tip.
+      const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.055, 1.05, 4), steel);
+      blade.scale.z = 0.3;
+      blade.rotation.y = Math.PI / 4;
+      blade.position.y = 0.65;
+      g.add(grip, pommel, guard, blossom, blade);
+      return g;
+    },
+  },
 };
 
 /**
@@ -209,7 +240,7 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
   let syncProps: (dt?: number) => void = () => {};
   /** Kick a floating prop into a swing (attacks and casts); a no-op for other props. */
   let swingProp = () => {};
-  const hand = spec && spec.mode !== 'float' ? model.getObjectByName(spec.bone) : undefined;
+  const hand = spec && (spec.mode === 'upright' || spec.mode === 'held') ? model.getObjectByName(spec.bone) : undefined;
   if (spec) {
     const p = spec.build();
     p.scale.setScalar(ps);
@@ -241,6 +272,47 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
         halo.rotation.z += dt * 3;
       };
       swingProp = () => (swingT = 0);
+    } else if (spec.mode === 'twin') {
+      // One blade on each side, laid point-forward (+x) and tipped slightly down, each with a soft
+      // glowing ring at the hilt.
+      const [ox, oy, oz] = spec.offset;
+      const blades = [-1, 1].map((side, i) => {
+        const pivot = new THREE.Group();
+        const b = i === 0 ? p : spec.build();
+        b.scale.setScalar(ps);
+        b.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = true) : null));
+        b.rotation.z = -Math.PI / 2 - 0.12; // +y (the point) to +x, a touch downward
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.12 * ps, 0.012 * ps, 6, 24),
+          new THREE.MeshBasicMaterial({ color: spec.glow, transparent: true, opacity: 0.7 }),
+        );
+        ring.rotation.y = Math.PI / 2;
+        pivot.add(b, ring);
+        pivot.position.set(ox * ps, oy * ps, side * oz * ps);
+        root.add(pivot);
+        return { pivot, blade: b, ring, phase: i * Math.PI, swingT: Infinity };
+      });
+      let t = Math.random() * 10;
+      syncProps = (dt = 0) => {
+        t += dt;
+        for (const s of blades) {
+          s.swingT += dt;
+          // A lunge forward and back over ~0.4 s, spinning the blade about its own length as it goes.
+          const k = s.swingT >= 0 && s.swingT < 0.4 ? Math.sin((s.swingT / 0.4) * Math.PI) : 0;
+          s.pivot.position.x = (ox + k * 0.9) * ps;
+          s.pivot.position.y = (oy + Math.sin(t * 2.1 + s.phase) * 0.06 - k * 0.15) * ps;
+          s.pivot.rotation.y = Math.sin(t * 0.9 + s.phase) * 0.12 * (s.pivot.position.z > 0 ? 1 : -1);
+          s.blade.rotation.x = k * Math.PI * 2;
+          s.ring.rotation.x += dt * 2;
+          (s.ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.3 * Math.sin(t * 3 + s.phase) + k * 0.3;
+        }
+      };
+      swingProp = () => {
+        // The right blade strikes first, the left a beat later.
+        blades[1].swingT = 0;
+        blades[0].swingT = -0.12;
+      };
+      syncProps();
     } else if (spec.mode === 'held' && hand) {
       // At the bind pose: forearm direction (elbow → wrist), the grip mid-fist along it, and the
       // blade pointing along `dir` made perpendicular to it. Then hand it to the bone (attach keeps

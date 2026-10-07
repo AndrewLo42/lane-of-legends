@@ -52,7 +52,8 @@ function load() {
     scene.remove(current.root);
     current.anim.dispose();
   }
-  const built = instantiate(name, 1.4, new THREE.Color(TEAM_COLOR[team]));
+  // Like the game: champions keep their own colours, everything else wears the team's.
+  const built = instantiate(name, 1.4, name.startsWith('champ_') ? null : new THREE.Color(TEAM_COLOR[team]));
   if (!built) return;
   built.root.rotation.y = -Math.PI / 4; // three-quarter view to start
   scene.add(built.root);

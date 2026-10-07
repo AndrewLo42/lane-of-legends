@@ -1,0 +1,104 @@
+[
+  {
+    "at": "2026-10-07T22:47:37.122Z",
+    "cmd": "concept",
+    "taskId": "01a1188c-8d56-73d4-97ac-df3982739885",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a graceful wuxia swordswoman duelist with fair skin and long black hair tied in a high topknot with a pink plum-blossom hairpin and two long ribbons, layered plum-blossom pink and ivory silk robes with wide flowing sleeves cinched by a deep rose sash, a short ivory cape-like overlayer embroidered with pink blossoms, slim fitted trousers and soft cloth boots, two slender swords in pink-lacquered scabbards crossed on her back with hilts over her shoulders. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/merial/concepts/82739885_0.png",
+      "assets-src/meshy/merial/concepts/82739885_1.png",
+      "assets-src/meshy/merial/concepts/82739885_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T22:47:37.686Z",
+    "cmd": "concept",
+    "taskId": "01a1188c-9097-7730-a7ff-a09d1eac78c6",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a graceful wuxia swordswoman duelist with fair skin and long black hair tied in a high topknot with a pink plum-blossom hairpin and two long ribbons, layered plum-blossom pink and ivory silk robes with wide flowing sleeves cinched by a deep rose sash, a short ivory cape-like overlayer embroidered with pink blossoms, slim fitted trousers and soft cloth boots, two slender swords in pink-lacquered scabbards crossed on her back with hilts over her shoulders. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/merial/concepts/1eac78c6_0.png",
+      "assets-src/meshy/merial/concepts/1eac78c6_1.png",
+      "assets-src/meshy/merial/concepts/1eac78c6_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T22:52:07.040Z",
+    "cmd": "model",
+    "taskId": "01a1188f-0d28-7119-b243-c3e6e9e2f002",
+    "request": {
+      "image_urls": [
+        "82739885_0.png",
+        "82739885_1.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "plum-blossom pink and ivory layered silk robes with wide sleeves, deep rose sash, ivory shoulder cape embroidered with pink blossoms, long black hair in a topknot with a pink blossom hairpin and pink ribbons, two swords in pink scabbards crossed on her back, ivory cloth boots"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/merial/model_e9e2f002.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T22:52:46.917Z",
+    "cmd": "rig",
+    "taskId": "01a11891-7ad9-7041-9097-19f8598d93e8",
+    "request": {
+      "input_task_id": "01a1188f-0d28-7119-b243-c3e6e9e2f002",
+      "animation_type": "biped",
+      "height_meters": 1.7
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/merial/rigged_598d93e8.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T22:53:47.804Z",
+    "cmd": "animate",
+    "taskId": "01a11892-2330-75b7-a910-f4b48f0d5d1a",
+    "request": {
+      "rig_task_id": "01a11891-7ad9-7041-9097-19f8598d93e8",
+      "action_ids": [
+        11,
+        14,
+        219,
+        97,
+        240,
+        242,
+        239,
+        185,
+        178,
+        41
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/merial/anims_batch1.glb"
+    ]
+  }
+]
