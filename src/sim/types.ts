@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'merial';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,11 +47,12 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
-   * shield: damage it can still absorb. Root stops movement (and dashes); stun stops everything.
+   * shield: damage it can still absorb; guard: fraction of damage prevented; regen: HP per second.
+   * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
   sourceId: number;
@@ -81,7 +82,7 @@ export interface ChampState {
   /** A cast pressed during a wind-up or dash; it fires as soon as the champion is free (if before `until`). */
   queued: { slot: Slot; at: Vec2; until: number } | null;
   /** Moving under its own power (can't act until it lands). */
-  dash: { to: Vec2; speed: number; onPass?: (u: Unit) => void; passed: number[] } | null;
+  dash: { to: Vec2; speed: number; onPass?: (u: Unit) => void; onArrive?: () => void; passed: number[] } | null;
   /** Kit-specific bookkeeping (echo positions, rewind history, ...). */
   data: Record<string, unknown>;
   augments: AugmentId[];
@@ -147,7 +148,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal';
 
 export interface Missile {
   id: number;
@@ -202,7 +203,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom';
   pos: Vec2;
   dir?: number;
   radius?: number;

@@ -112,7 +112,25 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'maren') {
+  if (u.champ!.kit === 'merial') {
+    // Slim duelist with a topknot and a blade on each hip.
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 1.05, 4, 12), teamMat);
+    body.position.y = 0.9;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 14, 10), new THREE.MeshStandardMaterial({ color: 0xe8c3a0 }));
+    head.position.y = 1.9;
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: 0x241a1f }));
+    bun.position.set(-0.05, 2.18, 0);
+    const sash = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.06, 6, 16), glow);
+    sash.rotation.x = Math.PI / 2;
+    sash.position.y = 0.95;
+    g.add(body, head, bun, sash);
+    for (const side of [-1, 1]) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.09), metal);
+      blade.position.set(0.15, 0.95, side * 0.42);
+      blade.rotation.z = -0.5;
+      g.add(blade);
+    }
+  } else if (u.champ!.kit === 'maren') {
     const robe = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.6, 10), teamMat);
     robe.position.y = 0.8;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 10), new THREE.MeshStandardMaterial({ color: 0xc9a27e }));

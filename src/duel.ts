@@ -102,7 +102,7 @@ export class Duel {
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
-    if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view });
+    if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam });
   }
 
   frame(dt: number) {

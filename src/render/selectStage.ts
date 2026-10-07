@@ -3,9 +3,11 @@ import { KITS, KIT_IDS } from '../sim/kits';
 import type { KitId } from '../sim/types';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
+import { World } from '../sim/world';
 import { RIGS } from './rigs';
+import { placeholderFor } from './scene';
 
-const SPACING = 3.2;
+const SPACING = 3.0;
 
 /**
  * The champion select backdrop: every champion idling on a podium. Focusing one spotlights it and
@@ -50,7 +52,13 @@ export class SelectStage {
       const model: ModelName = `champ_${kit}`;
       const built = hasModel(model) ? instantiate(model, kit === 'tock' ? 2.3 : 2.1, null) : null;
       if (!built) {
-        this.champs.set(kit, { root: new THREE.Group(), ring, light });
+        // No Meshy model yet: stand the placeholder figure on the podium instead.
+        const stand = placeholderFor(new World(1).spawnChampion('blue', kit, { think: () => [] }));
+        stand.position.set(x, 0.3, 0);
+        stand.rotation.y = -Math.PI / 2;
+        stand.scale.setScalar(0.95);
+        s.add(stand);
+        this.champs.set(kit, { root: stand, ring, light });
         return;
       }
       built.root.position.set(x, 0.3, 0);
@@ -62,7 +70,8 @@ export class SelectStage {
       this.champs.set(kit, { root: built.root, anim, ring, light, syncProps: built.syncProps, swingProp: built.swingProp });
     });
 
-    this.camera.position.set(0, 2.4, 9.5);
+    // Pull back as the roster grows so every podium fits.
+    this.camera.position.set(0, 2.4, 3.5 * KIT_IDS.length - 1);
     this.camera.lookAt(0, 0.95, 0);
   }
 

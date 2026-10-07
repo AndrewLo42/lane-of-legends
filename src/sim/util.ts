@@ -40,3 +40,17 @@ export function inCone(origin: Vec2, dir: number, radius: number, angle: number,
   // Widen the arc by the target's angular half-size so big targets at the edge still count.
   return Math.abs(diff) <= angle / 2 + Math.asin(Math.min(1, r / d));
 }
+
+/**
+ * A pincer (an inverted V): its point at `aim` (pulled to between `minRange` and `range` from
+ * `from`), its two arms reaching back past `from`, opening by ±`spread` radians. Blades start at
+ * the arms' outer ends and close on the point.
+ */
+export function pincerShape(from: Vec2, aim: Vec2, range: number, minRange: number, spread: number) {
+  const d = Math.min(range, Math.max(minRange, dist(from, aim)));
+  const fwd = dirTo(from, aim);
+  const point = { x: from.x + fwd.x * d, y: from.y + fwd.y * d };
+  const back = Math.atan2(-fwd.y, -fwd.x);
+  const starts = [-1, 1].map((side) => ({ x: point.x + Math.cos(back + side * spread) * d, y: point.y + Math.sin(back + side * spread) * d }));
+  return { point, starts: starts as [Vec2, Vec2], depth: d, back };
+}

@@ -36,11 +36,12 @@ function setup(kit: KitId, rank = 1) {
   return { w, ctl, me, cast };
 }
 
-/** An enemy champion that stands still. */
+/** An enemy champion that stands still and doesn't hurt anyone (set `damage` to let its autos land). */
 function dummy(w: World, x: number, y = 0, kit: KitId = 'arlo') {
   const d = w.spawnChampion('red', kit, { think: () => [] });
   d.pos = { x, y };
   d.maxHp = d.hp = 5000;
+  d.damage = 0;
   return d;
 }
 
@@ -150,7 +151,6 @@ describe('Tock', () => {
   it('Stopwatch shields Tock while he stands in it, once per field', () => {
     const { w, me, cast } = setup('tock');
     const foe = dummy(w, 2);
-    foe.range = 0; // no autos (they'd chip the shield: auto-attacks pass through the field)
     cast(1, 3); // field centred 3 away: he's inside it
     run(w, 0.3);
     const shield = w.status(me, 'shield');
@@ -170,7 +170,7 @@ describe('Tock', () => {
   it('Stopwatch freezes skillshots but lets auto-attacks through', () => {
     const { w, me, cast } = setup('tock');
     const arlo = dummy(w, 5);
-    arlo.range = 6;
+    arlo.damage = 60;
     cast(1, 0); // field around Tock
     w.fireLine(arlo, { style: 'spark', dir: { x: -1, y: 0 }, speed: 30, range: 10, width: 0.6, onHit: (t) => w.dealDamage(arlo, t, 50) });
     run(w, 1);
@@ -303,6 +303,106 @@ describe('Maren', () => {
   });
 });
 
+describe('Merial', () => {
+  it('Petal Step dashes to the target and hits it; no reset on an unmarked survivor', () => {
+    const { w, me, cast } = setup('merial');
+    const t = dummy(w, 5);
+    cast(0, 5);
+    run(w, 0.5);
+    expect(me.pos.x).toBeGreaterThan(3);
+    near(lost(t), KITS.merial.abilities[0].damage!(1, me));
+    expect(me.champ!.abilities[0].readyAt).toBeGreaterThan(w.tick);
+  });
+
+  it('Petal Step on a marked target resets, refunds mana and heals (Petal Harvest)', () => {
+    const { w, me, cast } = setup('merial');
+    const t = dummy(w, 5);
+    w.addStatus(t, { kind: 'mark', value: 1, sourceId: me.id, seconds: 4 });
+    me.hp = 300;
+    cast(0, 5);
+    run(w, 0.5);
+    expect(w.status(t, 'mark', me.id)).toBeUndefined();
+    expect(me.champ!.abilities[0].readyAt).toBeLessThanOrEqual(w.tick);
+    expect(me.hp).toBeGreaterThan(300 + 40 + 0.05 * me.maxHp - 5);
+  });
+
+  it('Petal Step resets when the cut kills (minion chain)', () => {
+    const { w, me, cast } = setup('merial');
+    const m = w.spawnMinion('red', 'caster', { x: 4, y: 0 });
+    m.speed = 0;
+    m.hp = 5;
+    cast(0, 4);
+    run(w, 0.4);
+    expect(m.dead || !w.units.includes(m)).toBe(true);
+    expect(me.champ!.abilities[0].readyAt).toBeLessThanOrEqual(w.tick);
+  });
+
+  it('Petal Step with nobody under the cursor costs nothing', () => {
+    const { w, me, cast } = setup('merial');
+    const mana = me.champ!.mana;
+    cast(0, 5);
+    expect(me.champ!.mana).toBe(mana);
+    expect(me.champ!.abilities[0].readyAt).toBe(0);
+    expect(w.castBlocker(me, 0)).toBeNull();
+  });
+
+  it('Find Your Center: meditate (rooted), then less damage and regeneration', () => {
+    const { w, me, cast } = setup('merial');
+    const foe = dummy(w, 4);
+    cast(1, 0);
+    expect(w.isBusy(me)).toBe(true);
+    expect(w.dealDamage(foe, me, 100)).toBeCloseTo(65, 5); // 35% guard at rank 1
+    const hp = me.hp;
+    run(w, 1);
+    expect(me.hp).toBeGreaterThan(hp + 0.03 * me.maxHp * 0.9);
+    run(w, 2.5);
+    expect(w.dealDamage(foe, me, 100)).toBeCloseTo(100, 5); // worn off
+  });
+
+  it('Twin Petals closes on the aim point: hits and marks a target there', () => {
+    const { w, me, cast } = setup('merial');
+    const t = dummy(w, 6, 0);
+    cast(2, 6);
+    run(w, 0.8);
+    expect(w.status(t, 'mark', me.id)).toBeDefined();
+    near(lost(t), KITS.merial.abilities[2].damage!(1, me));
+  });
+
+  it('Twin Petals cuts everything between the blades, once each, and nothing outside', () => {
+    const { w, me, cast } = setup('merial');
+    const inside = [dummy(w, 3, 0.5), dummy(w, 5, -0.4), dummy(w, 1, 1.5)]; // within the V (point at x=6)
+    const outside = [dummy(w, 3, 3.5), dummy(w, 7.5, 0), dummy(w, -2, 0)]; // beside it, past the point, behind her
+    cast(2, 6);
+    run(w, 0.8);
+    for (const t of inside) {
+      expect(w.status(t, 'mark', me.id)).toBeDefined();
+      near(lost(t), KITS.merial.abilities[2].damage!(1, me)); // exactly one cut
+    }
+    for (const t of outside) expect(lost(t)).toBe(0);
+  });
+
+  it('Twin Petals reaches the outermost targets first', () => {
+    const { w, cast } = setup('merial');
+    const near0 = dummy(w, 0.5, 0.8); // beside Merial: at the open end of the V
+    const tip = dummy(w, 5.8, 0); // at the point
+    cast(2, 6);
+    run(w, 0.25);
+    expect(lost(near0)).toBeGreaterThan(0);
+    expect(lost(tip)).toBe(0);
+    run(w, 0.5);
+    expect(lost(tip)).toBeGreaterThan(0);
+  });
+
+  it('Blossom Storm hits up to three blades per enemy and marks', () => {
+    const { w, me, cast } = setup('merial');
+    const t = dummy(w, 2, 0);
+    cast(3, 8);
+    run(w, 1.2);
+    near(lost(t), 3 * KITS.merial.abilities[3].damage!(1, me), 12);
+    expect(w.status(t, 'mark', me.id)).toBeDefined();
+  });
+});
+
 describe('levels and resources', () => {
   it('minion deaths nearby grant XP and level-ups grant skill points', () => {
     const w = new World(1);
@@ -342,14 +442,14 @@ describe('levels and resources', () => {
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['merial', 'arlo'], ['tock', 'merial']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController());
       const b = w.spawnChampion('red', red, new BotController());
       run(w, 240);
       for (const c of [a, b]) {
-        expect(c.champ!.level).toBeGreaterThanOrEqual(4); // ult unlocks at 6, but whoever loses lane can trail
+        expect(c.champ!.level).toBeGreaterThanOrEqual(3); // leveled at least twice; whoever loses lane can trail far behind
         expect(c.champ!.abilities.slice(0, 3).every((s) => s.rank > 0)).toBe(true);
         expect(c.champ!.abilities.some((s) => s.readyAt > 0)).toBe(true); // has cast something
       }

@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { Missile, MissileStyle, Unit, Vec2 } from '../sim/types';
-import type { World } from '../sim/world';
+import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
 import { RIGS } from './rigs';
+import { KITS } from '../sim/kits';
 import { TEAM_COLOR, placeholderFor } from './scene';
 
 /** Unit → Meshy model and its in-game height (metres); placeholders are used when none is loaded. */
@@ -30,6 +31,8 @@ interface UnitView {
   bubble?: THREE.Mesh;
   root?: THREE.Mesh;
   stun?: THREE.Object3D;
+  /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
+  mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
   prevFacing: number;
   /** Materials with their resting emissive, for the hit flash. */
@@ -73,6 +76,7 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     bolt: () => ({ geo: new THREE.OctahedronGeometry(0.22), color: 0x9fe8ff, height: 1.1 }),
     wave: () => ({ geo: new THREE.BoxGeometry(1.2, 1.4, m.width), color: 0xffc94a, height: 0.9, opacity: 0.55 }),
     tide: () => ({ geo: new THREE.ConeGeometry(0.3, 1.0, 8).rotateZ(-Math.PI / 2), color: 0x7fe0ff, height: 1.0, opacity: 0.85 }),
+    petal: () => ({ geo: new THREE.ConeGeometry(0.16, 0.9, 4).rotateZ(-Math.PI / 2).scale(1, 0.35, 1), color: 0xf7a8c8, height: 1.2 }),
   };
   const look = looks[m.style]();
   const mat = new THREE.MeshBasicMaterial({ color: look.color, transparent: look.opacity != null, opacity: look.opacity ?? 1 });
@@ -313,12 +317,48 @@ export class WorldView {
       v.stun.position.y = 2.3;
       v.obj.add(v.stun);
     }
+    this.markVisual(u, v, dt);
     if (v.bubble) v.bubble.visible = shielded;
     if (v.root) v.root.visible = rooted;
     if (v.stun) {
       v.stun.visible = stunned;
       v.stun.rotation.y += dt * 5;
     }
+  }
+
+  /**
+   * Marked units (Merial's E/R, Arlo's W) wear a pulsing ring at their feet and a spinning petal
+   * overhead, coloured for whoever marked them, fading out over the mark's last second.
+   */
+  private markVisual(u: Unit, v: UnitView, dt: number) {
+    const st = u.statuses.find((x) => x.kind === 'mark' && x.until > this.world.tick);
+    const marker = st && this.world.get(st.sourceId);
+    const color = marker?.champ ? KITS[marker.champ.kit].color : '#ffffff';
+    if (st && (!v.mark || v.mark.color !== color)) {
+      if (v.mark) v.obj.remove(v.mark.ring, v.mark.petal);
+      const mat = () => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(u.radius + 0.35, 0.07, 6, 28), mat());
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.08;
+      // A four-pointed petal (a flattened octahedron) floating above the head.
+      const petal = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat());
+      petal.scale.set(1, 1.5, 0.35);
+      petal.position.y = BAR_HEIGHT[u.kind] + 0.9;
+      v.obj.add(ring, petal);
+      v.mark = { ring, petal, color };
+    }
+    if (!v.mark) return;
+    v.mark.ring.visible = v.mark.petal.visible = !!st;
+    if (!st) return;
+    const left = (st.until - this.world.tick) / TICK_HZ;
+    const fade = Math.min(1, left); // fade over the last second
+    const pulse = 1 + Math.sin(performance.now() / 120) * 0.08;
+    v.mark.ring.scale.setScalar(pulse);
+    (v.mark.ring.material as THREE.MeshBasicMaterial).opacity = 0.9 * fade;
+    (v.mark.petal.material as THREE.MeshBasicMaterial).opacity = 0.95 * fade;
+    v.mark.petal.rotation.y += dt * 3;
+    // Bob gently above the health bar (which is drawn at BAR_HEIGHT and would hide anything lower).
+    v.mark.petal.position.y = BAR_HEIGHT[u.kind] + 0.9 + Math.sin(performance.now() / 300) * 0.08;
   }
 
   /** Remove everything this view added to the scene. */

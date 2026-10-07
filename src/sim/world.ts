@@ -214,6 +214,8 @@ export class World {
     if (blocker) return;
     const c = u.champ!;
     const st = c.abilities[slot];
+    const targeted = kitOf(u).abilities[slot].target;
+    if (targeted && !(this.tick < st.recastUntil) && !targeted(this, u, at)) return; // nothing to click on
     const def = kitOf(u).abilities[slot];
     const recast = !!def.recast && this.tick < st.recastUntil;
     if (recast) {
@@ -267,7 +269,10 @@ export class World {
         }
       }
       this.resolveStructures(u);
-      if (dist(u.pos, d.to) < 0.05 || dist(next, d.to) < 1e-6 || u.pos.x !== next.x || u.pos.y !== next.y) c.dash = null;
+      if (dist(u.pos, d.to) < 0.05 || dist(next, d.to) < 1e-6 || u.pos.x !== next.x || u.pos.y !== next.y) {
+        c.dash = null;
+        d.onArrive?.();
+      }
     }
     if (c.queued && !c.casting && !c.dash) {
       const q = c.queued;
@@ -427,15 +432,15 @@ export class World {
     if (dist(u.pos, f.to) < 0.05 || u.pos.x !== next.x || u.pos.y !== next.y) u.forced = null;
   }
 
-  dash(u: Unit, to: Vec2, speed: number, onPass?: (e: Unit) => void) {
-    u.champ!.dash = { to: clampToLane(to, u.radius), speed, onPass, passed: [] };
+  dash(u: Unit, to: Vec2, speed: number, onPass?: (e: Unit) => void, onArrive?: () => void) {
+    u.champ!.dash = { to: clampToLane(to, u.radius), speed, onPass, onArrive, passed: [] };
     u.moveTarget = null;
     u.windup = 0;
   }
 
-  fireLine(src: Unit, o: { style: MissileStyle; dir: Vec2; speed: number; range: number; width: number; pierce?: boolean; canHit?: (u: Unit) => boolean; onHit: (t: Unit) => void }) {
+  fireLine(src: Unit, o: { style: MissileStyle; dir: Vec2; speed: number; range: number; width: number; pierce?: boolean; canHit?: (u: Unit) => boolean; onHit: (t: Unit) => void; from?: Vec2 }) {
     this.missiles.push({
-      id: this.nextId++, team: src.team, sourceId: src.id, style: o.style, pos: { ...src.pos }, speed: o.speed, targetId: null,
+      id: this.nextId++, team: src.team, sourceId: src.id, style: o.style, pos: { ...(o.from ?? src.pos) }, speed: o.speed, targetId: null,
       dir: o.dir, range: o.range, travelled: 0, width: o.width, pierce: !!o.pierce,
       canHit: o.canHit ?? ((u) => u.kind === 'minion' || u.kind === 'champion'), hit: [], onHit: o.onHit, frozenBy: null,
     });
@@ -635,6 +640,8 @@ export class World {
     }
     if (target.champ) {
       amount *= target.champ.mods.takenMult;
+      const guard = target.statuses.reduce((g, st) => (st.kind === 'guard' && st.until > this.tick ? Math.max(g, st.value) : g), 0);
+      amount *= 1 - guard;
       if (src?.kind === 'tower') amount *= target.champ.mods.towerTakenMult;
     }
     // Shields soak damage first (oldest first); an emptied shield expires this tick.
@@ -731,6 +738,11 @@ export class World {
       const c = u.champ!;
       u.hp = Math.min(u.maxHp, u.hp + (CHAMPION_REGEN + (atFountain ? u.maxHp * FOUNTAIN.healPerSec : 0)) * DT);
       c.mana = Math.min(c.maxMana, c.mana + (kitOf(u).stats.manaRegen + c.mods.manaRegen + (atFountain ? c.maxMana * FOUNTAIN.healPerSec : 0)) * DT);
+    }
+    for (const u of this.champions()) {
+      if (u.dead) continue;
+      const heal = u.statuses.reduce((h, st) => (st.kind === 'regen' ? h + st.value : h), 0);
+      if (heal) u.hp = Math.min(u.maxHp, u.hp + heal * DT);
     }
     for (const u of this.units) {
       for (const b of u.statuses) {

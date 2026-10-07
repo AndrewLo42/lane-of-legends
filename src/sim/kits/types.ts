@@ -6,7 +6,11 @@ export type Aim =
   | { shape: 'line'; length: number; width: number }
   | { shape: 'cone'; radius: number; angle: number }
   | { shape: 'circle'; range: number; radius: number }
-  | { shape: 'dash'; range: number };
+  | { shape: 'dash'; range: number }
+  /** Two blades closing on the cursor from either side of the caster (see `pincerShape`). */
+  | { shape: 'pincer'; range: number; minRange: number; spread: number }
+  /** Click an enemy within `range`; the indicator shows the range. */
+  | { shape: 'target'; range: number };
 
 export interface CastCtx {
   world: World;
@@ -28,6 +32,11 @@ export interface AbilityDef {
   /** Seconds rooted before `cast` runs. */
   castTime: number;
   aim: Aim;
+  /**
+   * Unit-targeted abilities: the enemy this cast would hit when aimed at `at`, or undefined. With
+   * no valid target the cast doesn't start (no mana or cooldown spent).
+   */
+  target?: (world: World, self: Unit, at: Vec2) => Unit | undefined;
   /** Main damage at a rank, if it deals any (bots and tooltips use this). */
   damage?: (rank: number, self: Unit) => number;
   /** Tooltip text for a rank (0 = not learned yet; describe rank 1). */

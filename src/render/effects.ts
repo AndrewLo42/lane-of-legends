@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Aim } from '../sim/kits/types';
 import type { Fx, Team, Telegraph, Vec2, Zone } from '../sim/types';
+import { pincerShape } from '../sim/util';
 import { TICK_HZ, type World } from '../sim/world';
 import { TEAM_COLOR } from './scene';
 
@@ -245,6 +246,16 @@ export class EffectsView {
         });
         break;
       }
+      case 'bloom': {
+        // Find Your Center / Petal Harvest: a soft ring of blossom pink rising around her.
+        const r = ringShape(fx.radius ?? 1, 0.2, basic(0xf7a8c8, 0.9));
+        add(r, 0.7, (k) => {
+          fade(r, 0.9)(k);
+          r.scale.setScalar(0.6 + k * 0.8);
+          r.position.y = 0.06 + k * 1.2;
+        });
+        break;
+      }
       case 'splash':
       case 'erupt': {
         const big = fx.kind === 'erupt';
@@ -298,11 +309,34 @@ export class AimIndicator {
       const mat = castable ? this.ok : this.bad;
       if (aim.shape === 'line') this.group.add(lineShape(aim.length, aim.width, mat));
       if (aim.shape === 'cone') this.group.add(coneShape(aim.radius, aim.angle, mat));
+      if (aim.shape === 'target') {
+        // Range ring plus a pick marker that follows the cursor.
+        this.group.add(ringShape(aim.range, 0.08, mat));
+        const target = ringShape(0.7, 0.18, mat);
+        target.name = 'target';
+        this.group.add(target);
+      }
       if (aim.shape === 'dash') {
         this.group.add(ringShape(aim.range, 0.08, mat));
         const arrow = lineShape(aim.range, 0.5, mat);
         arrow.name = 'dash';
         this.group.add(arrow);
+      }
+      if (aim.shape === 'pincer') {
+        // Faint fill over the V, a blade line per arm (start → point) and a marker on the point.
+        const fill = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+        fill.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+        fill.name = 'fill';
+        this.group.add(fill);
+        for (const name of ['armA', 'armB']) {
+          const arm = new THREE.Group();
+          arm.name = name;
+          arm.add(lineShape(1, 0.35, castable ? basic(0xffffff, 0.55) : basic(0xff6b5e, 0.55)));
+          this.group.add(arm);
+        }
+        const tip = ringShape(0.55, 0.16, castable ? basic(0xffffff, 0.7) : basic(0xff6b5e, 0.7));
+        tip.name = 'tip';
+        this.group.add(tip);
       }
       if (aim.shape === 'circle') {
         if (aim.range > 0) this.group.add(ringShape(aim.range, 0.08, mat));
@@ -317,7 +351,25 @@ export class AimIndicator {
     this.group.position.set(from.x, 0.05, from.z);
     this.group.rotation.y = 0;
     const target = this.group.getObjectByName('target');
-    if (target && aim.shape === 'circle') {
+    if (aim.shape === 'pincer') {
+      // Same geometry the ability uses, relative to the champion (sim y is three.js z).
+      const p = pincerShape({ x: from.x, y: from.z }, cursor, aim.range, aim.minRange, aim.spread);
+      const local = (v: Vec2) => new THREE.Vector3(v.x - from.x, 0, v.y - from.z);
+      const tipAt = local(p.point);
+      (['armA', 'armB'] as const).forEach((name, i) => {
+        const arm = this.group.getObjectByName(name)!;
+        const start = local(p.starts[i]);
+        arm.position.copy(start);
+        arm.rotation.y = -Math.atan2(tipAt.z - start.z, tipAt.x - start.x);
+        arm.scale.x = start.distanceTo(tipAt);
+      });
+      this.group.getObjectByName('tip')!.position.copy(tipAt);
+      const fill = this.group.getObjectByName('fill') as THREE.Mesh;
+      const pos = fill.geometry.getAttribute('position') as THREE.BufferAttribute;
+      [local(p.starts[0]), tipAt, local(p.starts[1])].forEach((v, i) => pos.setXYZ(i, v.x, 0, v.z));
+      pos.needsUpdate = true;
+      fill.geometry.computeBoundingSphere();
+    } else if (target && (aim.shape === 'circle' || aim.shape === 'target')) {
       const k = d > aim.range ? aim.range / d : 1;
       target.position.set(dx * k, 0, dz * k);
     } else {

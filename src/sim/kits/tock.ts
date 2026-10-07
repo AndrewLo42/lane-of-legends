@@ -4,7 +4,7 @@ import type { World } from '../world';
 import { at } from './common';
 import type { Kit } from './types';
 
-const Q = { base: [60, 95, 130, 165, 200], ad: 0.9, cost: [40, 40, 40, 40, 40], cd: [7, 6.5, 6, 5.5, 5], radius: 3.6, angle: (110 * Math.PI) / 180, backswing: 1.5 };
+const Q = { base: [50, 85, 120, 155, 190], ad: 0.9, cost: [40, 40, 40, 40, 40], cd: [7, 6.5, 6, 5.5, 5], radius: 3.6, angle: (110 * Math.PI) / 180, backswing: 1.5 };
 const W = {
   cost: [70, 70, 70, 70, 70], cd: [18, 17, 16, 15, 14], range: 7, radius: 3.5, duration: [2, 2.25, 2.5, 2.75, 3],
   /** Standing in his own field shields Tock (once per field); it fades `linger` s after he leaves. */
@@ -87,7 +87,7 @@ export const TOCK: Kit = {
   blurb: 'Melee time-bender. Dash in, freeze enemy projectiles mid-air, and when a fight goes wrong, rewind it: back to where you were, health restored, and their pain replayed.',
   color: '#5fd0c4',
   stats: {
-    hp: 620, hpPerLevel: 92, mana: 300, manaPerLevel: 40, manaRegen: 1.8, damage: 64, damagePerLevel: 4.5,
+    hp: 620, hpPerLevel: 92, mana: 300, manaPerLevel: 40, manaRegen: 1.8, damage: 60, damagePerLevel: 4.5,
     attackInterval: 0.85, attackSpeedPerLevel: 0.02, windup: 0.2, range: 1.4, projectileSpeed: 0, speed: 6.6, radius: 0.65,
   },
   passive: {

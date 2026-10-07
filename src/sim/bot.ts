@@ -82,6 +82,7 @@ export class BotController implements Controller {
       arlo: { play: this.arlo, escape: this.arloEscape },
       tock: { play: this.tock, escape: this.tockEscape },
       maren: { play: this.maren, escape: this.marenEscape },
+      merial: { play: this.merial, escape: this.merialEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -230,5 +231,43 @@ export class BotController implements Controller {
     if (ready(1) && near(5)) return cast(1, self.pos);
     if (foe && ready(0) && near(4)) return cast(0, aim(foe, 99)); // slow them on the way out
     return null;
+  }
+
+  // ---------- Merial ----------
+
+  private merial(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, dmg, aim } = ctx;
+    const marked = (u: Unit) => !!world.status(u, 'mark', self.id);
+    const qReach = (u: Unit) => gap(self, u) <= 6;
+    if (foe) {
+      const healthy = self.hp > self.maxHp * 0.5;
+      // Brace when trading at close range and getting hurt.
+      if (ready(1) && near(3) && self.hp < self.maxHp * 0.7) return cast(1, self.pos);
+      if (ready(3) && near(7) && (foe.hp < foe.maxHp * 0.55 || healthy) && !unsafe(foe.pos)) return cast(3, aim(foe, 24));
+      if (ready(0) && qReach(foe) && (marked(foe) || foe.hp < dmg(0)) && !unsafe(foe.pos)) return cast(0, foe.pos);
+      if (ready(2) && near(7)) {
+        // Mark first; the dash follows once it lands. The pincer closes on its point a moment after
+        // the cast, so lead by that, and aim a little past them so they sit inside the V, not at its tip.
+        const p = ctx.aimAfter(foe, 0.15 + dist(self.pos, foe.pos) / 24);
+        const d = dirTo(self.pos, p);
+        return cast(2, { x: p.x + d.x * 1.2, y: p.y + d.y * 1.2 });
+      }
+    }
+    // Chain Petal Step through marked or killable minions (each one resets it).
+    if (ready(0)) {
+      const hop = world.units.find(
+        (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && qReach(u) && (marked(u) || u.hp < dmg(0)) && !unsafe(u.pos),
+      );
+      if (hop) return cast(0, hop.pos);
+    }
+    if (ready(2) && self.champ!.mana > self.champ!.maxMana * 0.6) {
+      const minions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 7 && !unsafe(u.pos));
+      if (minions.length >= 3) return cast(2, minions[0].pos);
+    }
+    return null;
+  }
+
+  private merialEscape({ self, near, ready }: Ctx): Command | null {
+    return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
   }
 }
