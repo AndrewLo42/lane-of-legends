@@ -1,8 +1,8 @@
 {
-  "out": "public/assets/meshy/Merial.glb",
-  "rigged": "assets-src/meshy/merial/rigged_598d93e8.glb",
+  "out": "public/assets/meshy/Lisha.glb",
+  "rigged": "assets-src/meshy/lisha/rigged_598d93e8.glb",
   "anims": [
-    "assets-src/meshy/merial/anims_batch1.glb"
+    "assets-src/meshy/lisha/anims_batch1.glb"
   ],
   "textures": {
     "baseColor": 1024,

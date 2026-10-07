@@ -41,9 +41,9 @@ function blade(world: World, self: Unit, dir: number, length: number, damage: nu
  * A duelist who flows between targets: mark enemies with thrown blades, then dash through them,
  * each marked (or killed) target refunding the dash and healing her.
  */
-export const MERIAL: Kit = {
-  id: 'merial',
-  name: 'Merial',
+export const LISHA: Kit = {
+  id: 'lisha',
+  name: 'Lisha',
   title: 'the Blossom Blade',
   blurb: 'Melee duelist. Mark enemies with twin blades, then dash from target to target: every mark or kill resets the dash and heals her.',
   color: '#e86f9a',
@@ -54,7 +54,7 @@ export const MERIAL: Kit = {
   passive: {
     name: 'Petal Harvest',
     icon: '❀',
-    describe: (self) => `When Petal Step consumes a mark, Merial heals ${Math.round(HARVEST.flat + HARVEST.hp * self.maxHp)} health.`,
+    describe: (self) => `When Petal Step consumes a mark, Lisha heals ${Math.round(HARVEST.flat + HARVEST.hp * self.maxHp)} health.`,
   },
   levelOrder: [3, 0, 2, 1],
   abilities: [
@@ -69,7 +69,7 @@ export const MERIAL: Kit = {
       target: qTarget,
       damage: (r, self) => at(Q.base, r) + Q.ad * self.damage,
       describe: (r, self) =>
-        `Dash to an enemy and cut it for ${Math.round(MERIAL.abilities[0].damage!(r, self))} damage. If it was marked or the ` +
+        `Dash to an enemy and cut it for ${Math.round(LISHA.abilities[0].damage!(r, self))} damage. If it was marked or the ` +
         `cut kills it, the cooldown resets (a mark also refunds half the mana).`,
       cast: ({ world, self, at: aim, rank }) => {
         const t = qTarget(world, self, aim);
@@ -80,7 +80,7 @@ export const MERIAL: Kit = {
           if (t.dead || gap(self, t) > 1.5) return;
           const marked = world.status(t, 'mark', self.id);
           if (marked) world.removeStatus(t, marked);
-          world.dealDamage(self, t, MERIAL.abilities[0].damage!(rank, self), { slot: 0 });
+          world.dealDamage(self, t, LISHA.abilities[0].damage!(rank, self), { slot: 0 });
           world.addFx({ kind: 'dashHit', pos: t.pos, team: self.team });
           const c = self.champ!;
           if (marked) {
@@ -122,9 +122,9 @@ export const MERIAL: Kit = {
       damage: (r, self) => at(E.base, r) + E.ad * self.damage,
       describe: (r, self) =>
         `Send two blades from either side of her to close on a point like a pincer. Everything between them is cut for ` +
-        `${Math.round(MERIAL.abilities[2].damage!(r, self))} damage (minions take ${E.minion * 100}%) and marked for ${MARK_SECONDS}s.`,
+        `${Math.round(LISHA.abilities[2].damage!(r, self))} damage (minions take ${E.minion * 100}%) and marked for ${MARK_SECONDS}s.`,
       cast: ({ world, self, at: aim, rank }) => {
-        const dmg = MERIAL.abilities[2].damage!(rank, self);
+        const dmg = LISHA.abilities[2].damage!(rank, self);
         const p = pincerShape(self.pos, aim, E.range, E.minRange, E.spread);
         // The blades fly in from the arms' outer ends; everything inside the V is cut as they sweep
         // past it (outermost first), finishing on the point.
@@ -154,7 +154,7 @@ export const MERIAL: Kit = {
       aim: { shape: 'cone', radius: R.length, angle: R.fan },
       damage: (r, self) => at(R.base, r) + R.ad * self.damage,
       describe: (r, self) =>
-        `Hurl a hail of ${R.blades} blades in a fan. Each deals ${Math.round(MERIAL.abilities[3].damage!(r, self))} damage ` +
+        `Hurl a hail of ${R.blades} blades in a fan. Each deals ${Math.round(LISHA.abilities[3].damage!(r, self))} damage ` +
         `(up to ${R.maxPerTarget} blades per enemy) and marks everything it cuts.`,
       onWindup: ({ world, self, at: aim }) => {
         world.telegraph({ team: self.team, shape: 'cone', pos: self.pos, dir: angleTo(self.pos, aim), length: R.length, width: R.fan }, 0.35);
@@ -162,7 +162,7 @@ export const MERIAL: Kit = {
       cast: ({ world, self, at: aim, rank }) => {
         const dir = angleTo(self.pos, aim);
         const hits = new Map<number, number>();
-        const dmg = MERIAL.abilities[3].damage!(rank, self);
+        const dmg = LISHA.abilities[3].damage!(rank, self);
         for (let i = 0; i < R.blades; i++) {
           blade(world, self, dir - R.fan / 2 + (R.fan * i) / (R.blades - 1), R.length, dmg, hits, R.maxPerTarget);
         }

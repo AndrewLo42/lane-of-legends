@@ -17,7 +17,7 @@ export const MODELS = {
   champ_arlo: 'Arlo.glb',
   champ_tock: 'Tock.glb',
   champ_maren: 'Maren.glb',
-  champ_merial: 'Merial.glb',
+  champ_lisha: 'Lisha.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 
@@ -78,7 +78,7 @@ function teamTint(mat: THREE.MeshStandardMaterial, team: THREE.Color) {
  *   `refHeight`), sways and bobs on its own, and strikes forward on `swingProp()`
  *   (attacks and casts). For hands that can't convincingly grip (Tock's open gauntlets).
  * - `twin`: two copies hovering at her sides (`offset`, mirrored across z), points forward. They bob
- *   out of step and lunge forward one after the other on `swingProp()` (Merial's flying blades).
+ *   out of step and lunge forward one after the other on `swingProp()` (Lisha's flying blades).
  */
 type PropSpec = { refHeight: number; build: () => THREE.Object3D } & (
   | { mode: 'upright'; bone: string; lean: number }
@@ -169,8 +169,8 @@ const PROPS: Partial<Record<ModelName, PropSpec>> = {
       return g;
     },
   },
-  // Merial's blades: slender jian with blossom-pink guards and a faint pink edge glow.
-  champ_merial: {
+  // Lisha's blades: slender jian with blossom-pink guards and a faint pink edge glow.
+  champ_lisha: {
     mode: 'twin',
     // Beside her hips and a little ahead: measured clear of her wide sleeves in every clip, idle or mid-lunge.
     offset: [0.3, 1.25, 0.95],

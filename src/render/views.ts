@@ -327,7 +327,7 @@ export class WorldView {
   }
 
   /**
-   * Marked units (Merial's E/R, Arlo's W) wear a pulsing ring at their feet and a spinning petal
+   * Marked units (Lisha's E/R, Arlo's W) wear a pulsing ring at their feet and a spinning petal
    * overhead, coloured for whoever marked them, fading out over the mark's last second.
    */
   private markVisual(u: Unit, v: UnitView, dt: number) {

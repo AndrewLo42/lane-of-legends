@@ -12,7 +12,7 @@ npm run dev        # http://localhost:5173 (?seed=42 for a fixed seed)
 npm test           # sim tests
 ```
 
-**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom. Free play (no run, nexus to win): `?champ=arlo|tock|maren|merial`, `&enemy=…` (defaults to the other one), `&seed=42`.
+**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha`, `&enemy=…` (defaults to the other one), `&seed=42`.
 
 **Champions** (kits in `src/sim/kits/`):
 
@@ -24,9 +24,9 @@ npm test           # sim tests
 | E | **Phase Step**: blink, then a homing bolt at the nearest enemy (marked first) | **Skip**: dash through enemies, leaving an echo; recast within 4s to snap back | **Undertow Hook**: skillshot that drags the first enemy 4 units toward her |
 | R | **Skyline Barrage**: 1s wind-up, then a wave across the whole lane (minions take half) | **Rewind**: plant an anchor; after 3s (or recast) snap back, recover all HP lost since, and replay 50/75% of the damage you dealt to champions | **Maelstrom**: 3s whirlpool that drags enemies inward and damages, then erupts and stuns 1s |
 
-**Merial, the Blossom Blade** (melee duelist, Irelia-like): **Petal Harvest** passive: consuming a mark with Q heals her · **Q Petal Step**: dash to a clicked enemy and cut it; resets if it was marked (also refunds half the mana) or dies · **W Find Your Center**: 1s meditation (rooted), then 3s of 35–55% damage reduction and 3% max HP/s regeneration · **E Twin Petals**: a pincer: two blades start beside her and close on the aimed point; everything inside the V is cut (outermost first) and marked (minions take 80%) · **R Blossom Storm**: a fan of 9 blades, up to 3 per enemy, marking everything.
+**Lisha, the Blossom Blade** (melee duelist, Irelia-like): **Petal Harvest** passive: consuming a mark with Q heals her · **Q Petal Step**: dash to a clicked enemy and cut it; resets if it was marked (also refunds half the mana) or dies · **W Find Your Center**: 1s meditation (rooted), then 3s of 35–55% damage reduction and 3% max HP/s regeneration · **E Twin Petals**: a pincer: two blades start beside her and close on the aimed point; everything inside the V is cut (outermost first) and marked (minions take 80%) · **R Blossom Storm**: a fan of 9 blades, up to 3 per enemy, marking everything.
 
-Marked units (Merial's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
+Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
 
 Crowd control: **root** (no walking, dashing or blinking), **stun** (nothing, and it interrupts wind-ups), **shields** (absorb damage first, shown white on health bars) and **pulls**. A cast pressed during another wind-up or dash is buffered for 0.4s, so combos like E→W don't drop keys.
 

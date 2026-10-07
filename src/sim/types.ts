@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'merial';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 

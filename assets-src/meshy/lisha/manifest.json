@@ -12,9 +12,9 @@
     },
     "credits": 9,
     "files": [
-      "assets-src/meshy/merial/concepts/82739885_0.png",
-      "assets-src/meshy/merial/concepts/82739885_1.png",
-      "assets-src/meshy/merial/concepts/82739885_2.png"
+      "assets-src/meshy/lisha/concepts/82739885_0.png",
+      "assets-src/meshy/lisha/concepts/82739885_1.png",
+      "assets-src/meshy/lisha/concepts/82739885_2.png"
     ]
   },
   {
@@ -30,9 +30,9 @@
     },
     "credits": 9,
     "files": [
-      "assets-src/meshy/merial/concepts/1eac78c6_0.png",
-      "assets-src/meshy/merial/concepts/1eac78c6_1.png",
-      "assets-src/meshy/merial/concepts/1eac78c6_2.png"
+      "assets-src/meshy/lisha/concepts/1eac78c6_0.png",
+      "assets-src/meshy/lisha/concepts/1eac78c6_1.png",
+      "assets-src/meshy/lisha/concepts/1eac78c6_2.png"
     ]
   },
   {
@@ -56,7 +56,7 @@
     },
     "credits": 30,
     "files": [
-      "assets-src/meshy/merial/model_e9e2f002.glb"
+      "assets-src/meshy/lisha/model_e9e2f002.glb"
     ]
   },
   {
@@ -70,7 +70,7 @@
     },
     "credits": 5,
     "files": [
-      "assets-src/meshy/merial/rigged_598d93e8.glb"
+      "assets-src/meshy/lisha/rigged_598d93e8.glb"
     ]
   },
   {
@@ -98,7 +98,7 @@
     },
     "credits": 30,
     "files": [
-      "assets-src/meshy/merial/anims_batch1.glb"
+      "assets-src/meshy/lisha/anims_batch1.glb"
     ]
   }
 ]

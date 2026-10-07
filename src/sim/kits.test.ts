@@ -303,19 +303,19 @@ describe('Maren', () => {
   });
 });
 
-describe('Merial', () => {
+describe('Lisha', () => {
   it('Petal Step dashes to the target and hits it; no reset on an unmarked survivor', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const t = dummy(w, 5);
     cast(0, 5);
     run(w, 0.5);
     expect(me.pos.x).toBeGreaterThan(3);
-    near(lost(t), KITS.merial.abilities[0].damage!(1, me));
+    near(lost(t), KITS.lisha.abilities[0].damage!(1, me));
     expect(me.champ!.abilities[0].readyAt).toBeGreaterThan(w.tick);
   });
 
   it('Petal Step on a marked target resets, refunds mana and heals (Petal Harvest)', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const t = dummy(w, 5);
     w.addStatus(t, { kind: 'mark', value: 1, sourceId: me.id, seconds: 4 });
     me.hp = 300;
@@ -327,7 +327,7 @@ describe('Merial', () => {
   });
 
   it('Petal Step resets when the cut kills (minion chain)', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const m = w.spawnMinion('red', 'caster', { x: 4, y: 0 });
     m.speed = 0;
     m.hp = 5;
@@ -338,7 +338,7 @@ describe('Merial', () => {
   });
 
   it('Petal Step with nobody under the cursor costs nothing', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const mana = me.champ!.mana;
     cast(0, 5);
     expect(me.champ!.mana).toBe(mana);
@@ -347,7 +347,7 @@ describe('Merial', () => {
   });
 
   it('Find Your Center: meditate (rooted), then less damage and regeneration', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const foe = dummy(w, 4);
     cast(1, 0);
     expect(w.isBusy(me)).toBe(true);
@@ -360,30 +360,30 @@ describe('Merial', () => {
   });
 
   it('Twin Petals closes on the aim point: hits and marks a target there', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const t = dummy(w, 6, 0);
     cast(2, 6);
     run(w, 0.8);
     expect(w.status(t, 'mark', me.id)).toBeDefined();
-    near(lost(t), KITS.merial.abilities[2].damage!(1, me));
+    near(lost(t), KITS.lisha.abilities[2].damage!(1, me));
   });
 
   it('Twin Petals cuts everything between the blades, once each, and nothing outside', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const inside = [dummy(w, 3, 0.5), dummy(w, 5, -0.4), dummy(w, 1, 1.5)]; // within the V (point at x=6)
     const outside = [dummy(w, 3, 3.5), dummy(w, 7.5, 0), dummy(w, -2, 0)]; // beside it, past the point, behind her
     cast(2, 6);
     run(w, 0.8);
     for (const t of inside) {
       expect(w.status(t, 'mark', me.id)).toBeDefined();
-      near(lost(t), KITS.merial.abilities[2].damage!(1, me)); // exactly one cut
+      near(lost(t), KITS.lisha.abilities[2].damage!(1, me)); // exactly one cut
     }
     for (const t of outside) expect(lost(t)).toBe(0);
   });
 
   it('Twin Petals reaches the outermost targets first', () => {
-    const { w, cast } = setup('merial');
-    const near0 = dummy(w, 0.5, 0.8); // beside Merial: at the open end of the V
+    const { w, cast } = setup('lisha');
+    const near0 = dummy(w, 0.5, 0.8); // beside Lisha: at the open end of the V
     const tip = dummy(w, 5.8, 0); // at the point
     cast(2, 6);
     run(w, 0.25);
@@ -394,11 +394,11 @@ describe('Merial', () => {
   });
 
   it('Blossom Storm hits up to three blades per enemy and marks', () => {
-    const { w, me, cast } = setup('merial');
+    const { w, me, cast } = setup('lisha');
     const t = dummy(w, 2, 0);
     cast(3, 8);
     run(w, 1.2);
-    near(lost(t), 3 * KITS.merial.abilities[3].damage!(1, me), 12);
+    near(lost(t), 3 * KITS.lisha.abilities[3].damage!(1, me), 12);
     expect(w.status(t, 'mark', me.id)).toBeDefined();
   });
 });
@@ -442,7 +442,7 @@ describe('levels and resources', () => {
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['merial', 'arlo'], ['tock', 'merial']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController());

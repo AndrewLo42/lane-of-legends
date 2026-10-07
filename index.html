@@ -74,7 +74,9 @@
       #abilities .slot .cdtext { position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; }
       #abilities .slot .key { position: absolute; bottom: -2px; right: 3px; font-size: 10px; color: #e8e6dfaa; }
       #abilities .slot .pips { position: absolute; top: 100%; left: 0; right: 0; text-align: center; font-size: 7px; letter-spacing: 1px; color: #ffd76a; margin-top: 2px; }
-      #abilities .slot.locked { filter: grayscale(1) brightness(0.45); }
+      /* Grey out the contents only: a filter on the slot would also dim its level-up button (an unlearned R at level 6). */
+      #abilities .slot.locked > :not(.plus) { filter: grayscale(1) brightness(0.45); }
+      #abilities .slot.locked { background: #14161c; border-color: #ffffff18; }
       #abilities .slot.oncd i { opacity: 0.3; }
       #abilities .slot.nomana { box-shadow: inset 0 0 0 50px #2a4a8a66; }
       #abilities .slot.recast { border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }

@@ -82,7 +82,7 @@ export class BotController implements Controller {
       arlo: { play: this.arlo, escape: this.arloEscape },
       tock: { play: this.tock, escape: this.tockEscape },
       maren: { play: this.maren, escape: this.marenEscape },
-      merial: { play: this.merial, escape: this.merialEscape },
+      lisha: { play: this.lisha, escape: this.lishaEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -233,9 +233,9 @@ export class BotController implements Controller {
     return null;
   }
 
-  // ---------- Merial ----------
+  // ---------- Lisha ----------
 
-  private merial(ctx: Ctx): Command | null {
+  private lisha(ctx: Ctx): Command | null {
     const { world, self, foe, near, unsafe, ready, dmg, aim } = ctx;
     const marked = (u: Unit) => !!world.status(u, 'mark', self.id);
     const qReach = (u: Unit) => gap(self, u) <= 6;
@@ -267,7 +267,7 @@ export class BotController implements Controller {
     return null;
   }
 
-  private merialEscape({ self, near, ready }: Ctx): Command | null {
+  private lishaEscape({ self, near, ready }: Ctx): Command | null {
     return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
   }
 }

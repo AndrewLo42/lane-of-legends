@@ -112,7 +112,7 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'merial') {
+  if (u.champ!.kit === 'lisha') {
     // Slim duelist with a topknot and a blade on each hip.
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 1.05, 4, 12), teamMat);
     body.position.y = 0.9;
