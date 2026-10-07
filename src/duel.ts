@@ -12,6 +12,7 @@ import { DT, TICK_HZ, World } from './sim/world';
 import { AbilityBar } from './ui/abilityBar';
 import { HealthBars } from './ui/bars';
 import { Hud } from './ui/hud';
+import { Minimap } from './ui/minimap';
 
 /** Long-lived pieces owned by main.ts and shared by every duel. */
 export interface Shell {
@@ -79,6 +80,7 @@ export class Duel {
   private bars: HealthBars;
   private hud: Hud;
   private abilityBar: AbilityBar;
+  private minimap: Minimap;
   /** The ability whose key is held down: its indicator shows, and it casts on release. */
   private aiming: Slot | null = null;
   private acc = 0;
@@ -100,6 +102,7 @@ export class Duel {
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
     this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
+    this.minimap = new Minimap(world, this.me, shell.cam, shell.input, shell.marker, (c) => this.player.queue.push(c));
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
     if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam });
@@ -153,6 +156,7 @@ export class Duel {
     this.bars.update(cam.camera);
     this.hud.update();
     this.abilityBar.update();
+    this.minimap.update(dt);
   }
 
   dispose() {
@@ -161,6 +165,7 @@ export class Duel {
     this.bars.dispose();
     this.hud.dispose();
     this.abilityBar.dispose();
+    this.minimap.dispose();
     this.shell.indicator.hide();
     this.shell.renderer.domElement.style.cursor = 'default';
   }

@@ -14,6 +14,8 @@ export class Input {
   wheel = 0;
   /** Cursor is inside the window (edge-pan only while it is). */
   inside = true;
+  /** Cursor is over a HUD element that takes its own clicks (the minimap): no edge-panning. */
+  overUi = false;
 
   constructor(target: HTMLElement) {
     window.addEventListener('keydown', (e) => {

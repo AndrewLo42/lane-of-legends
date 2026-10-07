@@ -4,7 +4,7 @@ import { LANE } from '../sim/lane';
 
 /**
  * MOBA camera: fixed pitch looking down at the lane, unlocked by default with edge panning.
- * Y toggles lock-on, holding Space snaps to the champion, the wheel zooms.
+ * Y toggles lock-on, holding Space snaps to the champion, the wheel zooms, the minimap jumps it.
  */
 export class MobaCamera {
   readonly camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 300);
@@ -23,7 +23,7 @@ export class MobaCamera {
 
     if (this.locked || input.isDown('Space')) {
       this.focus.lerp(champion, 1 - Math.exp(-dt * 12));
-    } else if (input.inside) {
+    } else if (input.inside && !input.overUi) {
       const edge = 24;
       const speed = 40 * dt;
       const { x, y } = input.mouse;
@@ -37,6 +37,12 @@ export class MobaCamera {
 
     this.camera.position.set(this.focus.x, this.focus.y + Math.sin(this.pitch) * this.zoom, this.focus.z + Math.cos(this.pitch) * this.zoom);
     this.camera.lookAt(this.focus);
+  }
+
+  /** Jump the camera to a ground point (minimap left-click) and unlock it so it stays there. */
+  lookAt(x: number, z: number) {
+    this.locked = false;
+    this.focus.set(x, 0, z);
   }
 
   resize() {

@@ -93,6 +93,9 @@
       #abilities .mana > div { background: linear-gradient(#6aa6ff, #3460c0); }
       #abilities .xp { height: 4px; }
       #abilities .xp > div { background: #b78cff; }
+      /* Shrinks on narrow screens so it never runs under the ability bar. */
+      #minimap { position: fixed; right: 12px; bottom: 14px; width: clamp(160px, calc(50vw - 200px), 300px); height: auto; border: 2px solid #ffffff30; border-radius: 6px; background: #0c0f14;
+        box-shadow: 0 2px 10px #0008; cursor: pointer; }
       #tip { position: fixed; display: none; bottom: 150px; left: 50%; transform: translateX(-50%); width: 320px; background: #12141bf2;
         border: 1px solid #ffffff30; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; }
       #tip b { font-size: 14px; }
