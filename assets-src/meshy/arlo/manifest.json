@@ -1,0 +1,103 @@
+[
+  {
+    "at": "2026-10-07T20:50:19.088Z",
+    "cmd": "concept",
+    "taskId": "01a11821-1915-7316-82bc-4a0fbe292cd8",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a cheerful young cartographer-adventurer man with warm brown skin and curly dark hair, round brass goggles pushed up on his forehead, a fitted olive-green long coat with many pockets and brass buttons, a leather satchel stuffed with rolled maps, a burnt-orange scarf, sturdy brown boots, and a chunky glowing golden rune-etched gauntlet covering his left forearm and hand. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/arlo/concepts/be292cd8_0.png",
+      "assets-src/meshy/arlo/concepts/be292cd8_1.png",
+      "assets-src/meshy/arlo/concepts/be292cd8_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:50:19.572Z",
+    "cmd": "concept",
+    "taskId": "01a11821-1c6f-7184-ae0b-69e3cabe88c7",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a cheerful young cartographer-adventurer man with warm brown skin and curly dark hair, round brass goggles pushed up on his forehead, a fitted olive-green long coat with many pockets and brass buttons, a leather satchel stuffed with rolled maps, a burnt-orange scarf, sturdy brown boots, and a chunky glowing golden rune-etched gauntlet covering his left forearm and hand. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/arlo/concepts/cabe88c7_0.png",
+      "assets-src/meshy/arlo/concepts/cabe88c7_1.png",
+      "assets-src/meshy/arlo/concepts/cabe88c7_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:57:59.435Z",
+    "cmd": "model",
+    "taskId": "01a11826-c3f5-7424-9a10-8bbfc5a121ae",
+    "request": {
+      "image_urls": [
+        "cabe88c7_0.png",
+        "cabe88c7_1.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "olive-green coat with brass buttons, burnt-orange scarf, brass goggles, brown leather satchel and boots, glowing golden rune gauntlet on the right forearm and hand"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/arlo/model_c5a121ae.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:58:44.228Z",
+    "cmd": "rig",
+    "taskId": "01a11829-1133-76dc-bfc3-fc7ae9a1afea",
+    "request": {
+      "input_task_id": "01a11826-c3f5-7424-9a10-8bbfc5a121ae",
+      "animation_type": "biped",
+      "height_meters": 1.8
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/arlo/rigged_e9a1afea.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:59:53.470Z",
+    "cmd": "animate",
+    "taskId": "01a11829-fc01-7504-8675-58cc7972792a",
+    "request": {
+      "rig_task_id": "01a11829-1133-76dc-bfc3-fc7ae9a1afea",
+      "action_ids": [
+        0,
+        14,
+        192,
+        194,
+        129,
+        125,
+        156,
+        189,
+        178,
+        28
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/arlo/anims_batch1.glb"
+    ]
+  }
+]

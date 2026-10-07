@@ -4,6 +4,7 @@ import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
 import { KITS, KIT_IDS } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
 import type { AugmentId, KitId } from '../sim/types';
+import { World } from '../sim/world';
 import { augmentChips } from './chips';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
@@ -51,29 +52,40 @@ const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].na
 
 // ---------- champion select ----------
 
-export async function pickChampion(meta: Meta): Promise<KitId> {
+/** `onFocus` tells the 3D stage which champion the pointer is on (cards are in the stage's order). */
+export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<KitId> {
+  const esc = (t: string) => t.replace(/"/g, '&quot;');
   const el = show(`
-    <h1>Lane Rogue</h1>
-    <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-    <div class="cards">
+    <div class="selecthead"><h1>Lane Rogue</h1>
+      <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p></div>
+    <div class="stagegap"></div>
+    <div class="cards champs">
       ${KIT_IDS.map((id) => {
         const k = KITS[id];
         const best = meta.best[id];
+        // Tooltip numbers come from a real level-1 champion in a throwaway world.
+        const sample = new World(1).spawnChampion('blue', id, { think: () => [] });
+        const icons = [
+          `<i title="${esc(`${k.passive.name} (Passive): ${k.passive.describe(sample)}`)}">${k.passive.icon}</i>`,
+          ...k.abilities.map((a, s) => `<i title="${esc(`${a.name} (${KEYS[s]}): ${a.describe(1, sample)}`)}">${a.icon}</i>`),
+        ].join('');
         return `
-          <button class="card champ" data-action="${id}" style="--accent:${k.color}">
+          <button class="card champ" data-action="${id}" data-kit="${id}" style="--accent:${k.color}">
             <div class="name">${k.name} <span>${k.title}</span></div>
             <p class="blurb">${k.blurb}</p>
-            <ul>
-              <li><i>${k.passive.icon}</i><b>${k.passive.name}</b><small>Passive</small></li>
-              ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><b>${a.name}</b><small>${KEYS[s]}</small></li>`).join('')}
-            </ul>
+            <div class="kit">${icons}</div>
             <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
           </button>`;
       }).join('')}
     </div>
-    ${CONTROLS}
-    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
+    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Hover an ability icon for details · Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
+  el.classList.add('select');
+  el.querySelectorAll<HTMLElement>('[data-kit]').forEach((card) => {
+    card.addEventListener('mouseenter', () => onFocus(card.dataset.kit as KitId));
+    card.addEventListener('focus', () => onFocus(card.dataset.kit as KitId));
+  });
   const kit = (await waitFor(el)) as KitId;
+  el.classList.remove('select');
   hide();
   return kit;
 }

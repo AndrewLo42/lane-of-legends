@@ -1,0 +1,103 @@
+[
+  {
+    "at": "2026-10-07T20:51:47.066Z",
+    "cmd": "concept",
+    "taskId": "01a11822-811a-7733-87b2-5de4f09a637d",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a sea-witch tidecaller woman with sun-tanned skin and long dark teal hair flowing in wave-like curls, coral-orange and sea-green layered flowing robes with a high collar, seashell and pearl jewelry, a coral circlet, a sash of netting with small shells, sandals. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/maren/concepts/f09a637d_0.png",
+      "assets-src/meshy/maren/concepts/f09a637d_1.png",
+      "assets-src/meshy/maren/concepts/f09a637d_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:51:47.623Z",
+    "cmd": "concept",
+    "taskId": "01a11822-8474-7557-9ffc-7e5eebdb461c",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a sea-witch tidecaller woman with sun-tanned skin and long dark teal hair flowing in wave-like curls, coral-orange and sea-green layered flowing robes with a high collar, seashell and pearl jewelry, a coral circlet, a sash of netting with small shells, sandals. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/maren/concepts/ebdb461c_0.png",
+      "assets-src/meshy/maren/concepts/ebdb461c_1.png",
+      "assets-src/meshy/maren/concepts/ebdb461c_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:58:04.595Z",
+    "cmd": "model",
+    "taskId": "01a11826-c3f9-7398-955c-caab79f5ca90",
+    "request": {
+      "image_urls": [
+        "ebdb461c_1.png",
+        "ebdb461c_0.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "coral-orange and sea-green layered robes, long dark teal wavy hair, seashell necklace and pearl bracelets, rope net sash with shells, coral circlet"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/maren/model_79f5ca90.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:59:20.596Z",
+    "cmd": "rig",
+    "taskId": "01a11829-9f8a-7037-9415-cf3ff9b11e76",
+    "request": {
+      "input_task_id": "01a11826-c3f9-7398-955c-caab79f5ca90",
+      "animation_type": "biped",
+      "height_meters": 1.8
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/maren/rigged_f9b11e76.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T21:01:13.367Z",
+    "cmd": "animate",
+    "taskId": "01a1182b-020a-76e7-b365-5b11395f47e4",
+    "request": {
+      "rig_task_id": "01a11829-9f8a-7037-9415-cf3ff9b11e76",
+      "action_ids": [
+        11,
+        14,
+        130,
+        131,
+        132,
+        125,
+        185,
+        178,
+        41,
+        133
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/maren/anims_batch1.glb"
+    ]
+  }
+]

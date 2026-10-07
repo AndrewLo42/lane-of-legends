@@ -4,6 +4,7 @@ import { Duel, type Shell } from './duel';
 import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
 import { AimIndicator } from './render/effects';
+import { SelectStage } from './render/selectStage';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
 import {
   advance, augmentOffers, buy, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
@@ -27,6 +28,7 @@ buildArena(scene);
 const cam = new MobaCamera(toV3(spawnPoint('blue')));
 addEventListener('resize', () => {
   cam.resize();
+  stage?.resize();
   renderer.setSize(innerWidth, innerHeight);
 });
 
@@ -34,6 +36,8 @@ const shell: Shell = {
   renderer, scene, cam, input: new Input(renderer.domElement), marker: new ClickMarker(scene), indicator: new AimIndicator(scene),
 };
 
+/** Champion select backdrop; built once the models have loaded (the render loop starts before that). */
+let stage: SelectStage | null = null;
 /** The duel being played, if any. Between duels the camera drifts over the empty lane behind the menus. */
 let duel: Duel | null = null;
 let last = performance.now();
@@ -44,6 +48,9 @@ function frame(now: number) {
   last = now;
   if (duel) {
     duel.frame(dt);
+  } else if (stage?.active) {
+    stage.update(dt);
+    stage.render(renderer);
   } else {
     idleT += dt;
     cam.camera.position.set(Math.sin(idleT * 0.05) * 40, 24, 20);
@@ -56,6 +63,7 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 await loadModels(); // missing models fall back to placeholders
+stage = new SelectStage();
 
 const params = new URLSearchParams(location.search);
 const asKit = (v: string | null) => (KIT_IDS.includes(v as KitId) ? (v as KitId) : null);
@@ -77,7 +85,12 @@ async function runLoop() {
   let run: RunState | null = loadRun();
   for (;;) {
     if (!run) {
-      run = newRun(await pickChampion(loadMeta()), Date.now() % 1e9);
+      const s = stage!;
+      s.active = true;
+      const kit = await pickChampion(loadMeta(), (k) => s.focus(k));
+      s.active = false;
+      s.focus(null);
+      run = newRun(kit, Date.now() % 1e9);
       saveRun(run);
     }
     if (run.shopping) {

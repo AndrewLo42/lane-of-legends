@@ -1,0 +1,103 @@
+[
+  {
+    "at": "2026-10-07T20:50:54.844Z",
+    "cmd": "concept",
+    "taskId": "01a11821-a3ff-7249-870a-dac941926f91",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a clockwork knight automaton champion: broad squat brass-and-steel armored body, big gear-shaped shoulder pauldrons, a glowing teal clock face set in its chest plate with visible hands, a rounded helmet with a narrow glowing teal visor, exposed gears at the joints, a short tattered dark-teal cloth tabard, heavy metal boots. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/tock/concepts/41926f91_0.png",
+      "assets-src/meshy/tock/concepts/41926f91_1.png",
+      "assets-src/meshy/tock/concepts/41926f91_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:51:16.152Z",
+    "cmd": "concept",
+    "taskId": "01a11821-a84a-77c8-a254-dfb2ecbff430",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a clockwork knight automaton champion: broad squat brass-and-steel armored body, big gear-shaped shoulder pauldrons, a glowing teal clock face set in its chest plate with visible hands, a rounded helmet with a narrow glowing teal visor, exposed gears at the joints, a short tattered dark-teal cloth tabard, heavy metal boots. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/tock/concepts/ecbff430_0.png",
+      "assets-src/meshy/tock/concepts/ecbff430_1.png",
+      "assets-src/meshy/tock/concepts/ecbff430_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:57:55.923Z",
+    "cmd": "model",
+    "taskId": "01a11826-c3f6-735c-a4fd-f6ca61ca529d",
+    "request": {
+      "image_urls": [
+        "ecbff430_0.png",
+        "ecbff430_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "steel and brass clockwork armor, glowing teal clock face on the chest, glowing teal visor, dark-teal cloth tabard and arm bands"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/tock/model_61ca529d.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:59:02.678Z",
+    "cmd": "rig",
+    "taskId": "01a11829-57e5-7494-9685-43002a66ee5e",
+    "request": {
+      "input_task_id": "01a11826-c3f6-735c-a4fd-f6ca61ca529d",
+      "animation_type": "biped",
+      "height_meters": 2
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/tock/rigged_2a66ee5e.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T21:00:33.456Z",
+    "cmd": "animate",
+    "taskId": "01a1182a-65cc-705f-86a4-1c22edd9e9f6",
+    "request": {
+      "rig_task_id": "01a11829-57e5-7494-9685-43002a66ee5e",
+      "action_ids": [
+        89,
+        15,
+        4,
+        97,
+        99,
+        127,
+        158,
+        8,
+        178,
+        88
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/tock/anims_batch1.glb"
+    ]
+  }
+]

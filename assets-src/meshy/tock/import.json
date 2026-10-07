@@ -1,0 +1,65 @@
+{
+  "out": "public/assets/meshy/Tock.glb",
+  "rigged": "assets-src/meshy/tock/rigged_2a66ee5e.glb",
+  "anims": [
+    "assets-src/meshy/tock/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": {
+      "src": "Combat_Stance"
+    },
+    "Run": {
+      "src": "Run_03"
+    },
+    "Attack": {
+      "src": "Attack",
+      "start": 0.6,
+      "end": 1.5
+    },
+    "Attack2": {
+      "src": "Left_Slash",
+      "start": 0.3,
+      "end": 1.2
+    },
+    "CastQ": {
+      "src": "Reaping_Swing",
+      "start": 3.8,
+      "end": 4.7
+    },
+    "CastW": {
+      "src": "Charged_Ground_Slam",
+      "start": 1.2,
+      "end": 2.1
+    },
+    "CastE": {
+      "src": "Roll_Dodge",
+      "start": 0.6,
+      "end": 1.6
+    },
+    "CastR": {
+      "src": "Charged_Ground_Slam",
+      "start": 0.6,
+      "end": 2.2
+    },
+    "Death": {
+      "src": "Dead",
+      "start": 0.9,
+      "end": 2.8
+    },
+    "Hit": {
+      "src": "Hit_Reaction",
+      "start": 0.0,
+      "end": 1.0
+    },
+    "Select": {
+      "src": "Chest_Pound_Taunt",
+      "start": 0.0,
+      "end": 3.5
+    }
+  }
+}

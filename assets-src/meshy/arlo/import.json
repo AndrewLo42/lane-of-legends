@@ -1,0 +1,65 @@
+{
+  "out": "public/assets/meshy/Arlo.glb",
+  "rigged": "assets-src/meshy/arlo/rigged_e9a1afea.glb",
+  "anims": [
+    "assets-src/meshy/arlo/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": {
+      "src": "Idle"
+    },
+    "Run": {
+      "src": "Run_02"
+    },
+    "Attack": {
+      "src": "Right_Jab_from_Guard",
+      "start": 0.05,
+      "end": 0.95
+    },
+    "Attack2": {
+      "src": "Right_Uppercut_from_Guard",
+      "start": 0.1,
+      "end": 0.95
+    },
+    "CastQ": {
+      "src": "mage_soell_cast",
+      "start": 0.13,
+      "end": 1.03
+    },
+    "CastW": {
+      "src": "mage_soell_cast",
+      "start": 0.13,
+      "end": 1.03
+    },
+    "CastE": {
+      "src": "Stand_Dodge",
+      "start": 0.0,
+      "end": 1.0
+    },
+    "CastR": {
+      "src": "Charged_Spell_Cast",
+      "start": 0.0,
+      "end": 1.2
+    },
+    "Death": {
+      "src": "dying_backwards",
+      "start": 0.0,
+      "end": 1.6
+    },
+    "Hit": {
+      "src": "Hit_Reaction",
+      "start": 0.0,
+      "end": 1.0
+    },
+    "Select": {
+      "src": "Big_Wave_Hello",
+      "start": 0.0,
+      "end": 3.0
+    }
+  }
+}

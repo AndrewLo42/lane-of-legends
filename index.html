@@ -112,6 +112,18 @@
       #screen li { display: flex; gap: 8px; align-items: center; font-size: 13px; }
       #screen li i { font-style: normal; width: 22px; text-align: center; color: var(--accent); font-size: 16px; }
       #screen li small { margin-left: auto; opacity: 0.5; }
+      /* Champion select over the 3D stage: title on top, cards along the bottom */
+      #screen.select { background: linear-gradient(#0b0d12cc 0%, #0b0d1200 22%, #0b0d1200 52%, #0b0d12ee 72%); justify-content: space-between; gap: 10px; }
+      #screen .selecthead { text-align: center; }
+      #screen .selecthead h1 { margin-bottom: 14px; }
+      #screen .selecthead .sub { margin: 0; }
+      #screen .stagegap { flex: 1; min-height: 34vh; }
+      #screen .cards.champs { gap: 14px; }
+      #screen .card.champ { width: min(290px, 30vw); background: #151922e6; padding: 12px 14px; }
+      #screen .card.champ .blurb { font-size: 12px; margin: 6px 0 8px; }
+      #screen .card.champ .kit { display: flex; gap: 8px; font-size: 18px; color: var(--accent); }
+      #screen .card.champ .kit i { font-style: normal; cursor: help; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; background: #ffffff0f; }
+      #screen .card.champ .best { margin-top: 8px; }
       #screen .hint { font-size: 12px; opacity: 0.55; text-align: center; max-width: 640px; }
       #screen .sub { margin: -8px 0 0; opacity: 0.75; text-align: center; padding: 0 16px; }
       #screen .best { margin-top: 12px; font-size: 12px; opacity: 0.6; }

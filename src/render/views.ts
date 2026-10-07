@@ -11,8 +11,13 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'minion') return u.role === 'melee' ? { name: 'minion_melee', height: 1.25 } : { name: 'minion_caster', height: 1.5 };
   if (u.kind === 'tower') return { name: 'tower', height: 7.2 };
   if (u.kind === 'nexus') return { name: 'nexus', height: 6.2 };
+  // Champions are oversized next to structures, as in League, so they read from the MOBA camera.
+  if (u.champ) return { name: `champ_${u.champ.kit}`, height: u.champ.kit === 'tock' ? 2.8 : 2.5 };
   return undefined;
 }
+const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
+/** A dead champion's body stays visible this long (its death clip), then hides until respawn. */
+const CHAMP_CORPSE_SECONDS = 2.5;
 /** How long a dead minion lingers to play its death clip, then how long it takes to sink away. */
 const CORPSE_SECONDS = 2.4;
 const SINK_SECONDS = 0.5;
@@ -36,6 +41,9 @@ interface UnitView {
   lastAttackSeen?: number;
   /** Alternates Attack / Attack2 so swings don't look identical. */
   attacks?: number;
+  lastCastSeen?: number;
+  /** Seconds since a champion died (null while alive). */
+  deadFor?: number | null;
 }
 
 interface MissileView {
@@ -48,7 +56,7 @@ interface MissileView {
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 /** Height of a unit's health bar anchor above its feet. */
-export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 2.6, minion: 1.4, tower: 7.4, nexus: 6.6 };
+export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6 };
 
 const FROZEN = new THREE.Color(0xd8fffb);
 
@@ -104,7 +112,9 @@ export class WorldView {
       live.add(u.id);
       if (this.units.has(u.id)) continue;
       const model = modelFor(u);
-      const built = model && hasModel(model.name) ? instantiate(model.name, model.height, new THREE.Color(TEAM_COLOR[u.team])) : null;
+      // Champions keep their own colours (health bars show the team); everything else wears it.
+      const tint = u.champ ? null : new THREE.Color(TEAM_COLOR[u.team]);
+      const built = model && hasModel(model.name) ? instantiate(model.name, model.height, tint) : null;
       const obj = built?.root ?? placeholderFor(u);
       const anim = built?.clips.length ? new AnimatedModel(built.model, built.clips, RIGS.meshy) : undefined;
       anim?.setBase('Idle');
@@ -192,18 +202,41 @@ export class WorldView {
     }
     for (const u of this.world.units) {
       const v = this.units.get(u.id)!;
-      v.obj.visible = !u.dead;
+      if (v.anim && u.champ) {
+        // Champions play their death clip, stay down briefly, then hide until they respawn.
+        if (u.dead && v.deadFor == null) {
+          v.deadFor = 0;
+          v.anim.playOnce('Death', { persistent: true });
+        } else if (!u.dead && v.deadFor != null) {
+          v.deadFor = null;
+          v.anim.stopOverlay();
+        }
+        if (v.deadFor != null) v.deadFor += dt;
+        v.obj.visible = !u.dead || (v.deadFor ?? 0) < CHAMP_CORPSE_SECONDS;
+      } else {
+        v.obj.visible = !u.dead;
+      }
       v.obj.position.set(v.prev.x + (u.pos.x - v.prev.x) * alpha, 0, v.prev.y + (u.pos.y - v.prev.y) * alpha);
       // Blinks and rewinds teleport: don't smear them across the lane.
       if (Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 3) v.obj.position.set(u.pos.x, 0, u.pos.y);
       if (u.speed > 0) v.obj.rotation.y = -lerpAngle(v.prevFacing, u.facing, alpha); // sim angle runs the other way round +Y
 
       if (v.anim) {
-        // Skeletal: walk while moving, idle otherwise, one-shot attack clip on each new attack.
-        const moving = Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
-        // Library walks are paced for a ~1.8 m human; speed the cycle up to match the unit's pace.
-        v.anim.setBase(moving ? 'Walk' : 'Idle', moving ? u.speed / 3.2 : 1);
-        if (u.lastAttackTick !== v.lastAttackSeen) {
+        // Skeletal: run/walk while moving, idle otherwise, one-shot clips for attacks and casts.
+        const moving = !u.dead && Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
+        // Library cycles are paced for a ~1.8 m human (walk ≈ 3.2 m/s, run ≈ 5.8 m/s); match the unit's pace.
+        const gait = v.anim.has('Run') ? 'Run' : 'Walk';
+        v.anim.setBase(moving ? gait : 'Idle', moving ? u.speed / (gait === 'Run' ? 5.8 : 3.2) : 1);
+        const cast = u.champ?.lastCast;
+        if (cast && cast.tick !== v.lastCastSeen && !u.dead) {
+          v.lastCastSeen = cast.tick;
+          const name = SLOT_CLIP[cast.slot];
+          const clip = v.anim.clip(name);
+          // Trimmed cast clips peak mid-way: land that peak when the ability fires.
+          const timeScale = clip ? THREE.MathUtils.clamp((clip.duration * 0.5) / Math.max(cast.time, 0.25), 0.8, 2.5) : 1;
+          v.anim.playOnce(name, { timeScale });
+          v.lastAttackSeen = u.lastAttackTick;
+        } else if (u.lastAttackTick !== v.lastAttackSeen && !u.dead) {
           v.lastAttackSeen = u.lastAttackTick;
           v.attacks = (v.attacks ?? 0) + 1;
           const name = v.attacks % 2 === 0 && v.anim.has('Attack2') ? 'Attack2' : 'Attack';

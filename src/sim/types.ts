@@ -76,6 +76,8 @@ export interface ChampState {
   abilities: [AbilityState, AbilityState, AbilityState, AbilityState];
   /** Rooted while winding up an ability; it fires at `fireAt`. */
   casting: { slot: Slot; at: Vec2; fireAt: number; recast: boolean } | null;
+  /** The latest ability cast (or recast), for the renderer's cast animation. */
+  lastCast: { slot: Slot; tick: number; time: number } | null;
   /** A cast pressed during a wind-up or dash; it fires as soon as the champion is free (if before `until`). */
   queued: { slot: Slot; at: Vec2; until: number } | null;
   /** Moving under its own power (can't act until it lands). */

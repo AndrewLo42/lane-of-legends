@@ -28,6 +28,9 @@ Clockwork faction, slim set: a brass bucket-helm knight with a sword and shield 
 ## Structures (done, Meshy)
 The same clockwork faction. The **tower** (`assets-src/meshy/tower`) is riveted brass on a stone base, with a side gear and wind-up key, magenta banners and a crystal. The **nexus** (`nexus`) is a stone plinth with pistons and pipes, and a toothed brass gear ring around a crystal heart. About 6.2k triangles each, 1K textures, static: built with `tools/blender/import_static.py` (no rig). They face the camera rather than down the lane, and when destroyed they shake, lean and sink.
 
+## Champions (done, Meshy)
+**Arlo** (a cartographer with a golden rune gauntlet), **Tock** (a clockwork knight with a chest clock) and **Maren** (a tidecaller in coral and sea-green robes). About 12.4k triangles each, 1K textures, built with `--pose none` from true A-pose concepts, so accessories survive. They are not team-tinted; health bars show the team. Clips: Idle, Run, Attack/Attack2, CastQ/W/E/R, Death, Hit and Select (a flourish for the select screen). Attacks and casts are trimmed to about 0.9 s around their peak hand speed, so the hit lands mid-clip. They're shown at 2.5 m (Tock 2.8 m), oversized next to the 7 m towers as in League. Tock has no pendulum blade yet; a weapon prop is a follow-up.
+
 ### Pipeline lessons
 - **The A-pose step (`pose_mode: a-pose`) strips held props and thin cloth.** The first melee model lost its tabard and sword, and the caster lost its staff. Use `--pose none` when the concept is already close to an A-pose, add a `--texture` prompt naming the key-coloured cloth, or rebuild the prop at runtime (the caster's staff is a three.js mesh on the `RightHand` bone).
 - **Check the concept views before modelling.** Drop any view that contradicts the others: a second front view in a different pose, or a back view with the prop in the mirrored hand.
@@ -37,4 +40,4 @@ The same clockwork faction. The **tower** (`assets-src/meshy/tower`) is riveted 
 - **Don't trust a model's origin.** The structures came back centred on their origin, not standing on it, despite `origin_at: bottom`. `instantiate()` now grounds and centres every model from its bounding box.
 - **Use `--pose none` for props and structures.** Use only the concept views that agree (the nexus's side view showed its rings crossed, so only front and back were used).
 - **Blender imports at 24 fps.** Clip `start`/`end` in `import.json` are in 24 fps seconds, so measure trims in that time base.
-- **Costs (Oct 2026):** a concept sheet 9, image→3D 30, rig 5, animations about 3 each. Two minions cost about 190 credits, including one wasted concept pair, one model regeneration and the two caster carry clips. The tower and nexus cost 96 (4 concept sheets, 2 models).
+- **Costs (Oct 2026):** a concept sheet 9, image→3D 30, rig 5, animations about 3 each. Two minions cost about 190 credits, including one wasted concept pair, one model regeneration and the two caster carry clips. The tower and nexus cost 96 (4 concept sheets, 2 models). The three champions cost about 250 (6 concept sheets, 3 models, 3 rigs, 30 animations).

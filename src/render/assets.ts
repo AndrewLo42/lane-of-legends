@@ -14,6 +14,9 @@ export const MODELS = {
   minion_caster: 'MinionCaster.glb',
   tower: 'Tower.glb',
   nexus: 'Nexus.glb',
+  champ_arlo: 'Arlo.glb',
+  champ_tock: 'Tock.glb',
+  champ_maren: 'Maren.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 
@@ -89,9 +92,9 @@ const PROPS: Partial<Record<ModelName, { bone: string; lean: number; build: () =
 
 /**
  * An independently animatable copy of a model, scaled to `height` metres, facing +x (the sim's
- * facing 0) and tinted for its team.
+ * facing 0). With a `team` colour, its magenta key cloth is tinted (champions keep their own colours).
  */
-export function instantiate(name: ModelName, height: number, team: THREE.Color) {
+export function instantiate(name: ModelName, height: number, team: THREE.Color | null) {
   const gltf = loaded.get(name);
   if (!gltf) return null;
   const model = cloneSkinned(gltf.scene);
@@ -114,7 +117,7 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color) 
     mat.emissive.set(0xffffff);
     mat.emissiveMap = mat.map;
     mat.emissiveIntensity = 0.3;
-    teamTint(mat, team);
+    if (team) teamTint(mat, team);
     m.material = mat;
     materials.push(mat);
   });

@@ -1,0 +1,65 @@
+{
+  "out": "public/assets/meshy/Maren.glb",
+  "rigged": "assets-src/meshy/maren/rigged_f9b11e76.glb",
+  "anims": [
+    "assets-src/meshy/maren/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": {
+      "src": "Idle_02"
+    },
+    "Run": {
+      "src": "Run_02"
+    },
+    "Attack": {
+      "src": "mage_soell_cast_1",
+      "start": 0.9,
+      "end": 1.8
+    },
+    "Attack2": {
+      "src": "mage_soell_cast_2",
+      "start": 0.8,
+      "end": 1.7
+    },
+    "CastQ": {
+      "src": "mage_soell_cast_3",
+      "start": 0.45,
+      "end": 1.35
+    },
+    "CastW": {
+      "src": "mage_soell_cast_4",
+      "start": 0.05,
+      "end": 0.95
+    },
+    "CastE": {
+      "src": "mage_soell_cast_2",
+      "start": 0.8,
+      "end": 1.7
+    },
+    "CastR": {
+      "src": "Charged_Spell_Cast",
+      "start": 0.0,
+      "end": 1.2
+    },
+    "Death": {
+      "src": "Shot_and_Slow_Fall_Backward",
+      "start": 1.7,
+      "end": 3.4
+    },
+    "Hit": {
+      "src": "Hit_Reaction",
+      "start": 0.0,
+      "end": 1.0
+    },
+    "Select": {
+      "src": "Formal_Bow",
+      "start": 1.8,
+      "end": 5.2
+    }
+  }
+}

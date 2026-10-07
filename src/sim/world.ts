@@ -78,7 +78,7 @@ export class World {
     const ability = () => ({ rank: 0, readyAt: 0, recastUntil: 0 });
     const champ: ChampState = {
       kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + mods.manaFlat, maxMana: k.mana + mods.manaFlat,
-      abilities: [ability(), ability(), ability(), ability()], casting: null, queued: null, dash: null, data: {},
+      abilities: [ability(), ability(), ability(), ability()], casting: null, lastCast: null, queued: null, dash: null, data: {},
       augments: [...augments], items: [...items], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
     };
     u.champ = champ;
@@ -225,6 +225,7 @@ export class World {
     const ctx: CastCtx = { world: this, self: u, at: { ...at }, rank: st.rank, recast };
     def.onWindup?.(ctx);
     const time = recast ? def.recastTime ?? def.castTime : def.castTime;
+    c.lastCast = { slot, tick: this.tick, time };
     if (time > 0) c.casting = { slot, at: { ...at }, fireAt: this.tick + ticks(time), recast };
     else this.resolveCast(ctx, slot);
     for (const a of perksOf(u)) a.onCast?.(this, u, slot, ctx.at, recast);
