@@ -11,11 +11,8 @@
       "generate_multi_view": true
     },
     "credits": 9,
-    "files": [
-      "assets-src/meshy/minion_caster/concepts/66ae3667_0.png",
-      "assets-src/meshy/minion_caster/concepts/66ae3667_1.png",
-      "assets-src/meshy/minion_caster/concepts/66ae3667_2.png"
-    ]
+    "files": [],
+    "note": "Discarded: sent with prompt \"true\" by a CLI flag-parsing bug; images deleted."
   },
   {
     "at": "2026-10-07T19:09:31.977Z",
@@ -29,11 +26,8 @@
       "generate_multi_view": true
     },
     "credits": 9,
-    "files": [
-      "assets-src/meshy/minion_caster/concepts/cf34a7bf_0.png",
-      "assets-src/meshy/minion_caster/concepts/cf34a7bf_1.png",
-      "assets-src/meshy/minion_caster/concepts/cf34a7bf_2.png"
-    ]
+    "files": [],
+    "note": "Discarded: sent with prompt \"true\" by a CLI flag-parsing bug; images deleted."
   },
   {
     "at": "2026-10-07T19:11:09.801Z",
