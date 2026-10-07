@@ -5,6 +5,7 @@ import { TICK_HZ, type World } from '../sim/world';
 import { TEAM_COLOR } from './scene';
 
 const TIME = 0x5fd0c4; // Tock's teal
+const WATER = 0x7fe0ff; // Maren's tides
 const flat = (m: THREE.Mesh) => {
   m.rotation.x = -Math.PI / 2;
   return m;
@@ -113,7 +114,7 @@ export class EffectsView {
       const left = (z.until - this.world.tick) / TICK_HZ;
       const total = (z.until - z.start) / TICK_HZ;
       const hand = v.g.getObjectByName('hand');
-      if (hand) hand.rotation.y -= dt * (z.kind === 'stasis' ? 1.2 : 4);
+      if (hand) hand.rotation.y -= dt * (z.kind === 'stasis' ? 1.2 : z.kind === 'maelstrom' ? 2.5 : 4);
       const timer = v.g.getObjectByName('timer') as THREE.Mesh | undefined;
       if (timer) {
         timer.geometry.dispose();
@@ -155,6 +156,23 @@ export class EffectsView {
       }
       floor.position.y = rim.position.y = 0.03;
       g.add(dome, floor, rim, hand);
+    } else if (z.kind === 'maelstrom') {
+      const floor = ringShape(z.radius, z.radius, mat(0x1d5f86, 0.35));
+      floor.position.y = 0.03;
+      const rim = ringShape(z.radius, 0.14, mat(team, 0.8));
+      rim.position.y = 0.04;
+      // Spiral arms, spun by the 'hand' rotation in syncZones.
+      const hand = new THREE.Group();
+      hand.name = 'hand';
+      hand.position.y = 0.06;
+      for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+          const r = z.radius * (0.25 + j * 0.2);
+          const arc = flat(new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 24, 1, (i / 4) * Math.PI * 2 + j * 0.5, Math.PI / 3), mat(WATER, 0.6)));
+          hand.add(arc);
+        }
+      }
+      g.add(floor, rim, hand);
     } else {
       // Echo / anchor: a ghost of Tock plus a ring (the anchor's ring counts down).
       const ghost = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 1.3, 8), mat(TIME, z.kind === 'anchor' ? 0.4 : 0.28));
@@ -224,6 +242,21 @@ export class EffectsView {
         add(s, 0.35, (k) => {
           fade(s, 0.7)(k);
           s.scale.setScalar(0.5 + k * 1.3);
+        });
+        break;
+      }
+      case 'splash':
+      case 'erupt': {
+        const big = fx.kind === 'erupt';
+        const r = ringShape(fx.radius ?? 2, 0.3, basic(WATER, 0.9));
+        add(r, big ? 0.6 : 0.4, (k) => {
+          fade(r, 0.9)(k);
+          r.scale.setScalar(0.5 + k * 0.7);
+        });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(fx.radius ?? 2, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), basic(WATER, 0.45));
+        add(dome, big ? 0.6 : 0.35, (k) => {
+          fade(dome, 0.45)(k);
+          dome.scale.set(0.6 + k * 0.5, (big ? 1.4 : 0.6) * (1 - k * 0.6), 0.6 + k * 0.5);
         });
         break;
       }

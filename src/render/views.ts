@@ -5,6 +5,10 @@ import { TEAM_COLOR, placeholderFor } from './scene';
 
 interface UnitView {
   obj: THREE.Object3D;
+  /** Lazily built status visuals: shield bubble, root ring, stun stars. */
+  bubble?: THREE.Mesh;
+  root?: THREE.Mesh;
+  stun?: THREE.Object3D;
   prev: Vec2;
   prevFacing: number;
   /** Materials with their resting emissive, for the hit flash. */
@@ -35,6 +39,7 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     flare: () => ({ geo: new THREE.IcosahedronGeometry(0.38, 1), color: 0xb36bff, height: 1.1 }),
     bolt: () => ({ geo: new THREE.OctahedronGeometry(0.22), color: 0x9fe8ff, height: 1.1 }),
     wave: () => ({ geo: new THREE.BoxGeometry(1.2, 1.4, m.width), color: 0xffc94a, height: 0.9, opacity: 0.55 }),
+    tide: () => ({ geo: new THREE.ConeGeometry(0.3, 1.0, 8).rotateZ(-Math.PI / 2), color: 0x7fe0ff, height: 1.0, opacity: 0.85 }),
   };
   const look = looks[m.style]();
   const mat = new THREE.MeshBasicMaterial({ color: look.color, transparent: look.opacity != null, opacity: look.opacity ?? 1 });
@@ -133,6 +138,8 @@ export class WorldView {
         m.emissiveIntensity = Math.max(intensity, flash);
       }
 
+      this.statusVisuals(u, v, dt);
+
       const spin = v.obj.getObjectByName('spin');
       if (spin) spin.rotation.y += dt * 0.6;
       const gear = v.obj.getObjectByName('gear');
@@ -151,6 +158,40 @@ export class WorldView {
       v.obj.rotation.y = -Math.atan2(m.dir.y, m.dir.x);
       v.mat.color.copy(frozen ? FROZEN : v.color);
       if (frozen) v.obj.position.y += Math.sin(performance.now() / 60 + m.id) * 0.03; // shiver in place
+    }
+  }
+
+  /** Shield bubble, a ring of water while rooted, and circling stars while stunned. */
+  private statusVisuals(u: Unit, v: UnitView, dt: number) {
+    const shielded = u.statuses.some((s) => s.kind === 'shield');
+    const rooted = u.statuses.some((s) => s.kind === 'root');
+    const stunned = u.statuses.some((s) => s.kind === 'stun');
+    if (shielded && !v.bubble) {
+      v.bubble = new THREE.Mesh(new THREE.SphereGeometry(u.radius + 0.6, 20, 14), new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0.25, depthWrite: false }));
+      v.bubble.position.y = 1.1;
+      v.obj.add(v.bubble);
+    }
+    if (rooted && !v.root) {
+      v.root = new THREE.Mesh(new THREE.TorusGeometry(u.radius + 0.25, 0.12, 6, 20), new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.8 }));
+      v.root.rotation.x = Math.PI / 2;
+      v.root.position.y = 0.25;
+      v.obj.add(v.root);
+    }
+    if (stunned && !v.stun) {
+      v.stun = new THREE.Group();
+      for (let i = 0; i < 3; i++) {
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.13), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+        star.position.set(Math.cos((i / 3) * Math.PI * 2) * 0.5, 0, Math.sin((i / 3) * Math.PI * 2) * 0.5);
+        v.stun.add(star);
+      }
+      v.stun.position.y = 2.3;
+      v.obj.add(v.stun);
+    }
+    if (v.bubble) v.bubble.visible = shielded;
+    if (v.root) v.root.visible = rooted;
+    if (v.stun) {
+      v.stun.visible = stunned;
+      v.stun.rotation.y += dt * 5;
     }
   }
 

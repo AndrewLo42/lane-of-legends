@@ -1,4 +1,4 @@
-import { lead, minionInTheWay } from './aim';
+import { lead, leadTime, minionInTheWay } from './aim';
 import { kitOf } from './kits';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
@@ -21,6 +21,8 @@ interface Ctx {
   /** Current-rank damage of an ability. */
   dmg: (slot: Slot) => number;
   aim: (target: Unit, speed: number) => Vec2;
+  /** Where `target` will be after `seconds`, with this bot's aim error (delayed ground effects). */
+  aimAfter: (target: Unit, seconds: number) => Vec2;
 }
 
 const cast = (slot: Slot, at: Vec2): Command => ({ type: 'cast', slot, at });
@@ -73,21 +75,22 @@ export class BotController implements Controller {
       ready: (slot) => world.castBlocker(self, slot) === null && abilities[slot].recastUntil <= world.tick,
       recasting: (slot) => world.castBlocker(self, slot) === null && abilities[slot].recastUntil > world.tick,
       dmg: (slot) => kit.abilities[slot].damage?.(abilities[slot].rank, self) ?? 0,
-      aim: (target, speed) => {
-        const p = lead(world, self.pos, target, speed);
-        const miss = (1 - this.accuracy) * 3;
-        return { x: p.x + (world.rng.next() * 2 - 1) * miss, y: p.y + (world.rng.next() * 2 - 1) * miss };
-      },
+      aim: (target, speed) => this.miss(world, lead(world, self.pos, target, speed)),
+      aimAfter: (target, seconds) => this.miss(world, leadTime(world, target, seconds)),
     };
-    const arlo = self.champ!.kit === 'arlo';
+    const kitPlay = {
+      arlo: { play: this.arlo, escape: this.arloEscape },
+      tock: { play: this.tock, escape: this.tockEscape },
+      maren: { play: this.maren, escape: this.marenEscape },
+    }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
     if (self.hp < self.maxHp * 0.3) this.retreating = true;
     if (self.hp > self.maxHp * 0.9) this.retreating = false;
-    if (this.retreating) return (arlo ? this.arloEscape(ctx) : this.tockEscape(ctx)) ?? { type: 'move', to: spawnPoint(self.team) };
+    if (this.retreating) return kitPlay.escape.call(this, ctx) ?? { type: 'move', to: spawnPoint(self.team) };
     if (ctx.unsafe(self.pos)) return { type: 'move', to: { x: self.pos.x - towardFoe * 4, y: self.pos.y } };
 
-    const play = arlo ? this.arlo(ctx) : this.tock(ctx);
+    const play = kitPlay.play.call(this, ctx);
     if (play) return play;
 
     // Trade autos when healthy (melee needs to walk further in).
@@ -107,6 +110,12 @@ export class BotController implements Controller {
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
     return { type: 'move', to: spot };
+  }
+
+  /** Scatter an aim point by this bot's inaccuracy. */
+  private miss(world: World, p: Vec2): Vec2 {
+    const miss = (1 - this.accuracy) * 3;
+    return { x: p.x + (world.rng.next() * 2 - 1) * miss, y: p.y + (world.rng.next() * 2 - 1) * miss };
   }
 
   // ---------- Arlo ----------
@@ -187,6 +196,38 @@ export class BotController implements Controller {
   private tockEscape({ self, recasting, ready, near }: Ctx): Command | null {
     if (recasting(2)) return cast(2, self.pos);
     if (ready(3) && near(4)) return cast(3, self.pos);
+    return null;
+  }
+
+  // ---------- Maren ----------
+
+  private maren(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim, aimAfter } = ctx;
+    const mana = self.champ!.mana;
+    if (foe) {
+      const d = dist(self.pos, foe.pos);
+      const pinned = world.isRooted(foe) || !!world.status(foe, 'slow');
+      // Shield up when they commit, or when a tower is about to start hitting us.
+      if (ready(1) && (near(2.5) || (self.hp < self.maxHp * 0.6 && near(5)))) return cast(1, self.pos);
+      if (ready(3) && d < 10 && (pinned || foe.hp < foe.maxHp * 0.5) && !unsafe(foe.pos)) return cast(3, aimAfter(foe, 0.5));
+      if (ready(2) && d < 8.5 && !unsafe(foe.pos) && self.hp > self.maxHp * 0.4) {
+        const p = aim(foe, 26);
+        if (!minionInTheWay(world, self, p, 0.7)) return cast(2, p);
+      }
+      if (ready(0) && d < 9.5) return cast(0, aimAfter(foe, 0.75));
+    }
+    // Farm with Riptide when it hits a cluster.
+    if (ready(0) && mana > self.champ!.maxMana * 0.5) {
+      const minions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 9 && !unsafe(u.pos));
+      const best = minions.find((m) => minions.filter((o) => dist(o.pos, m.pos) < 2).length >= 3);
+      if (best) return cast(0, best.pos);
+    }
+    return null;
+  }
+
+  private marenEscape({ self, foe, near, ready, aim }: Ctx): Command | null {
+    if (ready(1) && near(5)) return cast(1, self.pos);
+    if (foe && ready(0) && near(4)) return cast(0, aim(foe, 99)); // slow them on the way out
     return null;
   }
 }

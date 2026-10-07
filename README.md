@@ -10,17 +10,19 @@ npm run dev        # http://localhost:5173 (?seed=42 for a fixed seed)
 npm test           # sim tests
 ```
 
-**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom. Free play (no run, nexus to win): `?champ=arlo|tock`, `&enemy=…` (defaults to the other one), `&seed=42`.
+**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom. Free play (no run, nexus to win): `?champ=arlo|tock|maren`, `&enemy=…` (defaults to the other one), `&seed=42`.
 
 **Champions** (kits in `src/sim/kits/`):
 
-| | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) |
-|---|---|---|
-| Passive | **Momentum**: ability hits grant +10% attack speed, up to 5 stacks | **Second Hand**: every 3rd attack echoes 0.4s later for 60% |
-| Q | **Sparkshot**: skillshot that hits the first enemy; on hit, all cooldowns -1.5s | **Pendulum**: telegraphed cone sweep; recast within 3s to backswing (+50% to anything hit twice) |
-| W | **Rune Flare**: passes minions and marks a champion; an attack or ability detonates it for damage + mana | **Stopwatch**: field that slows enemies 50% and freezes enemy projectiles in mid-air; they crumble when it ends |
-| E | **Phase Step**: blink, then a homing bolt at the nearest enemy (marked first) | **Skip**: dash through enemies, leaving an echo; recast within 4s to snap back |
-| R | **Skyline Barrage**: 1s wind-up, then a wave across the whole lane (minions take half) | **Rewind**: plant an anchor; after 3s (or recast) snap back, recover all HP lost since, and replay 50/75% of the damage you dealt to champions |
+| | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
+|---|---|---|---|
+| Passive | **Momentum**: ability hits grant +10% attack speed, up to 5 stacks | **Second Hand**: every 3rd attack echoes 0.4s later for 60% | **Undertow**: abilities Soak champions; the 3rd stack roots for 1s |
+| Q | **Sparkshot**: skillshot that hits the first enemy; on hit, all cooldowns -1.5s | **Pendulum**: telegraphed cone sweep; recast within 3s to backswing (+50% to anything hit twice) | **Riptide**: lobbed wave lands after 0.6s (telegraphed) for damage + 30% slow |
+| W | **Rune Flare**: passes minions and marks a champion; an attack or ability detonates it for damage + mana | **Stopwatch**: field that slows enemies 50% and freezes enemy projectiles in mid-air; they crumble when it ends | **Tide Shield**: absorb shield; bursts around her when it breaks or fades |
+| E | **Phase Step**: blink, then a homing bolt at the nearest enemy (marked first) | **Skip**: dash through enemies, leaving an echo; recast within 4s to snap back | **Undertow Hook**: skillshot that drags the first enemy 4 units toward her |
+| R | **Skyline Barrage**: 1s wind-up, then a wave across the whole lane (minions take half) | **Rewind**: plant an anchor; after 3s (or recast) snap back, recover all HP lost since, and replay 50/75% of the damage you dealt to champions | **Maelstrom**: 3s whirlpool that drags enemies inward and damages, then erupts and stuns 1s |
+
+Crowd control: **root** (no walking, dashing or blinking), **stun** (nothing, and it interrupts wind-ups), **shields** (absorb damage first, shown white on health bars) and **pulls**. A cast pressed during another wind-up or dash is buffered for 0.4s, so combos like E→W don't drop keys.
 
 Levels 1–11 from XP (minions dying within 12 units, champion kills). Each level gives a skill point: basics up to rank ceil(level/2), max 5; ultimate at 6 and 11.
 

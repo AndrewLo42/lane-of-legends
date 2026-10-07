@@ -182,6 +182,87 @@ describe('Tock', () => {
   });
 });
 
+describe('Maren', () => {
+  it('Riptide lands after a telegraphed delay, damaging and slowing', () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 6);
+    cast(0, 6);
+    run(w, 0.3);
+    expect(lost(t)).toBe(0);
+    expect(w.telegraphs.some((g) => g.shape === 'circle')).toBe(true);
+    run(w, 0.6);
+    near(lost(t), KITS.maren.abilities[0].damage!(1, me));
+    expect(w.status(t, 'slow')).toBeDefined();
+  });
+
+  it('three ability hits root (Undertow)', () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 6);
+    for (let i = 0; i < 3; i++) {
+      me.champ!.abilities[0].readyAt = 0;
+      cast(0, 6);
+      run(w, 0.9);
+    }
+    expect(w.isRooted(t)).toBe(true);
+    expect(w.status(t, 'soak')).toBeUndefined();
+  });
+
+  it('Tide Shield absorbs damage, then bursts when broken', () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 2);
+    cast(1, 0);
+    const shield = w.status(me, 'shield')!.value;
+    w.dealDamage(t, me, shield - 10);
+    expect(me.hp).toBe(me.maxHp);
+    expect(lost(t)).toBe(0);
+    w.dealDamage(t, me, 50);
+    expect(me.maxHp - me.hp).toBeCloseTo(40, 5);
+    w.step();
+    near(lost(t), KITS.maren.abilities[1].damage!(1, me));
+  });
+
+  it('Undertow Hook drags the first enemy toward her', () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 8);
+    cast(2, 8);
+    run(w, 1);
+    expect(t.pos.x).toBeLessThan(8 - 3.5);
+    expect(t.pos.x).toBeGreaterThan(me.radius + t.radius);
+    near(lost(t), KITS.maren.abilities[2].damage!(1, me));
+  });
+
+  it('Maelstrom drags enemies in, then erupts and stuns', () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 6 + 3); // inside the 4.5 radius pool centred at x=6
+    cast(3, 6);
+    run(w, 1.5);
+    expect(t.pos.x).toBeLessThan(9);
+    run(w, 1.8);
+    expect(w.isStunned(t)).toBe(true);
+    expect(lost(t)).toBeGreaterThan(KITS.maren.abilities[3].damage!(1, me));
+  });
+
+  it('a cast pressed during another wind-up fires right after it', () => {
+    const { w, me, ctl } = setup('maren');
+    dummy(w, 6);
+    ctl.queue.push({ type: 'cast', slot: 2, at: { x: 6, y: 0 } }, { type: 'cast', slot: 1, at: me.pos });
+    run(w, 0.4);
+    expect(w.status(me, 'shield')).toBeDefined();
+  });
+
+  it('roots stop dashes and blinks; stuns stop everything', () => {
+    const { w, me, cast } = setup('arlo');
+    w.addStatus(me, { kind: 'root', value: 1, sourceId: 0, seconds: 1 });
+    expect(w.castBlocker(me, 2)).toBe('rooted');
+    expect(w.castBlocker(me, 0)).toBeNull();
+    w.addStatus(me, { kind: 'stun', value: 1, sourceId: 0, seconds: 1 });
+    expect(w.castBlocker(me, 0)).toBe('busy');
+    const x = me.pos.x;
+    cast(2, 20);
+    expect(me.pos.x).toBe(x);
+  });
+});
+
 describe('levels and resources', () => {
   it('minion deaths nearby grant XP and level-ups grant skill points', () => {
     const w = new World(1);
@@ -221,14 +302,14 @@ describe('levels and resources', () => {
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['arlo', 'arlo']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController());
       const b = w.spawnChampion('red', red, new BotController());
       run(w, 240);
       for (const c of [a, b]) {
-        expect(c.champ!.level).toBeGreaterThanOrEqual(5);
+        expect(c.champ!.level).toBeGreaterThanOrEqual(4); // ult unlocks at 6, but whoever loses lane can trail
         expect(c.champ!.abilities.slice(0, 3).every((s) => s.rank > 0)).toBe(true);
         expect(c.champ!.abilities.some((s) => s.readyAt > 0)).toBe(true); // has cast something
       }

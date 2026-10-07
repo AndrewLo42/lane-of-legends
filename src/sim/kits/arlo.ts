@@ -37,8 +37,8 @@ export const ARLO: Kit = {
   blurb: 'Ranged skillshot marksman. Land Sparkshots to shorten every cooldown, blink out of trouble, and snipe the low-health from across the lane.',
   color: '#f2c14e',
   stats: {
-    hp: 600, hpPerLevel: 90, mana: 380, manaPerLevel: 45, manaRegen: 2.2, damage: 58, damagePerLevel: 3.5,
-    attackInterval: 0.75, attackSpeedPerLevel: 0.025, windup: 0.18, range: 5.5, projectileSpeed: 24, speed: 6.5, radius: 0.6,
+    hp: 600, hpPerLevel: 90, mana: 380, manaPerLevel: 45, manaRegen: 2.2, damage: 62, damagePerLevel: 3.5,
+    attackInterval: 0.72, attackSpeedPerLevel: 0.025, windup: 0.18, range: 5.5, projectileSpeed: 24, speed: 6.5, radius: 0.6,
   },
   passive: {
     name: 'Momentum',

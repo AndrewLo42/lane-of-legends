@@ -16,6 +16,14 @@ export function lead(world: World, from: Vec2, target: Unit, speed: number): Vec
   return p;
 }
 
+/** Where `target` will be after `seconds` if it keeps walking (for delayed ground effects). */
+export function leadTime(world: World, target: Unit, seconds: number): Vec2 {
+  if (!target.moveTarget || world.isBusy(target) || world.isRooted(target)) return { ...target.pos };
+  const step = Math.min(dist(target.pos, target.moveTarget), world.effectiveSpeed(target) * seconds);
+  const v = dirTo(target.pos, target.moveTarget);
+  return { x: target.pos.x + v.x * step, y: target.pos.y + v.y * step };
+}
+
 /** Would a non-piercing line of `width` from `from` to `to` hit an enemy minion first? */
 export function minionInTheWay(world: World, self: Unit, to: Vec2, width: number, ignore?: Unit) {
   return world.units.some(

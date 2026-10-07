@@ -4,7 +4,7 @@ import type { World } from '../world';
 import { at } from './common';
 import type { Kit } from './types';
 
-const Q = { base: [60, 95, 130, 165, 200], ad: 0.9, cost: [30, 30, 30, 30, 30], cd: [7, 6.5, 6, 5.5, 5], radius: 3.6, angle: (110 * Math.PI) / 180, backswing: 1.5 };
+const Q = { base: [60, 95, 130, 165, 200], ad: 0.9, cost: [40, 40, 40, 40, 40], cd: [7, 6.5, 6, 5.5, 5], radius: 3.6, angle: (110 * Math.PI) / 180, backswing: 1.5 };
 const W = { cost: [70, 70, 70, 70, 70], cd: [18, 17, 16, 15, 14], range: 7, radius: 3.5, duration: [2, 2.25, 2.5, 2.75, 3] };
 const E = { base: [50, 80, 110, 140, 170], ad: 0.5, cost: [40, 40, 40, 40, 40], cd: [14, 13, 12, 11, 10], range: 5.5, echo: 4 };
 const R = { echo: [0.5, 0.75], cost: [100, 100], cd: [100, 80], window: 3 };

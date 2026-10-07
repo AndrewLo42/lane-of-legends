@@ -5,13 +5,22 @@ import { BAR_HEIGHT, type WorldView } from '../render/views';
 
 const WIDTH: Record<Unit['kind'], number> = { champion: 74, minion: 34, tower: 96, nexus: 120 };
 
+interface Bar {
+  el: HTMLDivElement;
+  fill: HTMLDivElement;
+  shield: HTMLDivElement;
+  mana?: HTMLDivElement;
+  lvl?: HTMLSpanElement;
+  cc?: HTMLSpanElement;
+}
+
 /**
  * HTML health bars that follow units on screen. Colours follow League's convention: you are green,
  * allies blue, enemies red. Untargetable structures show a lock.
  */
 export class HealthBars {
   private root = document.getElementById('bars')!;
-  private bars = new Map<number, { el: HTMLDivElement; fill: HTMLDivElement; mana?: HTMLDivElement; lvl?: HTMLSpanElement }>();
+  private bars = new Map<number, Bar>();
   private v = new THREE.Vector3();
 
   constructor(private world: World, private view: WorldView, private meId: number, private myTeam: Unit['team']) {}
@@ -30,7 +39,16 @@ export class HealthBars {
       const y = (-this.v.y * 0.5 + 0.5) * innerHeight;
       bar.el.style.transform = `translate(${x - WIDTH[u.kind] / 2}px, ${y}px)`;
       bar.el.style.display = this.v.z > 1 ? 'none' : '';
-      bar.fill.style.width = `${(100 * u.hp) / u.maxHp}%`;
+      const hpPct = (100 * u.hp) / u.maxHp;
+      bar.fill.style.width = `${hpPct}%`;
+      // Shields show as a white extension past the health (League-style), capped at the bar's end.
+      const shield = u.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);
+      bar.shield.style.left = `${hpPct}%`;
+      bar.shield.style.width = `${Math.min(100 - hpPct, (100 * shield) / u.maxHp)}%`;
+      if (bar.cc) {
+        const cc = this.world.isStunned(u) ? 'STUNNED' : this.world.isRooted(u) ? 'ROOTED' : '';
+        if (bar.cc.textContent !== cc) bar.cc.textContent = cc;
+      }
       if (u.champ && bar.mana && bar.lvl) {
         bar.mana.style.width = `${(100 * u.champ.mana) / u.champ.maxMana}%`;
         bar.lvl.textContent = String(u.champ.level);
@@ -57,8 +75,14 @@ export class HealthBars {
     el.style.width = `${WIDTH[u.kind]}px`;
     const fill = document.createElement('div');
     el.appendChild(fill);
-    const bar: { el: HTMLDivElement; fill: HTMLDivElement; mana?: HTMLDivElement; lvl?: HTMLSpanElement } = { el, fill };
+    const shield = document.createElement('div');
+    shield.className = 'sh';
+    el.appendChild(shield);
+    const bar: Bar = { el, fill, shield };
     if (u.champ) {
+      bar.cc = document.createElement('span');
+      bar.cc.className = 'cc';
+      el.append(bar.cc);
       const mana = document.createElement('div');
       mana.className = 'mp';
       mana.appendChild((bar.mana = document.createElement('div')));

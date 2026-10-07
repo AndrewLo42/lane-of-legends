@@ -112,7 +112,22 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'arlo') {
+  if (u.champ!.kit === 'maren') {
+    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.6, 10), teamMat);
+    robe.position.y = 0.8;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 10), new THREE.MeshStandardMaterial({ color: 0xc9a27e }));
+    head.position.y = 1.8;
+    const hair = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.9, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0x1f4f6a, side: THREE.DoubleSide }));
+    hair.position.y = 1.75;
+    hair.rotation.x = Math.PI;
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x6b4a32 }));
+    staff.position.set(0.15, 1.1, 0.62);
+    const coral = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22), glow);
+    coral.position.set(0.15, 2.3, 0.62);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshStandardMaterial({ color: 0x7fe0ff, emissive: 0x7fe0ff, emissiveIntensity: 1.2 }));
+    orb.position.set(0.15, 2.55, 0.62);
+    g.add(robe, head, hair, staff, coral, orb);
+  } else if (u.champ!.kit === 'arlo') {
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 1.0, 4, 12), teamMat);
     body.position.y = 0.92;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), new THREE.MeshStandardMaterial({ color: 0xf0d2b0 }));

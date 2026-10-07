@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock';
+export type KitId = 'arlo' | 'tock' | 'maren';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,9 +47,12 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield';
   until: number;
-  /** slow: fraction removed (0.5 = half speed); momentum: stacks; burn: damage per second. */
+  /**
+   * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
+   * shield: damage it can still absorb. Root stops movement (and dashes); stun stops everything.
+   */
   value: number;
   sourceId: number;
 }
@@ -73,6 +76,8 @@ export interface ChampState {
   abilities: [AbilityState, AbilityState, AbilityState, AbilityState];
   /** Rooted while winding up an ability; it fires at `fireAt`. */
   casting: { slot: Slot; at: Vec2; fireAt: number; recast: boolean } | null;
+  /** A cast pressed during a wind-up or dash; it fires as soon as the champion is free (if before `until`). */
+  queued: { slot: Slot; at: Vec2; until: number } | null;
   /** Moving under its own power (can't act until it lands). */
   dash: { to: Vec2; speed: number; onPass?: (u: Unit) => void; passed: number[] } | null;
   /** Kit-specific bookkeeping (echo positions, rewind history, ...). */
@@ -132,11 +137,13 @@ export interface Unit {
   /** Minions: lateral offset they keep while marching. */
   laneY: number;
   statuses: Status[];
+  /** Being pulled or knocked somewhere; can't act until it lands. */
+  forced: { to: Vec2; speed: number } | null;
   champ?: ChampState;
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide';
 
 export interface Missile {
   id: number;
@@ -164,7 +171,7 @@ export interface Missile {
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom';
   team: Team;
   ownerId: number;
   pos: Vec2;
@@ -191,7 +198,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt';
   pos: Vec2;
   dir?: number;
   radius?: number;

@@ -51,7 +51,7 @@ export class World {
       speed: s.speed, moveTarget: null, facing: team === 'blue' ? 0 : Math.PI,
       damage: s.damage, range: s.range, attackInterval: s.attackInterval, windupTicks: ticks(s.windup),
       projectileSpeed: s.projectileSpeed, attackTarget: null, attackCd: 0, windup: 0,
-      lastAttackTick: -999, lastHurtTick: -999, dead: false, respawnTick: 0, gold: 0, laneY: 0, statuses: [],
+      lastAttackTick: -999, lastHurtTick: -999, dead: false, respawnTick: 0, gold: 0, laneY: 0, statuses: [], forced: null,
     };
     this.units.push(u);
     return u;
@@ -74,7 +74,7 @@ export class World {
     const ability = () => ({ rank: 0, readyAt: 0, recastUntil: 0 });
     const champ: ChampState = {
       kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + mods.manaFlat, maxMana: k.mana + mods.manaFlat,
-      abilities: [ability(), ability(), ability(), ability()], casting: null, dash: null, data: {},
+      abilities: [ability(), ability(), ability(), ability()], casting: null, queued: null, dash: null, data: {},
       augments: [...augments], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
     };
     u.champ = champ;
@@ -107,7 +107,16 @@ export class World {
 
   /** Busy with an ability wind-up or a dash: can't walk or auto-attack. */
   isBusy(u: Unit) {
-    return !!(u.champ?.casting || u.champ?.dash);
+    return !!(u.champ?.casting || u.champ?.dash || u.forced || this.isStunned(u));
+  }
+
+  isStunned(u: Unit) {
+    return u.statuses.some((s) => s.kind === 'stun');
+  }
+
+  /** Can't walk, dash or blink (rooted or stunned). */
+  isRooted(u: Unit) {
+    return u.statuses.some((s) => s.kind === 'root' || s.kind === 'stun');
   }
 
   step() {
@@ -125,6 +134,7 @@ export class World {
       else if (u.kind === 'champion' && !u.moveTarget && u.attackTarget == null && !this.isBusy(u)) this.autoAcquire(u);
     }
     for (const u of this.champions()) if (!u.dead) this.updateCast(u);
+    for (const u of this.units) if (!u.dead && u.forced) this.updateForced(u);
     for (const u of this.units) if (!u.dead) this.combat(u);
     for (const u of this.units) if (!u.dead && u.speed > 0) this.move(u);
     this.separate();
@@ -173,12 +183,13 @@ export class World {
   // ---------- abilities ----------
 
   /** Why a cast would fail right now, or null if it would go through. */
-  castBlocker(u: Unit, slot: Slot): 'rank' | 'cooldown' | 'mana' | 'busy' | null {
+  castBlocker(u: Unit, slot: Slot): 'rank' | 'cooldown' | 'mana' | 'busy' | 'rooted' | null {
     const c = u.champ;
     if (!c || u.dead) return 'busy';
     if (this.isBusy(u)) return 'busy';
     const st = c.abilities[slot];
     const def = kitOf(u).abilities[slot];
+    if (def.aim.shape === 'dash' && this.isRooted(u)) return 'rooted';
     if (st.rank === 0) return 'rank';
     if (def.recast && this.tick < st.recastUntil) return null;
     if (this.tick < st.readyAt) return 'cooldown';
@@ -187,7 +198,12 @@ export class World {
   }
 
   private startCast(u: Unit, slot: Slot, at: Vec2) {
-    if (this.castBlocker(u, slot)) return;
+    const blocker = this.castBlocker(u, slot);
+    if (blocker === 'busy' && (u.champ?.casting || u.champ?.dash)) {
+      u.champ.queued = { slot, at: { ...at }, until: this.tick + ticks(0.4) }; // buffer combos like E→W
+      return;
+    }
+    if (blocker) return;
     const c = u.champ!;
     const st = c.abilities[slot];
     const def = kitOf(u).abilities[slot];
@@ -223,6 +239,7 @@ export class World {
 
   private updateCast(u: Unit) {
     const c = u.champ!;
+    if (c.casting && this.isStunned(u)) c.casting = null; // stuns interrupt wind-ups
     if (c.casting && this.tick >= c.casting.fireAt) {
       const { slot, at, recast } = c.casting;
       c.casting = null;
@@ -242,6 +259,11 @@ export class World {
       }
       this.resolveStructures(u);
       if (dist(u.pos, d.to) < 0.05 || dist(next, d.to) < 1e-6 || u.pos.x !== next.x || u.pos.y !== next.y) c.dash = null;
+    }
+    if (c.queued && !c.casting && !c.dash) {
+      const q = c.queued;
+      c.queued = null;
+      if (this.tick <= q.until) this.startCast(u, q.slot, q.at);
     }
   }
 
@@ -314,11 +336,11 @@ export class World {
 
   addStatus(u: Unit, s: Omit<Status, 'until'> & { seconds: number }) {
     const until = this.tick + ticks(s.seconds);
-    if (s.kind === 'momentum' || s.kind === 'mark') {
+    if (s.kind === 'momentum' || s.kind === 'mark' || s.kind === 'soak') {
       const cur = u.statuses.find((o) => o.kind === s.kind && o.sourceId === s.sourceId);
       if (cur) {
         cur.until = until;
-        cur.value = s.kind === 'momentum' ? Math.min(5, cur.value + s.value) : s.value;
+        cur.value = s.kind === 'momentum' ? Math.min(5, cur.value + s.value) : s.kind === 'soak' ? cur.value + s.value : s.value;
         return;
       }
     }
@@ -326,7 +348,7 @@ export class World {
   }
 
   status(u: Unit, kind: Status['kind'], sourceId?: number) {
-    return u.statuses.find((s) => s.kind === kind && (sourceId == null || s.sourceId === sourceId));
+    return u.statuses.find((s) => s.kind === kind && s.until > this.tick && (sourceId == null || s.sourceId === sourceId));
   }
 
   removeStatus(u: Unit, st: Status) {
@@ -368,6 +390,32 @@ export class World {
     u.windup = 0;
     this.addFx({ kind: 'blink', pos: from, team: u.team });
     this.addFx({ kind: 'blink', pos: u.pos, team: u.team });
+  }
+
+  /** Drag `u` to `to` (pulls, knockbacks). It can't act until it arrives; wind-ups and dashes are cancelled. */
+  pull(u: Unit, to: Vec2, speed: number) {
+    if (u.speed <= 0 || u.dead) return;
+    u.forced = { to: clampToLane(to, u.radius), speed };
+    u.windup = 0;
+    if (u.champ) {
+      u.champ.casting = null;
+      u.champ.dash = null;
+    }
+  }
+
+  /** Shift `u` up to `max` toward `to` this tick (slow drags like a whirlpool). */
+  nudge(u: Unit, to: Vec2, max: number) {
+    if (u.speed <= 0 || u.dead) return;
+    u.pos = clampToLane(toward(u.pos, to, max), u.radius);
+    this.resolveStructures(u);
+  }
+
+  private updateForced(u: Unit) {
+    const f = u.forced!;
+    const next = clampToLane(toward(u.pos, f.to, f.speed * DT), u.radius);
+    u.pos = next;
+    this.resolveStructures(u);
+    if (dist(u.pos, f.to) < 0.05 || u.pos.x !== next.x || u.pos.y !== next.y) u.forced = null;
   }
 
   dash(u: Unit, to: Vec2, speed: number, onPass?: (e: Unit) => void) {
@@ -466,6 +514,7 @@ export class World {
 
   private combat(u: Unit) {
     if (u.attackCd > 0) u.attackCd--;
+    if (this.isStunned(u) || u.forced) u.windup = 0;
     if (this.isBusy(u)) return;
     const target = this.get(u.attackTarget);
     if (u.attackTarget != null && !this.canAttack(u, target)) {
@@ -576,6 +625,14 @@ export class World {
     if (target.champ) {
       amount *= target.champ.mods.takenMult;
       if (src?.kind === 'tower') amount *= target.champ.mods.towerTakenMult;
+    }
+    // Shields soak damage first (oldest first); an emptied shield expires this tick.
+    for (const sh of target.statuses) {
+      if (sh.kind !== 'shield' || amount <= 0) continue;
+      const take = Math.min(sh.value, amount);
+      sh.value -= take;
+      amount -= take;
+      if (sh.value <= 0) sh.until = this.tick;
     }
     target.hp -= amount;
     target.lastHurtTick = this.tick;
@@ -696,7 +753,7 @@ export class World {
   // ---------- movement ----------
 
   private move(u: Unit) {
-    if (!u.moveTarget || u.windup > 0 || this.isBusy(u)) return;
+    if (!u.moveTarget || u.windup > 0 || this.isBusy(u) || this.isRooted(u)) return;
     const dx = u.moveTarget.x - u.pos.x;
     const dy = u.moveTarget.y - u.pos.y;
     const d = Math.hypot(dx, dy);
