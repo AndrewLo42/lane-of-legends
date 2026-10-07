@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lane Rogue</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #10141a; font-family: system-ui, sans-serif; user-select: none; color: #e8e6df; }
+      canvas { display: block; }
+      .controls { font-size: 12px; line-height: 1.7; opacity: 0.7; text-align: center; max-width: 620px; padding: 0 16px; }
+      .controls kbd { background: #ffffff22; border-radius: 3px; padding: 0 4px; font-family: inherit; }
+
+      #topbar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; align-items: center;
+        padding: 5px 16px; background: #0c0f14cc; border: 1px solid #ffffff22; border-radius: 6px; font-size: 13px; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+      #gold::before { content: '●'; color: #f2c14e; margin-right: 6px; }
+
+      #banner { position: fixed; top: 32%; width: 100%; text-align: center; font-size: 30px; letter-spacing: 3px; opacity: 0;
+        transition: opacity 300ms; text-shadow: 0 2px 8px #000; pointer-events: none; }
+      #banner[data-result='win'] { color: #ffd76a; font-size: 56px; }
+      #banner[data-result='loss'] { color: #ff6b5e; font-size: 56px; }
+      #banner[data-result='win']::after, #banner[data-result='loss']::after { content: attr(data-sub); display: block; font-size: 15px; letter-spacing: 1px; color: #e8e6df; margin-top: 8px; }
+      #floor { color: #ffd76a; }
+      #score { display: flex; gap: 12px; }
+      #score .you { color: #4ade80; }
+      #score .them { color: #ff8a80; }
+      #score .note { opacity: 0.7; }
+      #foe { position: fixed; top: 10px; right: 12px; display: flex; gap: 6px; align-items: center; padding: 5px 10px; background: #0c0f14cc;
+        border: 1px solid #ffffff22; border-radius: 6px; font-size: 13px; }
+
+      /* Augment chips (HUD and menus) */
+      .aug { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 5px; border-radius: 12px; font-size: 12px; border: 1px solid; background: #0008; cursor: help; }
+      .aug i { font-style: normal; }
+      .tier-silver { border-color: #b8c2cc; color: #dfe6ec; }
+      .tier-gold { border-color: #f2c14e; color: #ffd98a; }
+      .tier-prismatic { border-color: #c58bff; color: #e6c8ff; box-shadow: 0 0 8px #b36bff66; }
+      .none { opacity: 0.5; font-size: 12px; }
+      #abilities .augs { display: flex; flex-direction: column; gap: 3px; align-self: center; }
+      #abilities .augs .aug { padding: 1px 4px; pointer-events: auto; }
+
+      /* Health bars */
+      #bars { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+      .hb { position: absolute; left: 0; top: 0; height: 5px; background: #000000aa; border: 1px solid #000; border-radius: 2px; }
+      .hb > div:first-child { height: 100%; transition: width 90ms linear; }
+      .hb.champion { height: 8px; }
+      .hb.tower, .hb.nexus { height: 9px; }
+      .hb.me > div:first-child { background: #4ade80; }
+      .hb.ally > div:first-child { background: #3d8bff; }
+      .hb.enemy > div:first-child { background: #ef4444; }
+      .hb .mp { position: absolute; left: -1px; right: -1px; top: 100%; height: 3px; background: #000000cc; border: 1px solid #000; border-top: 0; }
+      .hb .mp > div { height: 100%; background: #4f8fe8; }
+      .hb .lvl { position: absolute; left: -21px; top: -4px; width: 17px; height: 14px; line-height: 14px; text-align: center; font-size: 10px;
+        font-weight: 700; background: #12141b; border: 1px solid #ffffff55; border-radius: 3px; }
+      .hb.marked::after { content: '◈'; position: absolute; right: -16px; top: -6px; color: #c58bff; font-size: 14px; text-shadow: 0 0 6px #b36bff; }
+      .hb.locked { opacity: 0.55; }
+      .hb.locked::after { content: '🔒'; position: absolute; left: -18px; top: -5px; font-size: 11px; }
+
+      /* Ability bar */
+      #abilities { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: flex-end;
+        padding: 10px 12px 8px; background: #0c0f14e6; border: 1px solid #ffffff22; border-radius: 10px; }
+      #abilities .portrait { position: relative; width: 62px; height: 62px; border-radius: 50%; border: 2px solid var(--accent);
+        display: grid; place-items: center; font-size: 30px; color: var(--accent); background: radial-gradient(#ffffff14, #0000); }
+      #abilities .portrait .lvl { position: absolute; bottom: -6px; right: -6px; background: #12141b; border: 1px solid var(--accent);
+        border-radius: 10px; min-width: 20px; text-align: center; font-size: 12px; color: #e8e6df; padding: 0 3px; }
+      #abilities .slots { display: flex; gap: 6px; }
+      #abilities .slot { position: relative; width: 50px; height: 50px; border-radius: 6px; background: #1b1e26; border: 2px solid #ffffff30;
+        display: grid; place-items: center; font-size: 24px; color: var(--accent); }
+      #abilities .slot i { font-style: normal; }
+      #abilities .slot.passive { width: 34px; height: 34px; font-size: 16px; align-self: center; border-radius: 50%; }
+      #abilities .slot .cd { position: absolute; inset: 0; border-radius: 4px; }
+      #abilities .slot .cdtext { position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; }
+      #abilities .slot .key { position: absolute; bottom: -2px; right: 3px; font-size: 10px; color: #e8e6dfaa; }
+      #abilities .slot .pips { position: absolute; top: 100%; left: 0; right: 0; text-align: center; font-size: 7px; letter-spacing: 1px; color: #ffd76a; margin-top: 2px; }
+      #abilities .slot.locked { filter: grayscale(1) brightness(0.45); }
+      #abilities .slot.oncd i { opacity: 0.3; }
+      #abilities .slot.nomana { box-shadow: inset 0 0 0 50px #2a4a8a66; }
+      #abilities .slot.recast { border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
+      #abilities .slot.casting { border-color: #fff; }
+      #abilities .slot .plus { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); width: 22px; height: 18px; padding: 0;
+        border: 1px solid #ffd76a; border-radius: 4px; background: #3a2f10; color: #ffd76a; font-weight: 700; cursor: pointer; animation: pulse 1s infinite; }
+      @keyframes pulse { 50% { box-shadow: 0 0 8px #ffd76a; } }
+      #abilities .core { display: flex; flex-direction: column; gap: 3px; }
+      #abilities .core .slots { margin: 18px 0 9px; }
+      #abilities .bar { position: relative; height: 13px; background: #000000aa; border: 1px solid #ffffff22; border-radius: 3px; overflow: hidden; }
+      #abilities .bar > div { height: 100%; transition: width 90ms linear; }
+      #abilities .bar > span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
+      #abilities .hp > div { background: linear-gradient(#4ade80, #239150); }
+      #abilities .mana > div { background: linear-gradient(#6aa6ff, #3460c0); }
+      #abilities .xp { height: 4px; }
+      #abilities .xp > div { background: #b78cff; }
+      #tip { position: fixed; display: none; bottom: 150px; left: 50%; transform: translateX(-50%); width: 320px; background: #12141bf2;
+        border: 1px solid #ffffff30; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; }
+      #tip b { font-size: 14px; }
+      #tip small { opacity: 0.6; }
+      #tip .cost { display: block; color: #9fc4ff; opacity: 0.9; }
+      #tip p { margin: 5px 0; }
+
+      /* Champion select */
+      #screen { position: fixed; inset: 0; background: #0b0d12d9; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 18px; z-index: 10; overflow-y: auto; padding: 24px 0; box-sizing: border-box; }
+      #screen h1 { margin: 0; font-weight: 600; letter-spacing: 2px; font-size: 26px; }
+      #screen .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+      #screen .card { width: 300px; text-align: left; color: inherit; font: inherit; background: #151922; border: 2px solid #ffffff22; border-radius: 12px;
+        padding: 16px 18px; cursor: pointer; transition: transform 120ms, border-color 120ms; }
+      #screen .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+      #screen .name { font-size: 24px; font-weight: 700; color: var(--accent); }
+      #screen .name span { font-size: 14px; font-weight: 400; color: #e8e6dfaa; }
+      #screen .blurb { font-size: 13px; line-height: 1.5; opacity: 0.85; }
+      #screen ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+      #screen li { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+      #screen li i { font-style: normal; width: 22px; text-align: center; color: var(--accent); font-size: 16px; }
+      #screen li small { margin-left: auto; opacity: 0.5; }
+      #screen .hint { font-size: 12px; opacity: 0.55; text-align: center; max-width: 640px; }
+      #screen .sub { margin: -8px 0 0; opacity: 0.75; text-align: center; padding: 0 16px; }
+      #screen .best { margin-top: 12px; font-size: 12px; opacity: 0.6; }
+      #screen button { font: inherit; color: inherit; }
+      #screen .floorhead { text-align: center; }
+      #screen .floorhead small { letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; font-size: 12px; }
+      #screen .floorhead h1 { font-size: 40px; margin-top: 2px; }
+      #screen h1.gold { color: #ffd76a; }
+      #screen h1.red { color: #ff6b5e; }
+      #screen .ladder { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; justify-content: center; }
+      #screen .ladder li { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 14px; background: #ffffff0d; font-size: 12px; opacity: 0.5; }
+      #screen .ladder li span { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #ffffff1a; font-size: 11px; }
+      #screen .ladder li.done { opacity: 0.8; color: #8fe08a; }
+      #screen .ladder li.now { opacity: 1; background: #ffd76a22; color: #ffd76a; outline: 1px solid #ffd76a66; }
+      #screen .versus { display: flex; gap: 20px; align-items: stretch; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+      #screen .side { width: 260px; background: #151922; border: 1px solid #ffffff1f; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+      #screen .side > small { opacity: 0.55; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+      #screen .side b { font-size: 20px; }
+      #screen .chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+      #screen .side .chips { justify-content: flex-start; }
+      #screen .scaling { font-size: 12px; color: #ff8a80; }
+      #screen .vs { align-self: center; font-size: 22px; font-weight: 700; opacity: 0.6; }
+      #screen .rules { display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 14px; text-align: center; padding: 0 16px; }
+      #screen .mod { background: #2a1f3a; border: 1px solid #c58bff55; border-radius: 8px; padding: 6px 12px; }
+      #screen .mod i { font-style: normal; margin-right: 6px; }
+      #screen .actions { display: flex; gap: 16px; align-items: center; }
+      #screen .go { padding: 10px 34px; font-size: 18px; font-weight: 700; letter-spacing: 1px; border-radius: 8px; border: 1px solid #ffd76a; background: #3a2f10; color: #ffd76a; cursor: pointer; }
+      #screen .go:hover { background: #4d3e14; }
+      #screen .link { background: none; border: none; opacity: 0.6; cursor: pointer; text-decoration: underline; }
+      #screen .link:disabled { opacity: 0.25; cursor: default; }
+      #screen .augcard { width: 220px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      #screen .augcard .icon { font-size: 40px; }
+      #screen .augcard .name { font-size: 18px; color: inherit; }
+      #screen .augcard .tier { text-transform: uppercase; letter-spacing: 2px; font-size: 10px; opacity: 0.8; }
+      #screen .augcard p { font-size: 13px; line-height: 1.45; color: #e8e6df; opacity: 0.9; }
+      #screen .augcard.tier-gold:hover { border-color: #f2c14e; }
+      #screen .augcard.tier-prismatic:hover { border-color: #c58bff; }
+      #screen .augcard.tier-silver:hover { border-color: #b8c2cc; }
+      #screen .results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; min-width: min(420px, 90vw); }
+      #screen .results li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; border-radius: 6px; background: #ffffff0d; font-size: 14px; }
+      #screen .results li.won span { color: #8fe08a; }
+      #screen .results li.lost span { color: #ff8a80; }
+    </style>
+  </head>
+  <body>
+    <div id="bars"></div>
+    <div id="topbar" style="display: none"><span id="floor"></span><span id="clock">0:00</span><span id="score"></span><span id="gold">0</span></div>
+    <div id="foe" style="display: none"></div>
+    <div id="banner"></div>
+    <div id="abilities" style="display: none"></div>
+    <div id="tip"></div>
+    <div id="screen" style="display: none"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

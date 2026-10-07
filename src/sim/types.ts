@@ -1,0 +1,216 @@
+/**
+ * Simulation types. The sim is pure TypeScript with no three.js or DOM imports, so it can be unit
+ * tested and later run on a server for PvP. The world is a 2D plane: `x` runs along the lane
+ * (blue base at -x, red base at +x) and `y` across it (the renderer maps it to three.js Z).
+ */
+export interface Vec2 {
+  x: number;
+  y: number;
+}
+
+export type Team = 'blue' | 'red';
+export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
+export type MinionRole = 'melee' | 'caster';
+export type KitId = 'arlo' | 'tock';
+/** 0..3 = Q W E R. */
+export type Slot = 0 | 1 | 2 | 3;
+
+export type AugmentId = string;
+
+/** Additive stat changes from augments and duel rules (multipliers multiply). */
+export interface Mods {
+  ad: number;
+  hpFlat: number;
+  hpPct: number;
+  /** Bonus attack speed (0.2 = +20%). */
+  attackSpeed: number;
+  /** Ability haste: cooldowns are multiplied by 100 / (100 + haste). */
+  haste: number;
+  speedPct: number;
+  /** Heal for this fraction of all damage dealt. */
+  omnivamp: number;
+  /** Extra damage dealt (0.2 = +20%). */
+  dmgAmp: number;
+  /** Damage taken multiplier. */
+  takenMult: number;
+  /** Damage taken from towers multiplier. */
+  towerTakenMult: number;
+  manaFlat: number;
+  manaRegen: number;
+}
+
+/** Where damage came from; drives which hooks fire. `proc` damage (on-hit extras, burns) fires no on-hit hooks, so procs can't chain. */
+export interface DamageSource {
+  attack?: boolean;
+  slot?: Slot;
+  proc?: boolean;
+}
+
+export interface Status {
+  kind: 'slow' | 'mark' | 'momentum' | 'burn';
+  until: number;
+  /** slow: fraction removed (0.5 = half speed); momentum: stacks; burn: damage per second. */
+  value: number;
+  sourceId: number;
+}
+
+export interface AbilityState {
+  rank: number;
+  /** Tick when the ability comes off cooldown. */
+  readyAt: number;
+  /** While tick < recastUntil, pressing the key recasts instead of casting. */
+  recastUntil: number;
+}
+
+/** Everything only champions have. */
+export interface ChampState {
+  kit: KitId;
+  level: number;
+  xp: number;
+  skillPoints: number;
+  mana: number;
+  maxMana: number;
+  abilities: [AbilityState, AbilityState, AbilityState, AbilityState];
+  /** Rooted while winding up an ability; it fires at `fireAt`. */
+  casting: { slot: Slot; at: Vec2; fireAt: number; recast: boolean } | null;
+  /** Moving under its own power (can't act until it lands). */
+  dash: { to: Vec2; speed: number; onPass?: (u: Unit) => void; passed: number[] } | null;
+  /** Kit-specific bookkeeping (echo positions, rewind history, ...). */
+  data: Record<string, unknown>;
+  augments: AugmentId[];
+  /** Augment bookkeeping, keyed by augment id. */
+  augData: Record<string, unknown>;
+  mods: Mods;
+  /** Opponent scaling: base HP and damage (and their growth) are multiplied by this. */
+  statMult: number;
+  kills: number;
+  deaths: number;
+  /** Minion last hits. */
+  cs: number;
+}
+
+export interface Unit {
+  id: number;
+  kind: UnitKind;
+  team: Team;
+  role?: MinionRole;
+  pos: Vec2;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  /** Units per second before slows; 0 for structures. */
+  speed: number;
+  /** Where the unit is walking to, if anywhere. */
+  moveTarget: Vec2 | null;
+  /** Facing angle in radians (0 = +x). */
+  facing: number;
+
+  // ---- auto-attacks ----
+  damage: number;
+  /** Edge-to-edge reach. */
+  range: number;
+  /** Seconds between attacks before attack-speed bonuses. */
+  attackInterval: number;
+  /** Ticks from attack start until it fires (moving during it cancels the attack). */
+  windupTicks: number;
+  /** 0 = melee (instant hit when the windup ends). */
+  projectileSpeed: number;
+  attackTarget: number | null;
+  /** Ticks until the next attack may start. */
+  attackCd: number;
+  /** Ticks left in the current windup, 0 when not attacking. */
+  windup: number;
+
+  // ---- bookkeeping ----
+  /** Tick the last attack started / damage was taken (renderer feedback). */
+  lastAttackTick: number;
+  lastHurtTick: number;
+  dead: boolean;
+  /** Champions only: tick at which they come back. */
+  respawnTick: number;
+  gold: number;
+  /** Minions: lateral offset they keep while marching. */
+  laneY: number;
+  statuses: Status[];
+  champ?: ChampState;
+}
+
+/** What a missile looks like; the renderer picks a mesh per style. */
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave';
+
+export interface Missile {
+  id: number;
+  team: Team;
+  sourceId: number;
+  style: MissileStyle;
+  pos: Vec2;
+  speed: number;
+  /** Homing missiles chase a unit; line missiles fly along `dir` until `range` runs out. */
+  targetId: number | null;
+  dir: Vec2;
+  range: number;
+  travelled: number;
+  /** Line missiles: collision width. */
+  width: number;
+  /** Line missiles keep going after a hit. */
+  pierce: boolean;
+  /** Line missiles: which units can stop/take it. */
+  canHit: (u: Unit) => boolean;
+  hit: number[];
+  onHit: (target: Unit) => void;
+  /** Id of the stasis field holding it in place, if any. */
+  frozenBy: number | null;
+}
+
+export interface Zone {
+  id: number;
+  kind: 'stasis' | 'echo' | 'anchor';
+  team: Team;
+  ownerId: number;
+  pos: Vec2;
+  radius: number;
+  until: number;
+  start: number;
+}
+
+/** A ground warning shown while something winds up. */
+export interface Telegraph {
+  id: number;
+  team: Team;
+  shape: 'line' | 'cone' | 'circle';
+  pos: Vec2;
+  /** Angle in radians (lines and cones). */
+  dir: number;
+  length: number;
+  /** Line width, or cone angle in radians. */
+  width: number;
+  start: number;
+  end: number;
+}
+
+/** One-shot visual events for the renderer (swings, blinks, detonations). */
+export interface Fx {
+  tick: number;
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit';
+  pos: Vec2;
+  dir?: number;
+  radius?: number;
+  angle?: number;
+  team: Team;
+}
+
+/**
+ * Everything a controller can ask its champion to do. Human input and the CPU bot both produce
+ * these, so swapping one for the other (or a network peer) doesn't touch the sim.
+ */
+export type Command =
+  | { type: 'move'; to: Vec2 }
+  | { type: 'attack'; target: number }
+  | { type: 'stop' }
+  | { type: 'cast'; slot: Slot; at: Vec2 }
+  | { type: 'levelUp'; slot: Slot };
+
+export interface Controller {
+  /** Called once per tick; returns the commands for this tick. */
+  think(world: import('./world').World, self: Unit): Command[];
+}

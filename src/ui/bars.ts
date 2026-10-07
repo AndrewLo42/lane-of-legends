@@ -1,0 +1,73 @@
+import * as THREE from 'three';
+import type { Unit } from '../sim/types';
+import type { World } from '../sim/world';
+import { BAR_HEIGHT, type WorldView } from '../render/views';
+
+const WIDTH: Record<Unit['kind'], number> = { champion: 74, minion: 34, tower: 96, nexus: 120 };
+
+/**
+ * HTML health bars that follow units on screen. Colours follow League's convention: you are green,
+ * allies blue, enemies red. Untargetable structures show a lock.
+ */
+export class HealthBars {
+  private root = document.getElementById('bars')!;
+  private bars = new Map<number, { el: HTMLDivElement; fill: HTMLDivElement; mana?: HTMLDivElement; lvl?: HTMLSpanElement }>();
+  private v = new THREE.Vector3();
+
+  constructor(private world: World, private view: WorldView, private meId: number, private myTeam: Unit['team']) {}
+
+  update(camera: THREE.Camera) {
+    const live = new Set<number>();
+    for (const u of this.world.units) {
+      const pos = this.view.positionOf(u.id);
+      if (u.dead || !pos) continue;
+      live.add(u.id);
+      let bar = this.bars.get(u.id);
+      if (!bar) bar = this.create(u);
+
+      this.v.set(pos.x, BAR_HEIGHT[u.kind], pos.z).project(camera);
+      const x = (this.v.x * 0.5 + 0.5) * innerWidth;
+      const y = (-this.v.y * 0.5 + 0.5) * innerHeight;
+      bar.el.style.transform = `translate(${x - WIDTH[u.kind] / 2}px, ${y}px)`;
+      bar.el.style.display = this.v.z > 1 ? 'none' : '';
+      bar.fill.style.width = `${(100 * u.hp) / u.maxHp}%`;
+      if (u.champ && bar.mana && bar.lvl) {
+        bar.mana.style.width = `${(100 * u.champ.mana) / u.champ.maxMana}%`;
+        bar.lvl.textContent = String(u.champ.level);
+        bar.el.classList.toggle('marked', !!this.world.status(u, 'mark'));
+      }
+      bar.el.classList.toggle('locked', (u.kind === 'tower' || u.kind === 'nexus') && !this.world.isTargetable(u));
+    }
+    for (const [id, bar] of this.bars) {
+      if (live.has(id)) continue;
+      bar.el.remove();
+      this.bars.delete(id);
+    }
+  }
+
+  dispose() {
+    for (const bar of this.bars.values()) bar.el.remove();
+    this.bars.clear();
+  }
+
+  private create(u: Unit) {
+    const el = document.createElement('div');
+    const side = u.id === this.meId ? 'me' : u.team === this.myTeam ? 'ally' : 'enemy';
+    el.className = `hb ${u.kind} ${side}`;
+    el.style.width = `${WIDTH[u.kind]}px`;
+    const fill = document.createElement('div');
+    el.appendChild(fill);
+    const bar: { el: HTMLDivElement; fill: HTMLDivElement; mana?: HTMLDivElement; lvl?: HTMLSpanElement } = { el, fill };
+    if (u.champ) {
+      const mana = document.createElement('div');
+      mana.className = 'mp';
+      mana.appendChild((bar.mana = document.createElement('div')));
+      bar.lvl = document.createElement('span');
+      bar.lvl.className = 'lvl';
+      el.append(mana, bar.lvl);
+    }
+    this.root.appendChild(el);
+    this.bars.set(u.id, bar);
+    return bar;
+  }
+}
