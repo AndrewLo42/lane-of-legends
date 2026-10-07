@@ -1,0 +1,60 @@
+[
+  {
+    "at": "2026-10-07T20:28:25.226Z",
+    "cmd": "concept",
+    "taskId": "01a1180d-1e86-76c8-af97-b3d4ee0494fe",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a defensive lane tower in a clockwork style: a tall, stout tower of riveted brass plates over a grey stone base, exposed gears and a wind-up key on its side, topped by a brass cradle holding a large glowing bright magenta crystal, two bright magenta cloth banners hanging down its front. stylized fantasy MOBA game prop, hand-painted textures, chunky readable silhouette, clean simple shapes, bright but controlled colors, game-ready prop concept. turnaround sheet with front view, side view and back view, plain light grey background, even soft studio lighting, no cast shadows, the whole object visible. no characters, no text, no logos, no busy background, no photorealism",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/tower/concepts/ee0494fe_0.png",
+      "assets-src/meshy/tower/concepts/ee0494fe_1.png",
+      "assets-src/meshy/tower/concepts/ee0494fe_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:28:30.112Z",
+    "cmd": "concept",
+    "taskId": "01a1180d-1f86-7138-ae29-dc6fc2bc0de9",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a defensive lane tower in a clockwork style: a tall, stout tower of riveted brass plates over a grey stone base, exposed gears and a wind-up key on its side, topped by a brass cradle holding a large glowing bright magenta crystal, two bright magenta cloth banners hanging down its front. stylized fantasy MOBA game prop, hand-painted textures, chunky readable silhouette, clean simple shapes, bright but controlled colors, game-ready prop concept. turnaround sheet with front view, side view and back view, plain light grey background, even soft studio lighting, no cast shadows, the whole object visible. no characters, no text, no logos, no busy background, no photorealism",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/tower/concepts/c2bc0de9_0.png",
+      "assets-src/meshy/tower/concepts/c2bc0de9_1.png",
+      "assets-src/meshy/tower/concepts/c2bc0de9_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:34:59.777Z",
+    "cmd": "model",
+    "taskId": "01a11811-bf55-7356-8de9-3727b433650e",
+    "request": {
+      "image_urls": [
+        "ee0494fe_0.png",
+        "ee0494fe_1.png",
+        "ee0494fe_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 6000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "riveted brass tower on a grey stone base, large glowing bright magenta crystal on top, bright magenta cloth banners"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/tower/model_b433650e.glb"
+    ]
+  }
+]

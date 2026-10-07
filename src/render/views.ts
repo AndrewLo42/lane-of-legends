@@ -6,14 +6,18 @@ import { hasModel, instantiate, type ModelName } from './assets';
 import { RIGS } from './rigs';
 import { TEAM_COLOR, placeholderFor } from './scene';
 
-/** Minion role → Meshy model and its in-game height (metres). */
-const MINION_MODELS: Record<string, { name: ModelName; height: number }> = {
-  melee: { name: 'minion_melee', height: 1.25 },
-  caster: { name: 'minion_caster', height: 1.5 },
-};
+/** Unit → Meshy model and its in-game height (metres); placeholders are used when none is loaded. */
+function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
+  if (u.kind === 'minion') return u.role === 'melee' ? { name: 'minion_melee', height: 1.25 } : { name: 'minion_caster', height: 1.5 };
+  if (u.kind === 'tower') return { name: 'tower', height: 7.2 };
+  if (u.kind === 'nexus') return { name: 'nexus', height: 6.2 };
+  return undefined;
+}
 /** How long a dead minion lingers to play its death clip, then how long it takes to sink away. */
 const CORPSE_SECONDS = 2.4;
 const SINK_SECONDS = 0.5;
+/** A destroyed structure shakes, tilts and sinks into the ground over this long. */
+const COLLAPSE_SECONDS = 1.6;
 
 interface UnitView {
   obj: THREE.Object3D;
@@ -72,7 +76,7 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
 export class WorldView {
   private units = new Map<number, UnitView>();
   /** Dead minions playing their death clip before they're removed. */
-  private corpses: { v: UnitView; age: number }[] = [];
+  private corpses: { v: UnitView; age: number; collapse: boolean }[] = [];
   private missiles = new Map<number, MissileView>();
 
   constructor(private scene: THREE.Scene, private world: World) {
@@ -99,11 +103,14 @@ export class WorldView {
     for (const u of this.world.units) {
       live.add(u.id);
       if (this.units.has(u.id)) continue;
-      const model = u.kind === 'minion' ? MINION_MODELS[u.role!] : undefined;
+      const model = modelFor(u);
       const built = model && hasModel(model.name) ? instantiate(model.name, model.height, new THREE.Color(TEAM_COLOR[u.team])) : null;
       const obj = built?.root ?? placeholderFor(u);
-      const anim = built ? new AnimatedModel(built.model, built.clips, RIGS.meshy) : undefined;
+      const anim = built?.clips.length ? new AnimatedModel(built.model, built.clips, RIGS.meshy) : undefined;
       anim?.setBase('Idle');
+      obj.userData.structure = u.kind === 'tower' || u.kind === 'nexus';
+      // Structures never turn; show their front to the MOBA camera (which looks toward -z).
+      obj.rotation.y = obj.userData.structure ? -Math.PI / 2 : -u.facing;
       obj.userData.unitId = u.id;
       const mats: UnitView['mats'] = [];
       obj.traverse((o) => {
@@ -116,9 +123,9 @@ export class WorldView {
     for (const [id, v] of this.units) {
       if (live.has(id)) continue;
       this.units.delete(id);
-      if (v.anim?.playOnce('Death', { persistent: true })) {
+      if (v.anim?.playOnce('Death', { persistent: true }) || v.obj.userData.structure) {
         v.obj.userData.unitId = undefined; // not pickable while dying
-        this.corpses.push({ v, age: 0 });
+        this.corpses.push({ v, age: 0, collapse: !v.anim });
       } else {
         this.removeView(v);
       }
@@ -161,6 +168,19 @@ export class WorldView {
     for (let i = this.corpses.length - 1; i >= 0; i--) {
       const c = this.corpses[i];
       c.age += dt;
+      if (c.collapse) {
+        // Shake, lean over and sink: a quick, readable "it's gone".
+        const k = Math.min(1, c.age / COLLAPSE_SECONDS);
+        const o = c.v.obj;
+        o.position.y = -k * k * 8;
+        o.rotation.z = k * 0.35;
+        o.position.x += Math.sin(c.age * 60) * 0.04 * (1 - k);
+        if (c.age >= COLLAPSE_SECONDS) {
+          this.removeView(c.v);
+          this.corpses.splice(i, 1);
+        }
+        continue;
+      }
       c.v.anim!.update(dt);
       c.v.syncProps?.();
       const sink = c.age - (CORPSE_SECONDS - SINK_SECONDS);

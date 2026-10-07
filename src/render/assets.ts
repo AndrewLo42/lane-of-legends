@@ -8,10 +8,12 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
  */
 const BASE = `${import.meta.env.BASE_URL}assets/meshy/`;
 
-/** Model name → file. Clips inside use the canonical names: Idle, Walk, Attack, Hit, Death. */
+/** Model name → file. Animated models' clips use the canonical names: Idle, Walk, Attack, Attack2, Death. */
 export const MODELS = {
   minion_melee: 'MinionMelee.glb',
   minion_caster: 'MinionCaster.glb',
+  tower: 'Tower.glb',
+  nexus: 'Nexus.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 
@@ -95,7 +97,11 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color) 
   const model = cloneSkinned(gltf.scene);
   model.updateMatrixWorld(true); // Meshy armatures carry a 0.01 (centimetre) scale; measure with it applied
   const box = new THREE.Box3().setFromObject(model);
-  model.scale.setScalar(height / Math.max(0.01, box.max.y - box.min.y));
+  const k = height / Math.max(0.01, box.max.y - box.min.y);
+  model.scale.setScalar(k);
+  // Stand it on the ground and centre it: not every Meshy export has its origin at the feet.
+  const centre = box.getCenter(new THREE.Vector3());
+  model.position.set(-centre.z * k, -box.min.y * k, centre.x * k); // (after the quarter turn below)
   model.rotation.y = Math.PI / 2; // Meshy models face +z
   const materials: THREE.MeshStandardMaterial[] = [];
   model.traverse((o) => {

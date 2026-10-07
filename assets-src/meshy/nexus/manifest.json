@@ -1,0 +1,59 @@
+[
+  {
+    "at": "2026-10-07T20:29:45.339Z",
+    "cmd": "concept",
+    "taskId": "01a1180d-a8e9-7374-b72e-5fa63a1f521e",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "the main base core structure in a clockwork style: a large brass orrery machine on a round stepped stone plinth, three brass rings circling a huge glowing bright magenta crystal heart, pistons, gears and pipes around the base, bright magenta cloth banners on the plinth. stylized fantasy MOBA game prop, hand-painted textures, chunky readable silhouette, clean simple shapes, bright but controlled colors, game-ready prop concept. turnaround sheet with front view, side view and back view, plain light grey background, even soft studio lighting, no cast shadows, the whole object visible. no characters, no text, no logos, no busy background, no photorealism",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/nexus/concepts/3a1f521e_0.png",
+      "assets-src/meshy/nexus/concepts/3a1f521e_1.png",
+      "assets-src/meshy/nexus/concepts/3a1f521e_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:29:46.034Z",
+    "cmd": "concept",
+    "taskId": "01a1180d-a9c3-76a7-9cec-8c513ef798ad",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "the main base core structure in a clockwork style: a large brass orrery machine on a round stepped stone plinth, three brass rings circling a huge glowing bright magenta crystal heart, pistons, gears and pipes around the base, bright magenta cloth banners on the plinth. stylized fantasy MOBA game prop, hand-painted textures, chunky readable silhouette, clean simple shapes, bright but controlled colors, game-ready prop concept. turnaround sheet with front view, side view and back view, plain light grey background, even soft studio lighting, no cast shadows, the whole object visible. no characters, no text, no logos, no busy background, no photorealism",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/nexus/concepts/3ef798ad_0.png",
+      "assets-src/meshy/nexus/concepts/3ef798ad_1.png",
+      "assets-src/meshy/nexus/concepts/3ef798ad_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:35:35.678Z",
+    "cmd": "model",
+    "taskId": "01a11811-bf54-7223-a4d6-d1add9fdbbdb",
+    "request": {
+      "image_urls": [
+        "3ef798ad_0.png",
+        "3ef798ad_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 6000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "grey stone plinth with brass gears and pipes, huge glowing bright magenta crystal heart inside a toothed brass gear ring, bright magenta cloth banners"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/nexus/model_d9fdbbdb.glb"
+    ]
+  }
+]
