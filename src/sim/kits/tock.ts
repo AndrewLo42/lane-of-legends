@@ -5,7 +5,11 @@ import { at } from './common';
 import type { Kit } from './types';
 
 const Q = { base: [60, 95, 130, 165, 200], ad: 0.9, cost: [40, 40, 40, 40, 40], cd: [7, 6.5, 6, 5.5, 5], radius: 3.6, angle: (110 * Math.PI) / 180, backswing: 1.5 };
-const W = { cost: [70, 70, 70, 70, 70], cd: [18, 17, 16, 15, 14], range: 7, radius: 3.5, duration: [2, 2.25, 2.5, 2.75, 3] };
+const W = {
+  cost: [70, 70, 70, 70, 70], cd: [18, 17, 16, 15, 14], range: 7, radius: 3.5, duration: [2, 2.25, 2.5, 2.75, 3],
+  /** Standing in his own field shields Tock (once per field); it fades `linger` s after he leaves. */
+  shield: [30, 45, 60, 75, 90], shieldHp: 0.02, linger: 1,
+};
 const E = { base: [50, 80, 110, 140, 170], ad: 0.5, cost: [40, 40, 40, 40, 40], cd: [14, 13, 12, 11, 10], range: 5.5, echo: 4 };
 const R = { echo: [0.5, 0.75], cost: [100, 100], cd: [100, 80], window: 3 };
 const PASSIVE = { every: 3, delay: 0.4, ratio: 0.6 };
@@ -17,6 +21,8 @@ interface TockData {
   swung?: number[];
   echo?: { pos: Vec2; zone: number };
   rewind?: { anchor: Vec2; hp: number; until: number; zone: number; dealt: Record<number, number> };
+  /** Stopwatch fields that have already shielded him. */
+  shieldedBy?: number[];
 }
 const data = (u: Unit) => u.champ!.data as TockData;
 
@@ -53,6 +59,23 @@ function rewind(world: World, self: Unit) {
   }
 }
 
+/** Inside his own Stopwatch: shield him once per field, and keep it up while he stays inside. */
+function stopwatchShield(world: World, self: Unit) {
+  const d = data(self);
+  d.shieldedBy = (d.shieldedBy ?? []).filter((id) => world.zones.some((z) => z.id === id));
+  const rank = self.champ!.abilities[1].rank;
+  for (const z of world.zones) {
+    if (z.kind !== 'stasis' || z.ownerId !== self.id || dist(z.pos, self.pos) > z.radius) continue;
+    const shield = world.status(self, 'shield', z.id);
+    if (shield) {
+      shield.until = Math.max(shield.until, world.tick + ticks(W.linger));
+    } else if (!d.shieldedBy.includes(z.id)) {
+      d.shieldedBy.push(z.id);
+      world.addStatus(self, { kind: 'shield', value: at(W.shield, rank) + W.shieldHp * self.maxHp, sourceId: z.id, seconds: W.linger });
+    }
+  }
+}
+
 /**
  * A clockwork knight who bends the few seconds around him: freeze projectiles in the air, skip
  * forward and snap back, and undo a bad trade entirely.
@@ -64,7 +87,7 @@ export const TOCK: Kit = {
   blurb: 'Melee time-bender. Dash in, freeze enemy projectiles mid-air, and when a fight goes wrong, rewind it: back to where you were, health restored, and their pain replayed.',
   color: '#5fd0c4',
   stats: {
-    hp: 680, hpPerLevel: 100, mana: 300, manaPerLevel: 40, manaRegen: 1.8, damage: 64, damagePerLevel: 4.5,
+    hp: 620, hpPerLevel: 92, mana: 300, manaPerLevel: 40, manaRegen: 1.8, damage: 64, damagePerLevel: 4.5,
     attackInterval: 0.85, attackSpeedPerLevel: 0.02, windup: 0.2, range: 1.4, projectileSpeed: 0, speed: 6.6, radius: 0.65,
   },
   passive: {
@@ -102,9 +125,10 @@ export const TOCK: Kit = {
       cooldown: (r) => at(W.cd, r),
       castTime: 0.15,
       aim: { shape: 'circle', range: W.range, radius: W.radius },
-      describe: (r) =>
-        `Stop time in an area for ${at(W.duration, r)}s. Enemies inside are slowed by 50%, and enemy projectiles that ` +
-        `enter it freeze in place and crumble when it ends.`,
+      describe: (r, self) =>
+        `Stop time in an area for ${at(W.duration, r)}s. Enemies inside are slowed by 35%, and enemy skillshots that ` +
+        `enter it freeze in place and crumble when it ends (auto-attacks pass through). Inside his own field, Tock gains a ` +
+        `${Math.round(at(W.shield, r) + W.shieldHp * self.maxHp)} shield (once per field) that fades ${W.linger}s after he leaves.`,
       cast: ({ world, self, at: aim, rank }) => {
         world.addZone('stasis', self, toward(self.pos, aim, W.range), W.radius, at(W.duration, rank));
       },
@@ -174,6 +198,7 @@ export const TOCK: Kit = {
   onTick: (world, self) => {
     const r = data(self).rewind;
     if (r && world.tick >= r.until) rewind(world, self);
+    stopwatchShield(world, self);
   },
   onDeath: (world, self) => {
     const d = data(self);

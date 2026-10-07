@@ -39,12 +39,14 @@ export class HealthBars {
       const y = (-this.v.y * 0.5 + 0.5) * innerHeight;
       bar.el.style.transform = `translate(${x - WIDTH[u.kind] / 2}px, ${y}px)`;
       bar.el.style.display = this.v.z > 1 ? 'none' : '';
-      const hpPct = (100 * u.hp) / u.maxHp;
-      bar.fill.style.width = `${hpPct}%`;
-      // Shields show as a white extension past the health (League-style), capped at the bar's end.
+      // Shields show as a white segment after the health. If health plus shield would overflow the
+      // bar, the whole bar rescales to fit both (as in League), so a full-health shield still shows.
       const shield = u.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);
+      const scale = Math.max(u.maxHp, u.hp + shield);
+      const hpPct = (100 * u.hp) / scale;
+      bar.fill.style.width = `${hpPct}%`;
       bar.shield.style.left = `${hpPct}%`;
-      bar.shield.style.width = `${Math.min(100 - hpPct, (100 * shield) / u.maxHp)}%`;
+      bar.shield.style.width = `${(100 * shield) / scale}%`;
       if (bar.cc) {
         const cc = this.world.isStunned(u) ? 'STUNNED' : this.world.isRooted(u) ? 'ROOTED' : '';
         if (bar.cc.textContent !== cc) bar.cc.textContent = cc;

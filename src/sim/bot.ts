@@ -172,6 +172,7 @@ export class BotController implements Controller {
     const healthy = self.hp > self.maxHp * 0.5;
 
     if (ready(3) && !healthy && near(4)) return cast(3, self.pos);
+    if (ready(1) && near(2.5)) return cast(1, self.pos); // slow them and shield himself in a melee trade
     if (recasting(0) && near(3)) return cast(0, foe.pos);
     if (ready(0) && near(3)) return cast(0, foe.pos);
     if (ready(2) && healthy && near(6.5) && !near(2) && !unsafe(foe.pos)) return cast(2, foe.pos);

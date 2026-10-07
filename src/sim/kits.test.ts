@@ -147,6 +147,46 @@ describe('Tock', () => {
     expect(me.hp).toBe(me.maxHp);
   });
 
+  it('Stopwatch shields Tock while he stands in it, once per field', () => {
+    const { w, me, cast } = setup('tock');
+    const foe = dummy(w, 2);
+    foe.range = 0; // no autos (they'd chip the shield: auto-attacks pass through the field)
+    cast(1, 3); // field centred 3 away: he's inside it
+    run(w, 0.3);
+    const shield = w.status(me, 'shield');
+    expect(shield?.value).toBeCloseTo(30 + 0.02 * me.maxHp, 5);
+    w.dealDamage(foe, me, 40);
+    expect(me.hp).toBe(me.maxHp); // absorbed
+    me.pos = { x: -10, y: 0 }; // step out: it lingers ~1s, then fades
+    run(w, 0.5);
+    expect(w.status(me, 'shield')).toBeDefined();
+    run(w, 0.7);
+    expect(w.status(me, 'shield')).toBeUndefined();
+    me.pos = { x: 0, y: 0 }; // back in the same field: no second shield
+    run(w, 0.2);
+    expect(w.status(me, 'shield')).toBeUndefined();
+  });
+
+  it('Stopwatch freezes skillshots but lets auto-attacks through', () => {
+    const { w, me, cast } = setup('tock');
+    const arlo = dummy(w, 5);
+    arlo.range = 6;
+    cast(1, 0); // field around Tock
+    w.fireLine(arlo, { style: 'spark', dir: { x: -1, y: 0 }, speed: 30, range: 10, width: 0.6, onHit: (t) => w.dealDamage(arlo, t, 50) });
+    run(w, 1);
+    expect(w.missiles.some((m) => m.style === 'spark' && m.frozenBy != null)).toBe(true);
+    const full = 30 + 0.02 * me.maxHp;
+    const left = w.status(me, 'shield')?.value ?? 0;
+    expect(left).toBeLessThan(full); // Arlo's autos reached him and chipped the shield
+  });
+
+  it('Stopwatch cast away from Tock gives no shield', () => {
+    const { w, me, cast } = setup('tock');
+    cast(1, 7);
+    run(w, 0.3);
+    expect(w.status(me, 'shield')).toBeUndefined();
+  });
+
   it('Skip dashes through enemies, then the recast snaps back to the echo', () => {
     const { w, me, cast } = setup('tock');
     const target = dummy(w, 3, 0.3);

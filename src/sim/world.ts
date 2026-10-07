@@ -17,6 +17,9 @@ import { DT, TICK_HZ, angleTo, dist, dirTo, enemyOf, gap, inCone, segmentDistanc
 export { DT, TICK_HZ, enemyOf, gap };
 export type { DamageSource };
 
+/** How much a Stopwatch field slows enemies inside it. */
+export const STASIS_SLOW = 0.35;
+
 export const xpToNext = (level: number) => XP_BASE + XP_STEP * (level - 1);
 
 export class World {
@@ -558,7 +561,9 @@ export class World {
     for (let i = this.missiles.length - 1; i >= 0; i--) {
       const m = this.missiles[i];
       if (m.frozenBy != null) continue; // released (destroyed) when its field ends
-      const field = this.zones.find((z) => z.kind === 'stasis' && z.team !== m.team && dist(z.pos, m.pos) <= z.radius);
+      // Stopwatch freezes skillshots, not auto-attacks (homing shots): otherwise standing in his own
+      // field made Tock immune to ranged champions for its whole duration.
+      const field = m.targetId == null && this.zones.find((z) => z.kind === 'stasis' && z.team !== m.team && dist(z.pos, m.pos) <= z.radius);
       if (field) { m.frozenBy = field.id; continue; }
 
       const stepLen = m.speed * DT;
@@ -608,7 +613,7 @@ export class World {
       if (z.kind === 'stasis') {
         for (const u of this.units) {
           if (u.dead || u.team === z.team || u.speed <= 0 || dist(u.pos, z.pos) > z.radius + u.radius) continue;
-          this.addStatus(u, { kind: 'slow', value: 0.5, sourceId: z.ownerId, seconds: 0.25 });
+          this.addStatus(u, { kind: 'slow', value: STASIS_SLOW, sourceId: z.ownerId, seconds: 0.25 });
         }
       }
     }
