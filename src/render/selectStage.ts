@@ -15,7 +15,7 @@ export class SelectStage {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
   active = false;
-  private champs = new Map<KitId, { root: THREE.Object3D; anim?: AnimatedModel; ring: THREE.Mesh; light: THREE.SpotLight }>();
+  private champs = new Map<KitId, { root: THREE.Object3D; anim?: AnimatedModel; ring: THREE.Mesh; light: THREE.SpotLight; syncProps?: (dt?: number) => void; swingProp?: () => void }>();
   private focused: KitId | null = null;
   private t = 0;
 
@@ -59,7 +59,7 @@ export class SelectStage {
       const anim = new AnimatedModel(built.model, built.clips, RIGS.meshy);
       anim.setBase('Idle');
       anim.mixer.setTime(i * 0.7); // don't idle in lockstep
-      this.champs.set(kit, { root: built.root, anim, ring, light });
+      this.champs.set(kit, { root: built.root, anim, ring, light, syncProps: built.syncProps, swingProp: built.swingProp });
     });
 
     this.camera.position.set(0, 2.4, 9.5);
@@ -75,7 +75,10 @@ export class SelectStage {
   focus(kit: KitId | null) {
     if (kit === this.focused) return;
     this.focused = kit;
-    if (kit) this.champs.get(kit)?.anim?.playOnce('Select');
+    if (!kit) return;
+    const c = this.champs.get(kit);
+    c?.anim?.playOnce('Select');
+    c?.swingProp?.();
   }
 
   update(dt: number) {
@@ -89,6 +92,7 @@ export class SelectStage {
       const yaw = -Math.PI / 2 + (on ? Math.sin(this.t * 0.6) * 0.25 : 0);
       c.root.rotation.y += (yaw - c.root.rotation.y) * Math.min(1, dt * 3);
       c.anim?.update(dt);
+      c.syncProps?.(dt);
     }
   }
 

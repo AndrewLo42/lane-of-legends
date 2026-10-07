@@ -41,8 +41,9 @@ const names = (Object.keys(MODELS) as ModelName[]).filter(hasModel);
 let name = (params.get('model') as ModelName) ?? names[0];
 let team: 'blue' | 'red' = 'blue';
 let speed = 1;
-let current: { root: THREE.Object3D; anim: AnimatedModel; syncProps: () => void } | null = null;
+let current: { root: THREE.Object3D; anim: AnimatedModel; syncProps: (dt?: number) => void; swingProp: () => void } | null = null;
 let clip = 'Idle';
+let swingClock = 0;
 
 const ui = document.getElementById('ui')!;
 
@@ -55,7 +56,7 @@ function load() {
   if (!built) return;
   built.root.rotation.y = -Math.PI / 4; // three-quarter view to start
   scene.add(built.root);
-  current = { root: built.root, anim: new AnimatedModel(built.model, built.clips, RIGS.meshy), syncProps: built.syncProps };
+  current = { root: built.root, anim: new AnimatedModel(built.model, built.clips, RIGS.meshy), syncProps: built.syncProps, swingProp: built.swingProp };
   play(clip, built.clips.map((c) => c.name));
 }
 
@@ -94,7 +95,16 @@ renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.1, (now - last) / 1000) * speed;
   last = now;
   current?.anim.update(dt);
-  current?.syncProps();
+  current?.syncProps(dt);
+  // Swing floating props each time an attack or cast clip loops round.
+  if (current && /^(Attack|Cast)/.test(clip)) {
+    const len = current.anim.clip(clip)?.duration ?? 1;
+    swingClock += dt;
+    if (swingClock >= len) {
+      swingClock -= len;
+      current.swingProp();
+    }
+  }
   controls.update();
   renderer.render(scene, camera);
 });

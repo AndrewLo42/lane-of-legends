@@ -64,27 +64,104 @@ function teamTint(mat: THREE.MeshStandardMaterial, team: THREE.Color) {
 }
 
 /**
- * Meshy's A-pose step drops held props, so some come back as simple meshes held at a hand bone.
- * `build` returns the prop in metres with its grip at the origin, pointing up (+y). The prop follows
- * the hand's position but stays upright with a slight forward `lean` (radians): library clips are
- * made for empty hands, so copying the wrist's rotation makes a staff flop around.
+ * Props the Meshy models don't have (the A-pose step drops held items; champions are generated
+ * empty-handed). `build` returns the prop in metres for a model `refHeight` tall, with its grip at
+ * the origin and pointing up (+y).
+ * - `upright`: follows the hand's position but stays vertical with a forward `lean`. Library clips
+ *   are made for empty hands, so a staff copying the wrist would flop around.
+ * - `held`: locked to the hand bone so it swings with the wrist like a weapon. At the bind pose it
+ *   sits `grip` metres past the wrist (mid-fist) and points along `dir` (root space: +x forward,
+ *   +y up, +z the model's right) with the forearm's direction removed, so it always leaves the fist
+ *   at a right angle instead of running back through the arm.
+ * - `float`: not held at all. It hangs from a glowing pivot at `offset` (root space, metres at
+ *   `refHeight`), sways and bobs on its own, and strikes forward on `swingProp()`
+ *   (attacks and casts). For hands that can't convincingly grip (Tock's open gauntlets).
  */
-const PROPS: Partial<Record<ModelName, { bone: string; lean: number; build: () => THREE.Object3D }>> = {
+type PropSpec = { refHeight: number; build: () => THREE.Object3D } & (
+  | { mode: 'upright'; bone: string; lean: number }
+  | { mode: 'held'; bone: string; dir: [number, number, number]; grip: number }
+  | { mode: 'float'; offset: [number, number, number] }
+);
+
+const brass = () => new THREE.MeshStandardMaterial({ color: 0xb8893a, metalness: 0.7, roughness: 0.35 });
+const glow = (c: number) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.4 });
+
+/** A gear: a thin disc with teeth around its rim. */
+function gear(radius: number, thickness: number, teeth: number, mat: THREE.Material) {
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, thickness, 24), mat);
+  g.add(disc);
+  for (let i = 0; i < teeth; i++) {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(radius * 0.3, thickness, radius * 0.28), mat);
+    const a = (i / teeth) * Math.PI * 2;
+    t.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    t.rotation.y = -a;
+    g.add(t);
+  }
+  return g;
+}
+
+const PROPS: Partial<Record<ModelName, PropSpec>> = {
   minion_caster: {
     bone: 'LeftHand', // the torch idle and spear walk carry their object in the left hand
+    mode: 'upright',
     lean: 0.18,
+    refHeight: 1.3,
     build: () => {
       const g = new THREE.Group();
-      const brass = new THREE.MeshStandardMaterial({ color: 0xb8893a, metalness: 0.7, roughness: 0.35 });
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.0, 6), brass);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 1.0, 6), brass());
       shaft.position.y = 0.15;
-      const cup = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.12, 6, 1, true), brass);
+      const cup = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.12, 6, 1, true), brass());
       cup.position.y = 0.68;
       cup.rotation.x = Math.PI;
       const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.08), new THREE.MeshStandardMaterial({ color: 0x9fe8ff, emissive: 0x5fd0ff, emissiveIntensity: 1.4 }));
       crystal.position.y = 0.76;
       crystal.scale.y = 1.6;
       g.add(shaft, cup, crystal);
+      return g;
+    },
+  },
+  // Tock's pendulum blade: a clock pendulum with a sharpened crescent around its bob.
+  champ_tock: {
+    mode: 'float',
+    // Ahead and to his right, pivot above his head: measured clear of his mesh in every clip,
+    // through the whole sway and strike (anything closer gets hit by his arms when he runs or casts).
+    offset: [1.3, 2.9, 1.5],
+    refHeight: 2.8,
+    build: () => {
+      const g = new THREE.Group();
+      const dark = new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.8 });
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.42, 8), dark);
+      grip.position.y = 0.02;
+      const pommel = gear(0.08, 0.05, 8, brass());
+      pommel.rotation.x = Math.PI / 2;
+      pommel.position.y = -0.22;
+      const guard = gear(0.16, 0.06, 10, brass());
+      guard.position.y = 0.26;
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.08, 16), glow(0x5fd0c4));
+      core.position.y = 0.26;
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.85, 8), brass());
+      shaft.position.y = 0.7;
+      // The bob: a brass disc, edge-on to the swing so it cuts with its rim.
+      const bob = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 28), brass());
+      bob.rotation.z = Math.PI / 2;
+      bob.position.y = 1.35;
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.07, 24), glow(0x5fd0c4));
+      face.rotation.z = Math.PI / 2;
+      face.position.y = 1.35;
+      // Crescent blade around the far half of the bob, glowing at the edge.
+      const outer = 0.48;
+      const inner = 0.3;
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, outer, -Math.PI * 0.15, Math.PI * 1.15, false);
+      shape.absarc(0, 0.08, inner, Math.PI * 1.15, -Math.PI * 0.15, true);
+      const blade = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.02, bevelSegments: 1, curveSegments: 24 }),
+        new THREE.MeshStandardMaterial({ color: 0xbfe9e4, metalness: 0.8, roughness: 0.25, emissive: 0x2a8f86, emissiveIntensity: 0.6 }),
+      );
+      blade.rotation.y = Math.PI / 2; // into the same plane as the bob
+      blade.position.set(0.015, 1.35, 0);
+      g.add(grip, pommel, guard, core, shaft, bob, face, blade);
       return g;
     },
   },
@@ -125,21 +202,65 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
   root.add(model);
 
   const spec = PROPS[name];
-  const hand = spec && model.getObjectByName(spec.bone);
-  let syncProps = () => {};
-  if (spec && hand) {
+  /** Prop scale: props are built for a model `refHeight` tall. */
+  const ps = spec ? height / spec.refHeight : 1;
+  /** Call after each animation update (with the frame's dt) so props track their hand or keep floating. */
+  let syncProps: (dt?: number) => void = () => {};
+  /** Kick a floating prop into a swing (attacks and casts); a no-op for other props. */
+  let swingProp = () => {};
+  const hand = spec && spec.mode !== 'float' ? model.getObjectByName(spec.bone) : undefined;
+  if (spec) {
     const p = spec.build();
-    p.scale.setScalar(height / 1.3);
-    p.rotation.z = -spec.lean; // top tips toward +x, the way the unit faces
+    p.scale.setScalar(ps);
     p.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = true) : null));
-    root.add(p);
+    root.updateMatrixWorld(true);
     const at = new THREE.Vector3();
-    syncProps = () => {
-      root.updateMatrixWorld(true);
-      p.position.copy(root.worldToLocal(hand.getWorldPosition(at)));
-    };
-    syncProps();
+    if (spec.mode === 'float') {
+      // Hang it upside down from a pivot (bob below), with a spinning clockwork halo selling the magic.
+      const pivot = new THREE.Group();
+      const [ox, oy, oz] = spec.offset;
+      pivot.position.set(ox * ps, oy * ps, oz * ps);
+      p.rotation.z = Math.PI;
+      p.position.y = 0.25 * ps; // grip end just above the pivot
+      const halo = gear(0.13, 0.025, 10, new THREE.MeshStandardMaterial({ color: 0x5fd0c4, emissive: 0x5fd0c4, emissiveIntensity: 1.6 }));
+      halo.scale.setScalar(ps);
+      halo.rotation.x = Math.PI / 2;
+      pivot.add(p, halo);
+      root.add(pivot);
+      let t = Math.random() * 10;
+      let swingT = Infinity;
+      syncProps = (dt = 0) => {
+        t += dt;
+        swingT += dt;
+        // A slow forward-back sway, plus a fast strike for ~0.45 s after a swing: rotating about the
+        // pivot's z axis tips the bob forward (+x), toward the target and away from his body.
+        const strike = swingT < 0.45 ? Math.sin((swingT / 0.45) * Math.PI) * 1.5 : 0;
+        pivot.rotation.z = Math.sin(t * 1.7) * 0.25 + strike;
+        pivot.position.y = (oy + Math.sin(t * 2.3) * 0.05) * ps;
+        halo.rotation.z += dt * 3;
+      };
+      swingProp = () => (swingT = 0);
+    } else if (spec.mode === 'held' && hand) {
+      // At the bind pose: forearm direction (elbow → wrist), the grip mid-fist along it, and the
+      // blade pointing along `dir` made perpendicular to it. Then hand it to the bone (attach keeps
+      // the world transform).
+      const wrist = hand.getWorldPosition(at);
+      const elbow = (hand.parent ?? hand).getWorldPosition(new THREE.Vector3());
+      const fore = wrist.clone().sub(elbow).normalize();
+      const dir = new THREE.Vector3(...spec.dir).normalize();
+      dir.addScaledVector(fore, -dir.dot(fore)).normalize();
+      p.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      p.position.copy(wrist).addScaledVector(fore, spec.grip * ps);
+      hand.attach(p);
+    } else if (spec.mode === 'upright' && hand) {
+      p.rotation.z = -spec.lean; // top tips toward +x, the way the unit faces
+      root.add(p);
+      syncProps = () => {
+        root.updateMatrixWorld(true);
+        p.position.copy(root.worldToLocal(hand.getWorldPosition(at)));
+      };
+      syncProps();
+    }
   }
-  /** Call after each animation update so held props track their hand. */
-  return { root, model, clips: gltf.animations, materials, syncProps };
+  return { root, model, clips: gltf.animations, materials, syncProps, swingProp };
 }

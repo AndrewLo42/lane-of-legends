@@ -36,8 +36,10 @@ interface UnitView {
   mats: { m: THREE.MeshStandardMaterial; emissive: THREE.Color; intensity: number }[];
   /** Skeletal animation, when the unit uses a Meshy model instead of a placeholder. */
   anim?: AnimatedModel;
-  /** Moves held props (the caster's staff) to their hand after the animation updates. */
-  syncProps?: () => void;
+  /** Moves props after the animation updates (the caster's staff to its hand; Tock's pendulum floats). */
+  syncProps?: (dt?: number) => void;
+  /** Swings a floating prop (Tock's pendulum) on attacks and casts. */
+  swingProp?: () => void;
   lastAttackSeen?: number;
   /** Alternates Attack / Attack2 so swings don't look identical. */
   attacks?: number;
@@ -128,7 +130,7 @@ export class WorldView {
         if (m?.isMeshStandardMaterial) mats.push({ m, emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
       });
       this.scene.add(obj);
-      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, mats, anim, syncProps: built?.syncProps, lastAttackSeen: u.lastAttackTick });
+      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, mats, anim, syncProps: built?.syncProps, swingProp: built?.swingProp, lastAttackSeen: u.lastAttackTick });
     }
     for (const [id, v] of this.units) {
       if (live.has(id)) continue;
@@ -192,7 +194,7 @@ export class WorldView {
         continue;
       }
       c.v.anim!.update(dt);
-      c.v.syncProps?.();
+      c.v.syncProps?.(dt);
       const sink = c.age - (CORPSE_SECONDS - SINK_SECONDS);
       if (sink > 0) c.v.obj.position.y = -sink * 1.2;
       if (c.age >= CORPSE_SECONDS) {
@@ -235,6 +237,7 @@ export class WorldView {
           // Trimmed cast clips peak mid-way: land that peak when the ability fires.
           const timeScale = clip ? THREE.MathUtils.clamp((clip.duration * 0.5) / Math.max(cast.time, 0.25), 0.8, 2.5) : 1;
           v.anim.playOnce(name, { timeScale });
+          v.swingProp?.();
           v.lastAttackSeen = u.lastAttackTick;
         } else if (u.lastAttackTick !== v.lastAttackSeen && !u.dead) {
           v.lastAttackSeen = u.lastAttackTick;
@@ -243,9 +246,10 @@ export class WorldView {
           const clip = v.anim.clip(name);
           const interval = u.attackInterval * 0.9;
           v.anim.playOnce(name, { timeScale: clip ? Math.max(1, clip.duration / interval) : 1 });
+          v.swingProp?.();
         }
         v.anim.update(dt);
-        v.syncProps?.();
+        v.syncProps?.(dt);
       } else {
         // Placeholder: a quick lean toward the target that springs back. Casting leans back a little.
         const sinceAttack = (tick - u.lastAttackTick + alpha) / u.windupTicks;
