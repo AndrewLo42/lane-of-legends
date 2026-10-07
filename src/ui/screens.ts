@@ -46,7 +46,7 @@ function ladder(run: RunState) {
 
 const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · hold <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> to aim,
   release to cast (right-click cancels) · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
-  hold <kbd>Space</kbd> centre camera · wheel zoom</p>`;
+  hold <kbd>Space</kbd> centre camera · wheel zoom · minimap: left-click to look, right-click to walk</p>`;
 
 const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].name}</b> <small>${KITS[id].title}</small>`;
 
@@ -129,12 +129,14 @@ export async function floorIntro(run: RunState, plan: FloorPlan): Promise<'fight
 
 // ---------- after a win ----------
 
-export async function augmentPick(run: RunState, offers: () => AugmentId[], onReroll: () => boolean): Promise<AugmentId> {
+export async function augmentPick(
+  run: RunState, offers: () => AugmentId[], onReroll: () => boolean, heading = `Floor ${run.floor + 1} cleared`,
+): Promise<AugmentId> {
   for (;;) {
     const ids = offers();
     const tier = AUGMENTS[ids[0]].tier;
     const el = show(`
-      <div class="floorhead"><small>Floor ${run.floor + 1} cleared</small><h1>Choose an augment</h1></div>
+      <div class="floorhead"><small>${heading}</small><h1>Choose an augment</h1></div>
       <div class="cards">
         ${ids.map((id) => {
           const a = AUGMENTS[id];
@@ -154,6 +156,24 @@ export async function augmentPick(run: RunState, offers: () => AugmentId[], onRe
     hide();
     return action.slice('pick:'.length);
   }
+}
+
+// ---------- free starting relic ----------
+
+export async function starterItem(run: RunState, ids: AugmentId[]): Promise<AugmentId> {
+  const el = show(`
+    <div class="floorhead"><small>Starting gift · ${KITS[run.kit].name}</small><h1>Choose a relic</h1></div>
+    <div class="cards">
+      ${ids.map((id) => {
+        const it = ITEMS[id];
+        return `<button class="card itemcard" data-action="pick:${id}">
+          <div class="icon">${it.icon}</div><div class="name">${it.name}</div><p>${it.describe}</p><div class="price">Free</div></button>`;
+      }).join('')}
+    </div>
+    <p class="hint">Relics are free, kept for the whole run, and never sold in the shop. Your augments: ${run.augments.map((a) => AUGMENTS[a].icon).join(' ') || 'none yet'}</p>`);
+  const action = await waitFor(el);
+  hide();
+  return action.slice('pick:'.length);
 }
 
 // ---------- shop between floors ----------

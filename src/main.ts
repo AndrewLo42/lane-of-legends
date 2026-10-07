@@ -7,14 +7,14 @@ import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
 import {
-  advance, augmentOffers, buy, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
+  advance, augmentOffers, buy, starterAugments, starterItems, takeStarter, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
   type DuelResult, type RunState,
 } from './run/run';
 import { spawnPoint } from './sim/lane';
-import { KIT_IDS } from './sim/kits';
+import { KITS, KIT_IDS } from './sim/kits';
 import { SANDBOX_RULES } from './sim/rules';
 import type { KitId } from './sim/types';
-import { augmentPick, floorIntro, pickChampion, runEnd, shop } from './ui/screens';
+import { augmentPick, floorIntro, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -91,6 +91,21 @@ async function runLoop() {
       s.active = false;
       s.focus(null);
       run = newRun(kit, Date.now() % 1e9);
+      saveRun(run);
+    }
+    // A free augment and a free item to start the run.
+    if (run.starter === 'augment') {
+      const r = run;
+      const pick = await augmentPick(r, () => starterAugments(r), () => {
+        const ok = reroll(r);
+        saveRun(r);
+        return ok;
+      }, `Starting gift · ${KITS[r.kit].name}`);
+      takeStarter(r, pick);
+      saveRun(r);
+    }
+    if (run.starter === 'item') {
+      takeStarter(run, await starterItem(run, starterItems(run)));
       saveRun(run);
     }
     if (run.shopping) {

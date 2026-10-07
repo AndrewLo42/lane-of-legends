@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AUGMENTS } from '../sim/augments';
 import { DUEL_RULES } from '../sim/rules';
 import { ITEMS, MAX_ITEMS } from '../sim/items';
-import { FLOORS, WIN_BONUS, advance, augmentOffers, buy, cantBuy, floorPlan, loadout, newRun, reroll, shopStock } from './run';
+import { FLOORS, WIN_BONUS, advance, augmentOffers, buy, cantBuy, floorPlan, loadout, newRun, reroll, shopStock, starterAugments, starterItems, takeStarter } from './run';
 
 describe('run', () => {
   it('floor plans are deterministic per seed', () => {
@@ -102,5 +102,33 @@ describe('run', () => {
     expect(items.length).toBeGreaterThan(0);
     expect(spent).toBeLessThanOrEqual(4 * 800);
     expect(items.every((id) => !ITEMS[id].consumable)).toBe(true);
+  });
+
+  it('starts with a free silver augment, then a free cheap item', () => {
+    const run = newRun('arlo', 42);
+    expect(run.starter).toBe('augment');
+    const augs = starterAugments(run);
+    expect(augs).toHaveLength(3);
+    expect(augs.every((a) => AUGMENTS[a].tier === 'silver')).toBe(true);
+    takeStarter(run, augs[0]);
+    expect(run.augments).toEqual([augs[0]]);
+    expect(run.starter).toBe('item');
+
+    const items = starterItems(run);
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => ITEMS[i].starter)).toBe(true);
+    takeStarter(run, items[1]);
+    expect(run.items).toEqual([items[1]]);
+    expect(run.starter).toBeUndefined();
+    expect(run.gold).toBe(0); // free
+    // Relics are never sold.
+    expect(shopStock({ ...run, floor: 1 }).some((i) => ITEMS[i].starter)).toBe(false);
+  });
+
+  it('rerolling the starting augment changes the offer', () => {
+    const run = newRun('tock', 7);
+    const before = starterAugments(run);
+    expect(reroll(run)).toBe(true);
+    expect(starterAugments(run)).not.toEqual(before);
   });
 });

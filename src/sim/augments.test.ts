@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AUGMENTS, combineMods } from './augments';
+import { ITEMS, PERMANENT_ITEMS, STARTER_ITEMS } from './items';
 import { DUEL_RULES, SANDBOX_RULES } from './rules';
 import type { AugmentId, Command, Controller, Unit } from './types';
 import { TICK_HZ } from './util';
@@ -176,3 +177,85 @@ describe('items', () => {
     expect(w.spawnChampion('blue', 'maren', idle, { extraLevels: 1 }).champ!.level).toBe(DUEL_RULES.startLevel + 1);
   });
 });
+
+describe('relics (free starting items)', () => {
+  /** `me` carries the relic; the foe stands 2 away, harmless. */
+  function relic(id: AugmentId) {
+    const w = new World(1);
+    const ctl = new Script();
+    const me = w.spawnChampion('blue', 'arlo', ctl, { items: [id] });
+    const foe = w.spawnChampion('red', 'arlo', idle);
+    me.pos = { x: 0, y: 0 };
+    foe.pos = { x: 2, y: 0 };
+    foe.damage = 0;
+    me.range = 0; // no auto-attacking on its own
+    return { w, me, foe };
+  }
+  const lost = (u: Unit) => u.maxHp - u.hp;
+
+  it('are passives only, never sold or carried by opponents', () => {
+    expect(STARTER_ITEMS.length).toBeGreaterThanOrEqual(3);
+    for (const id of STARTER_ITEMS) {
+      expect(ITEMS[id].mods).toBeUndefined();
+      expect(PERMANENT_ITEMS).not.toContain(id);
+    }
+  });
+
+  it('Ricochet Charm bounces every third attack to a nearby enemy', () => {
+    const { w, me, foe } = relic('r.ricochet');
+    const m = w.spawnMinion('red', 'melee', { x: 4, y: 0 });
+    m.speed = 0;
+    m.damage = 0;
+    for (let i = 0; i < 2; i++) w.dealDamage(me, foe, 10, { attack: true });
+    run(w, 1);
+    expect(lost(m)).toBe(0);
+    w.dealDamage(me, foe, 10, { attack: true });
+    run(w, 1);
+    expect(lost(m)).toBeCloseTo(20 + 0.6 * me.damage, 0);
+  });
+
+  it('Wisp Lantern fires at the enemy champion in range every 5s', () => {
+    const { w, me, foe } = relic('r.wisp');
+    run(w, 1);
+    const one = 25 + 5 * me.champ!.level + 0.25 * me.damage;
+    expect(lost(foe)).toBeGreaterThan(one - 5);
+    run(w, 5);
+    expect(lost(foe)).toBeGreaterThan(2 * one - 15); // minus ~6s of regen
+  });
+
+  it('Phoenix Feather heals and scorches once when dropping low, then waits 60s', () => {
+    const { w, me, foe } = relic('r.phoenix');
+    w.dealDamage(foe, me, me.maxHp * 0.8);
+    expect(me.hp).toBeCloseTo(me.maxHp * 0.4, 0);
+    expect(lost(foe)).toBeCloseTo(40 + 8 * me.champ!.level, 0);
+    w.dealDamage(foe, me, me.maxHp * 0.3);
+    expect(me.hp).toBeCloseTo(me.maxHp * 0.1, 0); // on cooldown
+  });
+
+  it('Echo Bell rings on every third ability cast', () => {
+    const { w, me, foe } = relic('r.bell');
+    const bell = ITEMS['r.bell'];
+    bell.onCast!(w, me, 0, foe.pos, false);
+    bell.onCast!(w, me, 1, foe.pos, true); // recasts don't count
+    bell.onCast!(w, me, 2, foe.pos, false);
+    expect(lost(foe)).toBe(0);
+    bell.onCast!(w, me, 0, foe.pos, false);
+    expect(lost(foe)).toBeCloseTo(30 + 8 * me.champ!.level + 0.3 * me.damage, 0);
+    expect(w.status(foe, 'slow')?.value).toBe(0.3);
+  });
+
+  it('Leech Seed bursts on the fourth seed (one per second) and heals', () => {
+    const { w, me, foe } = relic('r.seed');
+    me.hp = 100;
+    for (let i = 0; i < 6; i++) w.dealDamage(me, foe, 1, { attack: true }); // one second: one seed
+    for (let i = 0; i < 2; i++) {
+      run(w, 1.05);
+      w.dealDamage(me, foe, 1, { attack: true });
+    }
+    expect(me.hp).toBeLessThan(110);
+    run(w, 1.05);
+    w.dealDamage(me, foe, 1, { attack: true });
+    expect(me.hp).toBeGreaterThan(100 + 40 + 0.05 * foe.maxHp - 10);
+  });
+});
+

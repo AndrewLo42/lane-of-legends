@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import { AUGMENTS, AUGMENT_IDS, type AugmentTier } from '../sim/augments';
-import { CONSUMABLES, ITEMS, MAX_ITEMS, PERMANENT_ITEMS } from '../sim/items';
+import { CONSUMABLES, ITEMS, MAX_ITEMS, PERMANENT_ITEMS, STARTER_ITEMS } from '../sim/items';
 import { KIT_IDS } from '../sim/kits';
 import { DUEL_RULES, type DuelRules, type WinReason } from '../sim/rules';
 import type { AugmentId, KitId } from '../sim/types';
@@ -88,6 +88,8 @@ export interface RunState {
   shopping: boolean;
   /** Bought from the current shop (sold out until the next one). */
   bought: AugmentId[];
+  /** The free starting picks still to make, in order (absent once both are taken, and on older saves). */
+  starter?: 'augment' | 'item';
 }
 
 export interface FloorPlan {
@@ -117,7 +119,7 @@ const ofTier = (tier: AugmentTier) => AUGMENT_IDS.filter((id) => AUGMENTS[id].ti
 export function newRun(kit: KitId, seed: number): RunState {
   return {
     version: 1, seed, kit, floor: 0, augments: [], rerolls: 1, offerRoll: 0, results: [],
-    gold: 0, items: [], consumables: [], shopping: false, bought: [],
+    gold: 0, items: [], consumables: [], shopping: false, bought: [], starter: 'augment',
   };
 }
 
@@ -161,6 +163,30 @@ export function augmentOffers(run: RunState): AugmentId[] {
   const pool = shuffle(rng, fresh(ofTier(tier)));
   const backup = shuffle(rng, fresh(AUGMENT_IDS.filter((id) => AUGMENTS[id].tier !== tier)));
   return [...pool, ...backup].slice(0, 3);
+}
+
+/** The free starting augment: three silver augments (rerollable like any other offer). */
+export function starterAugments(run: RunState): AugmentId[] {
+  const rng = new Rng(run.seed * 2027 + run.offerRoll * 7907 + 5);
+  return shuffle(rng, ofTier('silver').filter((id) => !run.augments.includes(id))).slice(0, 3);
+}
+
+/** The free starting item: three relics, each a playful passive rather than stats. */
+export function starterItems(run: RunState): AugmentId[] {
+  const rng = new Rng(run.seed * 3301 + 11);
+  return shuffle(rng, STARTER_ITEMS).slice(0, 3);
+}
+
+/** Take a free starting pick and move on to the next one. */
+export function takeStarter(run: RunState, id: AugmentId) {
+  if (run.starter === 'augment') {
+    run.augments.push(id);
+    run.offerRoll = 0;
+    run.starter = 'item';
+  } else if (run.starter === 'item') {
+    run.items.push(id);
+    run.starter = undefined;
+  }
 }
 
 export function reroll(run: RunState) {
