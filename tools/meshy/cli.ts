@@ -46,7 +46,13 @@ function fail(msg: string): never {
   console.error(`✗ ${msg}`);
   process.exit(1);
 }
-const need = (name: string) => flags[name] ?? fail(`--${name} is required`);
+// A value flag given without a value parses as 'true'; never send that (an empty --prompt once
+// generated 'true' as a text-to-image prompt and burned credits on nonsense).
+const need = (name: string) => {
+  const v = flags[name];
+  if (v === undefined || v === 'true' || v.trim() === '') fail(`--${name} needs a value`);
+  return v;
+};
 
 // ---------- HTTP ----------
 async function api(method: 'GET' | 'POST', path: string, body?: unknown) {

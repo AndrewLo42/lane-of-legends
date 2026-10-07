@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Input } from './core/input';
 import { Duel, type Shell } from './duel';
 import { MobaCamera } from './render/camera';
+import { loadModels } from './render/assets';
 import { AimIndicator } from './render/effects';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
 import {
@@ -53,6 +54,8 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+await loadModels(); // missing models fall back to placeholders
 
 const params = new URLSearchParams(location.search);
 const asKit = (v: string | null) => (KIT_IDS.includes(v as KitId) ? (v as KitId) : null);

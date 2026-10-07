@@ -1,0 +1,13 @@
+{
+  "out": "public/assets/meshy/MinionMelee.glb",
+  "rigged": "assets-src/meshy/minion_melee/rigged_3a07b136.glb",
+  "anims": ["assets-src/meshy/minion_melee/anims_batch1.glb"],
+  "textures": { "baseColor": 1024, "normal": 512, "metallicRoughness": 256 },
+  "clips": {
+    "Idle": { "src": "Idle" },
+    "Walk": { "src": "Walk_Fight_Forward" },
+    "Attack": { "src": "Attack" },
+    "Attack2": { "src": "Left_Slash" },
+    "Death": { "src": "Dead", "start": 0.8, "end": 2.4 }
+  }
+}

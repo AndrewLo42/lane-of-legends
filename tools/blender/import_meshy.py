@@ -67,14 +67,19 @@ for path in cfg['anims']:
     bpy.ops.import_scene.gltf(filepath=path)
     for o in new_objects(before):
         bpy.data.objects.remove(o, do_unlink=True)
-for a in bpy.data.actions:
+for a in list(bpy.data.actions):  # snapshot: renaming re-sorts the collection
     a.use_fake_user = True
+    # Prefix sources so a canonical clip can reuse a source's name (Meshy's "Idle" -> our "Idle")
+    # without Blender renaming the copy to "Idle.001".
+    a.name = 'src:' + a.name
 
 
 def find_src(name):
     for a in bpy.data.actions:
-        parts = a.name.split('|')
-        if a.name == name or name in parts:
+        own = a.name[len('src:'):] if a.name.startswith('src:') else None
+        if own is None:
+            continue
+        if own == name or name in own.split('|'):
             return a
     raise SystemExit(f'no source action "{name}" in {[a.name for a in bpy.data.actions]}')
 

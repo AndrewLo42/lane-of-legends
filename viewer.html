@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lane Rogue · Model viewer</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #3a3f47; font-family: system-ui, sans-serif; color: #e8e6df; }
+      canvas { display: block; }
+      #ui { position: fixed; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; }
+      #ui div { display: flex; flex-wrap: wrap; gap: 4px; }
+      #ui button { font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 5px; border: 1px solid #ffffff33; background: #12141bcc; color: inherit; cursor: pointer; }
+      #ui button.on { border-color: #ffd76a; color: #ffd76a; }
+    </style>
+  </head>
+  <body>
+    <div id="ui"></div>
+    <script type="module" src="/src/viewer.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+[
+  {
+    "at": "2026-10-07T19:08:09.798Z",
+    "cmd": "concept",
+    "taskId": "01a117c3-c19f-73eb-aeb4-61a44cfcdc50",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "small clockwork automaton foot soldier: round riveted brass body, oversized bucket helmet with a glowing amber eye slit, wind-up key on its back, short brass sword in the right hand and a small round shield on the left arm, a bright magenta cloth tabard and a bright magenta emblem on the shield. stylized fantasy MOBA minion, hand-painted textures, chunky readable silhouette, stubby cute proportions about 3 heads tall, clean simple shapes, bright but controlled colors, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms away from the body, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no text, no logos, feet not cropped",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_melee/concepts/4cfcdc50_0.png",
+      "assets-src/meshy/minion_melee/concepts/4cfcdc50_1.png",
+      "assets-src/meshy/minion_melee/concepts/4cfcdc50_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:08:22.696Z",
+    "cmd": "concept",
+    "taskId": "01a117c3-c61b-7454-ba8f-bee6c1c6b449",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "small clockwork automaton foot soldier: round riveted brass body, oversized bucket helmet with a glowing amber eye slit, wind-up key on its back, short brass sword in the right hand and a small round shield on the left arm, a bright magenta cloth tabard and a bright magenta emblem on the shield. stylized fantasy MOBA minion, hand-painted textures, chunky readable silhouette, stubby cute proportions about 3 heads tall, clean simple shapes, bright but controlled colors, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms away from the body, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no text, no logos, feet not cropped",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_melee/concepts/c1c6b449_0.png",
+      "assets-src/meshy/minion_melee/concepts/c1c6b449_1.png",
+      "assets-src/meshy/minion_melee/concepts/c1c6b449_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:15:42.949Z",
+    "cmd": "model",
+    "taskId": "01a117c8-dcfb-7719-9026-acb381b44eba",
+    "request": {
+      "image_urls": [
+        "4cfcdc50_0.png",
+        "4cfcdc50_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 3000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/minion_melee/model_81b44eba.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:26:23.240Z",
+    "cmd": "model",
+    "taskId": "01a117d1-f896-7682-a208-b991858634b1",
+    "request": {
+      "image_urls": [
+        "4cfcdc50_0.png",
+        "4cfcdc50_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 3000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "polished brass clockwork knight wearing a large bright magenta cloth tabard that covers the chest and belly front and back, bright magenta gear emblem on the round brass shield, short brass sword"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/minion_melee/model_858634b1.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:27:07.017Z",
+    "cmd": "rig",
+    "taskId": "01a117d5-31f0-7266-8a22-38043a07b136",
+    "request": {
+      "input_task_id": "01a117d1-f896-7682-a208-b991858634b1",
+      "animation_type": "biped",
+      "height_meters": 1.25
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/minion_melee/rigged_3a07b136.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:27:31.568Z",
+    "cmd": "animate",
+    "taskId": "01a117d5-8c77-753d-be98-4b4a39064827",
+    "request": {
+      "rig_task_id": "01a117d5-31f0-7266-8a22-38043a07b136",
+      "action_ids": [
+        0,
+        21,
+        4,
+        97,
+        8
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 15,
+    "files": [
+      "assets-src/meshy/minion_melee/anims_batch1.glb"
+    ]
+  }
+]

@@ -1,7 +1,19 @@
 import * as THREE from 'three';
 import type { Missile, MissileStyle, Unit, Vec2 } from '../sim/types';
 import type { World } from '../sim/world';
+import { AnimatedModel } from './animatedModel';
+import { hasModel, instantiate, type ModelName } from './assets';
+import { RIGS } from './rigs';
 import { TEAM_COLOR, placeholderFor } from './scene';
+
+/** Minion role → Meshy model and its in-game height (metres). */
+const MINION_MODELS: Record<string, { name: ModelName; height: number }> = {
+  melee: { name: 'minion_melee', height: 1.25 },
+  caster: { name: 'minion_caster', height: 1.5 },
+};
+/** How long a dead minion lingers to play its death clip, then how long it takes to sink away. */
+const CORPSE_SECONDS = 2.4;
+const SINK_SECONDS = 0.5;
 
 interface UnitView {
   obj: THREE.Object3D;
@@ -13,6 +25,13 @@ interface UnitView {
   prevFacing: number;
   /** Materials with their resting emissive, for the hit flash. */
   mats: { m: THREE.MeshStandardMaterial; emissive: THREE.Color; intensity: number }[];
+  /** Skeletal animation, when the unit uses a Meshy model instead of a placeholder. */
+  anim?: AnimatedModel;
+  /** Moves held props (the caster's staff) to their hand after the animation updates. */
+  syncProps?: () => void;
+  lastAttackSeen?: number;
+  /** Alternates Attack / Attack2 so swings don't look identical. */
+  attacks?: number;
 }
 
 interface MissileView {
@@ -52,6 +71,8 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
  */
 export class WorldView {
   private units = new Map<number, UnitView>();
+  /** Dead minions playing their death clip before they're removed. */
+  private corpses: { v: UnitView; age: number }[] = [];
   private missiles = new Map<number, MissileView>();
 
   constructor(private scene: THREE.Scene, private world: World) {
@@ -78,7 +99,11 @@ export class WorldView {
     for (const u of this.world.units) {
       live.add(u.id);
       if (this.units.has(u.id)) continue;
-      const obj = placeholderFor(u);
+      const model = u.kind === 'minion' ? MINION_MODELS[u.role!] : undefined;
+      const built = model && hasModel(model.name) ? instantiate(model.name, model.height, new THREE.Color(TEAM_COLOR[u.team])) : null;
+      const obj = built?.root ?? placeholderFor(u);
+      const anim = built ? new AnimatedModel(built.model, built.clips, RIGS.meshy) : undefined;
+      anim?.setBase('Idle');
       obj.userData.unitId = u.id;
       const mats: UnitView['mats'] = [];
       obj.traverse((o) => {
@@ -86,13 +111,17 @@ export class WorldView {
         if (m?.isMeshStandardMaterial) mats.push({ m, emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
       });
       this.scene.add(obj);
-      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, mats });
+      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, mats, anim, syncProps: built?.syncProps, lastAttackSeen: u.lastAttackTick });
     }
     for (const [id, v] of this.units) {
       if (live.has(id)) continue;
-      this.scene.remove(v.obj);
-      v.obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
       this.units.delete(id);
+      if (v.anim?.playOnce('Death', { persistent: true })) {
+        v.obj.userData.unitId = undefined; // not pickable while dying
+        this.corpses.push({ v, age: 0 });
+      } else {
+        this.removeView(v);
+      }
     }
 
     const liveMissiles = new Set<number>();
@@ -114,10 +143,33 @@ export class WorldView {
     }
   }
 
+  private removeView(v: UnitView) {
+    this.scene.remove(v.obj);
+    v.anim?.dispose();
+    v.obj.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry?.dispose();
+      for (const mat of [m.material].flat()) mat.dispose();
+    });
+  }
+
   /** Place everything at `alpha` (0..1) of the way from the previous tick to the current one. */
   update(alpha: number, dt: number) {
     this.sync();
     const tick = this.world.tick;
+    for (let i = this.corpses.length - 1; i >= 0; i--) {
+      const c = this.corpses[i];
+      c.age += dt;
+      c.v.anim!.update(dt);
+      c.v.syncProps?.();
+      const sink = c.age - (CORPSE_SECONDS - SINK_SECONDS);
+      if (sink > 0) c.v.obj.position.y = -sink * 1.2;
+      if (c.age >= CORPSE_SECONDS) {
+        this.removeView(c.v);
+        this.corpses.splice(i, 1);
+      }
+    }
     for (const u of this.world.units) {
       const v = this.units.get(u.id)!;
       v.obj.visible = !u.dead;
@@ -126,10 +178,27 @@ export class WorldView {
       if (Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 3) v.obj.position.set(u.pos.x, 0, u.pos.y);
       if (u.speed > 0) v.obj.rotation.y = -lerpAngle(v.prevFacing, u.facing, alpha); // sim angle runs the other way round +Y
 
-      // Attack lunge: a quick lean toward the target that springs back. Casting leans back a little.
-      const sinceAttack = (tick - u.lastAttackTick + alpha) / u.windupTicks;
-      const lunge = u.speed > 0 && sinceAttack < 2 ? Math.sin(Math.min(1, sinceAttack / 2) * Math.PI) * 0.25 : 0;
-      v.obj.rotation.z = u.champ?.casting ? 0.15 : -lunge;
+      if (v.anim) {
+        // Skeletal: walk while moving, idle otherwise, one-shot attack clip on each new attack.
+        const moving = Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
+        // Library walks are paced for a ~1.8 m human; speed the cycle up to match the unit's pace.
+        v.anim.setBase(moving ? 'Walk' : 'Idle', moving ? u.speed / 3.2 : 1);
+        if (u.lastAttackTick !== v.lastAttackSeen) {
+          v.lastAttackSeen = u.lastAttackTick;
+          v.attacks = (v.attacks ?? 0) + 1;
+          const name = v.attacks % 2 === 0 && v.anim.has('Attack2') ? 'Attack2' : 'Attack';
+          const clip = v.anim.clip(name);
+          const interval = u.attackInterval * 0.9;
+          v.anim.playOnce(name, { timeScale: clip ? Math.max(1, clip.duration / interval) : 1 });
+        }
+        v.anim.update(dt);
+        v.syncProps?.();
+      } else {
+        // Placeholder: a quick lean toward the target that springs back. Casting leans back a little.
+        const sinceAttack = (tick - u.lastAttackTick + alpha) / u.windupTicks;
+        const lunge = u.speed > 0 && sinceAttack < 2 ? Math.sin(Math.min(1, sinceAttack / 2) * Math.PI) * 0.25 : 0;
+        v.obj.rotation.z = u.champ?.casting ? 0.15 : -lunge;
+      }
 
       // Hit flash.
       const flash = Math.max(0, 1 - (tick - u.lastHurtTick + alpha) / 4);
@@ -197,10 +266,9 @@ export class WorldView {
 
   /** Remove everything this view added to the scene. */
   dispose() {
-    for (const v of this.units.values()) {
-      this.scene.remove(v.obj);
-      v.obj.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-    }
+    for (const v of this.units.values()) this.removeView(v);
+    for (const c of this.corpses) this.removeView(c.v);
+    this.corpses = [];
     for (const v of this.missiles.values()) this.scene.remove(v.obj);
     this.units.clear();
     this.missiles.clear();

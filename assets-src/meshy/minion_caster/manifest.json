@@ -1,0 +1,154 @@
+[
+  {
+    "at": "2026-10-07T19:08:25.939Z",
+    "cmd": "concept",
+    "taskId": "01a117c3-c19b-77de-baf2-2a6366ae3667",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "true",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_caster/concepts/66ae3667_0.png",
+      "assets-src/meshy/minion_caster/concepts/66ae3667_1.png",
+      "assets-src/meshy/minion_caster/concepts/66ae3667_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:09:31.977Z",
+    "cmd": "concept",
+    "taskId": "01a117c3-c575-7227-b7b3-c1d7cf34a7bf",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "true",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_caster/concepts/cf34a7bf_0.png",
+      "assets-src/meshy/minion_caster/concepts/cf34a7bf_1.png",
+      "assets-src/meshy/minion_caster/concepts/cf34a7bf_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:11:09.801Z",
+    "cmd": "concept",
+    "taskId": "01a117c6-1ff6-71cc-961f-c81d6c64667f",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "small clockwork automaton mage: slim brass body, a glass lantern for a head with a warm glowing flame inside, a bright magenta hooded cloth mantle and sash, holding a short brass staff topped with a glowing crystal, wind-up key on its back. stylized fantasy MOBA minion, hand-painted textures, chunky readable silhouette, stubby cute proportions about 3 heads tall, clean simple shapes, bright but controlled colors, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms away from the body, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no text, no logos, feet not cropped",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_caster/concepts/6c64667f_0.png",
+      "assets-src/meshy/minion_caster/concepts/6c64667f_1.png",
+      "assets-src/meshy/minion_caster/concepts/6c64667f_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:11:10.281Z",
+    "cmd": "concept",
+    "taskId": "01a117c6-254b-74ba-8ff4-372f490241ff",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "small clockwork automaton mage: slim brass body, a glass lantern for a head with a warm glowing flame inside, a bright magenta hooded cloth mantle and sash, holding a short brass staff topped with a glowing crystal, wind-up key on its back. stylized fantasy MOBA minion, hand-painted textures, chunky readable silhouette, stubby cute proportions about 3 heads tall, clean simple shapes, bright but controlled colors, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms away from the body, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no text, no logos, feet not cropped",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/minion_caster/concepts/490241ff_0.png",
+      "assets-src/meshy/minion_caster/concepts/490241ff_1.png",
+      "assets-src/meshy/minion_caster/concepts/490241ff_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:15:14.300Z",
+    "cmd": "model",
+    "taskId": "01a117c8-dcf8-7483-bf8a-85e82f024afd",
+    "request": {
+      "image_urls": [
+        "6c64667f_0.png",
+        "6c64667f_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 3000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/minion_caster/model_2f024afd.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:15:58.987Z",
+    "cmd": "rig",
+    "taskId": "01a117cb-10b8-739e-ae2e-8575af382281",
+    "request": {
+      "input_task_id": "01a117c8-dcf8-7483-bf8a-85e82f024afd",
+      "animation_type": "biped",
+      "height_meters": 1.3
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/minion_caster/rigged_af382281.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T19:23:36.964Z",
+    "cmd": "animate",
+    "taskId": "01a117d1-f879-7383-9e9f-a23c103f0737",
+    "request": {
+      "rig_task_id": "01a117cb-10b8-739e-ae2e-8575af382281",
+      "action_ids": [
+        0,
+        30,
+        129,
+        125,
+        181
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 15,
+    "files": [
+      "assets-src/meshy/minion_caster/anims_batch1.glb"
+    ]
+  },
+  {
+    "at": "2026-10-07T20:11:33.368Z",
+    "cmd": "animate",
+    "taskId": "01a117fd-e71a-75ad-beef-4b81089d47e2",
+    "request": {
+      "rig_task_id": "01a117cb-10b8-739e-ae2e-8575af382281",
+      "action_ids": [
+        560,
+        337
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 6,
+    "files": [
+      "assets-src/meshy/minion_caster/anims_batch2.glb"
+    ]
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "out": "public/assets/meshy/MinionCaster.glb",
+  "rigged": "assets-src/meshy/minion_caster/rigged_af382281.glb",
+  "anims": ["assets-src/meshy/minion_caster/anims_batch1.glb", "assets-src/meshy/minion_caster/anims_batch2.glb"],
+  "textures": { "baseColor": 1024, "normal": 512, "metallicRoughness": 256 },
+  "clips": {
+    "Idle": { "src": "Torch_Look_Around" },
+    "Walk": { "src": "Spear_Walk" },
+    "Attack": { "src": "mage_soell_cast" },
+    "Attack2": { "src": "Charged_Spell_Cast" },
+    "Death": { "src": "Electrocuted_Fall", "start": 2.75, "end": 5.0 }
+  }
+}
