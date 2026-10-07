@@ -142,3 +142,37 @@ describe('duel rules', () => {
     }
   });
 });
+
+describe('items', () => {
+  it('item mods apply at spawn alongside augments', () => {
+    const w = new World(1, DUEL_RULES);
+    const plain = w.spawnChampion('blue', 'arlo', idle);
+    const geared = w.spawnChampion('red', 'arlo', idle, { items: ['i.blade', 'i.warden'], augments: ['brute'] });
+    expect(geared.damage).toBeCloseTo(plain.damage + 24);
+    expect(geared.maxHp).toBeCloseTo(plain.maxHp + 250);
+    expect(w.dealDamage(plain, geared, 100)).toBeCloseTo(90);
+  });
+
+  it('Stormcaller Bow strikes every third attack', () => {
+    const w = new World(1);
+    const me = w.spawnChampion('blue', 'arlo', idle, { items: ['i.storm'] });
+    const foe = w.spawnChampion('red', 'arlo', idle);
+    for (let i = 0; i < 3; i++) w.dealDamage(me, foe, 10, { attack: true });
+    expect(foe.maxHp - foe.hp).toBeCloseTo(30 + 40 + 0.3 * me.damage);
+  });
+
+  it('Tidebreaker Aegis shields once when health gets low', () => {
+    const w = new World(1);
+    const me = w.spawnChampion('blue', 'arlo', idle, { items: ['i.aegis'] });
+    const foe = w.spawnChampion('red', 'arlo', idle);
+    w.dealDamage(foe, me, me.maxHp * 0.75);
+    expect(w.status(me, 'shield')).toBeDefined();
+    w.dealDamage(foe, me, 1e6);
+    expect(me.dead).toBe(true);
+  });
+
+  it('Tome of Insight starts a duel a level higher', () => {
+    const w = new World(1, DUEL_RULES);
+    expect(w.spawnChampion('blue', 'maren', idle, { extraLevels: 1 }).champ!.level).toBe(DUEL_RULES.startLevel + 1);
+  });
+});

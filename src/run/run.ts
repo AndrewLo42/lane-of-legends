@@ -1,5 +1,6 @@
 import { Rng } from '../core/rng';
 import { AUGMENTS, AUGMENT_IDS, type AugmentTier } from '../sim/augments';
+import { CONSUMABLES, ITEMS, MAX_ITEMS, PERMANENT_ITEMS } from '../sim/items';
 import { KIT_IDS } from '../sim/kits';
 import { DUEL_RULES, type DuelRules, type WinReason } from '../sim/rules';
 import type { AugmentId, KitId } from '../sim/types';
@@ -54,7 +55,16 @@ export interface DuelResult {
   reason: WinReason | null;
   opponent: KitId;
   seconds: number;
+  /** Gold earned in the duel. */
+  gold: number;
 }
+
+/** Gold for winning a duel, on top of what you earned in it. */
+export const WIN_BONUS = 250;
+/** Permanent items on sale in each shop. */
+export const SHOP_SIZE = 5;
+/** Gold-worth of items the opponent on floor n brings. */
+const opponentItemBudget = (floor: number) => floor * 800;
 
 export interface RunState {
   version: 1;
@@ -69,6 +79,15 @@ export interface RunState {
   results: DuelResult[];
   /** A won duel whose augment hasn't been picked yet (so a reload resumes at the pick, not the fight). */
   pending?: DuelResult;
+  gold: number;
+  /** Permanent shop items, kept for the whole run. */
+  items: AugmentId[];
+  /** Consumables bought for the next duel only. */
+  consumables: AugmentId[];
+  /** In the shop between floors (so a reload resumes there). */
+  shopping: boolean;
+  /** Bought from the current shop (sold out until the next one). */
+  bought: AugmentId[];
 }
 
 export interface FloorPlan {
@@ -76,6 +95,7 @@ export interface FloorPlan {
   title: string;
   opponent: KitId;
   opponentAugments: AugmentId[];
+  opponentItems: AugmentId[];
   accuracy: number;
   statMult: number;
   modifier: Modifier | null;
@@ -95,7 +115,10 @@ const shuffle = <T>(rng: Rng, xs: T[]) => {
 const ofTier = (tier: AugmentTier) => AUGMENT_IDS.filter((id) => AUGMENTS[id].tier === tier);
 
 export function newRun(kit: KitId, seed: number): RunState {
-  return { version: 1, seed, kit, floor: 0, augments: [], rerolls: 1, offerRoll: 0, results: [] };
+  return {
+    version: 1, seed, kit, floor: 0, augments: [], rerolls: 1, offerRoll: 0, results: [],
+    gold: 0, items: [], consumables: [], shopping: false, bought: [],
+  };
 }
 
 /** Everything about the next duel, derived from the run seed so a resumed run sees the same floor. */
@@ -108,13 +131,23 @@ export function floorPlan(run: RunState): FloorPlan {
     const pool = ofTier(tier).filter((id) => !opponentAugments.includes(id));
     opponentAugments.push(pool[rng.int(0, pool.length - 1)]);
   }
+  // Opponents shop too: random items until the floor's budget runs out.
+  const opponentItems: AugmentId[] = [];
+  let budget = opponentItemBudget(run.floor);
+  for (;;) {
+    const affordable = PERMANENT_ITEMS.filter((id) => ITEMS[id].cost <= budget && !opponentItems.includes(id));
+    if (!affordable.length || opponentItems.length >= MAX_ITEMS) break;
+    const pick = affordable[rng.int(0, affordable.length - 1)];
+    opponentItems.push(pick);
+    budget -= ITEMS[pick].cost;
+  }
   // Each run deals the modifiers out in its own order, so floors 2-5 never repeat one.
   const order = shuffle(new Rng(run.seed * 31 + 7), MODIFIERS);
   const modifier = run.floor === 0 ? null : order[(run.floor - 1) % order.length];
   const rules = { ...DUEL_RULES };
   modifier?.apply(rules);
   return {
-    floor: run.floor, title: def.title, opponent, opponentAugments, accuracy: def.accuracy, statMult: def.statMult, modifier, rules,
+    floor: run.floor, title: def.title, opponent, opponentAugments, opponentItems, accuracy: def.accuracy, statMult: def.statMult, modifier, rules,
     seed: (run.seed * 131 + run.floor * 977) % 1e9,
   };
 }
@@ -137,13 +170,65 @@ export function reroll(run: RunState) {
   return true;
 }
 
-/** Record a duel win and the augment picked for it, and advance to the next floor. */
+/** Record a duel win and the augment picked for it, bank the gold, and open the shop for the next floor. */
 export function advance(run: RunState, result: DuelResult, pick: AugmentId | null) {
   run.pending = undefined;
   run.results.push(result);
   if (pick) run.augments.push(pick);
   run.floor++;
   run.offerRoll = 0;
+  run.gold += result.gold + WIN_BONUS;
+  run.consumables = [];
+  run.shopping = true;
+  run.bought = [];
+}
+
+// ---------- shop ----------
+
+/** Permanent items on sale before the current floor (seeded, so a reload sees the same stock). */
+export function shopStock(run: RunState): AugmentId[] {
+  const rng = new Rng(run.seed * 6151 + run.floor * 389 + 3);
+  // Based on what you owned when you walked in, so buying doesn't reshuffle the shelf.
+  const ownedBefore = run.items.filter((id) => !run.bought.includes(id));
+  return shuffle(rng, PERMANENT_ITEMS.filter((id) => !ownedBefore.includes(id))).slice(0, SHOP_SIZE);
+}
+
+/** Why `id` can't be bought right now, or null if it can. */
+export function cantBuy(run: RunState, id: AugmentId): string | null {
+  const item = ITEMS[id];
+  if (!item) return 'Unknown item';
+  if (run.bought.includes(id)) return 'Sold out';
+  if (!item.consumable) {
+    if (run.items.includes(id)) return 'Owned';
+    if (run.items.length >= MAX_ITEMS) return 'Inventory full';
+    if (!shopStock(run).includes(id)) return 'Not in stock';
+  } else if (!CONSUMABLES.includes(id)) return 'Not in stock';
+  if (run.gold < item.cost) return 'Not enough gold';
+  return null;
+}
+
+export function buy(run: RunState, id: AugmentId): boolean {
+  if (cantBuy(run, id)) return false;
+  const item = ITEMS[id];
+  run.gold -= item.cost;
+  run.bought.push(id);
+  if (item.rerolls) run.rerolls += item.rerolls;
+  else if (item.consumable) run.consumables.push(id);
+  else run.items.push(id);
+  return true;
+}
+
+export function leaveShop(run: RunState) {
+  run.shopping = false;
+}
+
+/** Items and extra levels you take into the next duel. */
+export function loadout(run: RunState) {
+  const consumables = run.consumables.map((id) => ITEMS[id]);
+  return {
+    items: [...run.items, ...consumables.filter((c) => c.mods).map((c) => c.id)],
+    extraLevels: consumables.reduce((n, c) => n + (c.extraLevels ?? 0), 0),
+  };
 }
 
 export const isFinalFloor = (run: RunState) => run.floor === FLOORS.length - 1;
@@ -171,8 +256,13 @@ export function saveRun(run: RunState | null) {
 
 export function loadRun(): RunState | null {
   try {
-    const run = JSON.parse(localStorage.getItem(RUN_KEY) ?? 'null') as RunState | null;
-    if (run?.version === 1 && KIT_IDS.includes(run.kit) && run.floor < FLOORS.length && run.augments.every((a) => AUGMENTS[a])) return run;
+    const saved = JSON.parse(localStorage.getItem(RUN_KEY) ?? 'null') as Partial<RunState> | null;
+    // Saves from before the shop existed lack its fields.
+    const run = saved && ({ gold: 0, items: [], consumables: [], shopping: false, bought: [], ...saved } as RunState);
+    if (
+      run?.version === 1 && KIT_IDS.includes(run.kit) && run.floor < FLOORS.length && run.augments.every((a) => AUGMENTS[a]) &&
+      [...run.items, ...run.consumables].every((i) => ITEMS[i])
+    ) return run;
   } catch {
     /* corrupt or unavailable */
   }

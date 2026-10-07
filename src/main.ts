@@ -5,13 +5,14 @@ import { MobaCamera } from './render/camera';
 import { AimIndicator } from './render/effects';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
 import {
-  advance, augmentOffers, floorPlan, isFinalFloor, loadMeta, loadRun, newRun, recordRunEnd, reroll, saveRun, type RunState,
+  advance, augmentOffers, buy, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
+  type DuelResult, type RunState,
 } from './run/run';
 import { spawnPoint } from './sim/lane';
 import { KIT_IDS } from './sim/kits';
 import { SANDBOX_RULES } from './sim/rules';
 import type { KitId } from './sim/types';
-import { augmentPick, floorIntro, pickChampion, runEnd } from './ui/screens';
+import { augmentPick, floorIntro, pickChampion, runEnd, shop } from './ui/screens';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -68,7 +69,7 @@ if (freePlayKit) {
   void runLoop();
 }
 
-/** Champion select → floor intro → duel → augment pick → ... until a loss or the boss falls. */
+/** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */
 async function runLoop() {
   let run: RunState | null = loadRun();
   for (;;) {
@@ -76,7 +77,15 @@ async function runLoop() {
       run = newRun(await pickChampion(loadMeta()), Date.now() % 1e9);
       saveRun(run);
     }
-    let result = run.pending;
+    if (run.shopping) {
+      const r = run;
+      await shop(r, (id) => {
+        if (buy(r, id)) saveRun(r);
+      });
+      leaveShop(run);
+      saveRun(run);
+    }
+    let result: DuelResult | undefined = run.pending;
     if (!result) {
       const plan = floorPlan(run);
       if ((await floorIntro(run, plan)) === 'abandon') {
@@ -87,15 +96,15 @@ async function runLoop() {
       }
 
       duel = new Duel(shell, {
-        seed: plan.seed, rules: plan.rules, kit: run.kit, augments: run.augments, enemyKit: plan.opponent,
-        enemyAugments: plan.opponentAugments, enemyStatMult: plan.statMult, enemyAccuracy: plan.accuracy,
+        seed: plan.seed, rules: plan.rules, kit: run.kit, augments: run.augments, ...loadout(run), enemyKit: plan.opponent,
+        enemyAugments: plan.opponentAugments, enemyItems: plan.opponentItems, enemyStatMult: plan.statMult, enemyAccuracy: plan.accuracy,
         label: `Floor ${run.floor + 1} · ${plan.title}`,
       });
       const outcome = await duel.finished;
       duel.dispose();
       duel = null;
 
-      result = { floor: run.floor, won: outcome.won, reason: outcome.reason, opponent: plan.opponent, seconds: outcome.seconds };
+      result = { floor: run.floor, won: outcome.won, reason: outcome.reason, opponent: plan.opponent, seconds: outcome.seconds, gold: outcome.gold };
       if (!outcome.won || isFinalFloor(run)) {
         run.results.push(result);
         const meta = recordRunEnd(run, outcome.won);

@@ -83,7 +83,9 @@ export interface ChampState {
   /** Kit-specific bookkeeping (echo positions, rewind history, ...). */
   data: Record<string, unknown>;
   augments: AugmentId[];
-  /** Augment bookkeeping, keyed by augment id. */
+  /** Shop items carried into this duel (permanent ones plus this duel's consumables). */
+  items: AugmentId[];
+  /** Augment and item bookkeeping, keyed by id. */
   augData: Record<string, unknown>;
   mods: Mods;
   /** Opponent scaling: base HP and damage (and their growth) are multiplied by this. */

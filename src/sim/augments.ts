@@ -1,18 +1,18 @@
 import type { AugmentId, DamageSource, Mods, Slot, Unit, Vec2 } from './types';
+import { ITEMS } from './items';
 import { TICK_HZ, ticks } from './util';
 import type { World } from './world';
 
 export type AugmentTier = 'silver' | 'gold' | 'prismatic';
 
 /**
- * A run-long power-up. Simple ones are just `mods`; the rest hook into the sim. Hooks run for the
- * champion that owns the augment (bots included: opponents get augments too).
+ * Anything a champion carries for a duel: augments and shop items. Simple ones are just `mods`; the
+ * rest hook into the sim. Hooks run for the champion that owns the perk (bots included).
  */
-export interface Augment {
+export interface Perk {
   id: AugmentId;
   name: string;
   icon: string;
-  tier: AugmentTier;
   describe: string;
   mods?: Partial<Mods>;
   /** Multiplier on damage we deal to `target`. */
@@ -31,6 +31,11 @@ export interface Augment {
   minionBuff?: number;
   /** A champion kill counts this many times toward the kill goal. */
   killValue?: number;
+}
+
+/** A run-long power-up picked after a win. */
+export interface Augment extends Perk {
+  tier: AugmentTier;
 }
 
 const data = <T>(self: Unit, id: string, init: T): T => {
@@ -126,17 +131,19 @@ const LIST: Augment[] = [
 
 export const AUGMENTS: Record<AugmentId, Augment> = Object.fromEntries(LIST.map((a) => [a.id, a]));
 export const AUGMENT_IDS = LIST.map((a) => a.id);
-export const augmentsOf = (u: Unit) => (u.champ?.augments ?? []).map((id) => AUGMENTS[id]).filter(Boolean);
+/** Every augment and item a champion carries, for running hooks. */
+export const perksOf = (u: Unit): Perk[] =>
+  u.champ ? [...u.champ.augments.map((id) => AUGMENTS[id]), ...u.champ.items.map((id) => ITEMS[id])].filter(Boolean) : [];
 
 export const NO_MODS: Mods = {
   ad: 0, hpFlat: 0, hpPct: 0, attackSpeed: 0, haste: 0, speedPct: 0, omnivamp: 0, dmgAmp: 0, takenMult: 1, towerTakenMult: 1, manaFlat: 0, manaRegen: 0,
 };
 
-/** Sum augment mods (multipliers multiply) on top of `base`. */
+/** Sum augment and item mods (multipliers multiply) on top of `base`. */
 export function combineMods(ids: AugmentId[], base: Partial<Mods> = {}): Mods {
   const out: Mods = { ...NO_MODS, ...base };
   for (const id of ids) {
-    const m = AUGMENTS[id]?.mods;
+    const m = (AUGMENTS[id] ?? ITEMS[id])?.mods;
     if (!m) continue;
     for (const k of Object.keys(m) as (keyof Mods)[]) {
       if (k === 'takenMult' || k === 'towerTakenMult') out[k] *= m[k]!;

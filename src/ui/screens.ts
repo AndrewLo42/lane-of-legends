@@ -1,5 +1,6 @@
-import { FLOORS, type FloorPlan, type Meta, type RunState } from '../run/run';
+import { FLOORS, cantBuy, shopStock, type FloorPlan, type Meta, type RunState } from '../run/run';
 import { AUGMENTS } from '../sim/augments';
+import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
 import { KITS, KIT_IDS } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
 import type { AugmentId, KitId } from '../sim/types';
@@ -92,10 +93,12 @@ export async function floorIntro(run: RunState, plan: FloorPlan): Promise<'fight
     <div class="floorhead"><small>Floor ${run.floor + 1} of ${FLOORS.length}${boss ? ' · Boss' : ''}</small><h1>${plan.title}</h1></div>
     ${ladder(run)}
     <div class="versus">
-      <div class="side"><small>You</small><div>${kitName(run.kit)}</div><div class="chips">${augmentChips(run.augments)}</div></div>
+      <div class="side"><small>You</small><div>${kitName(run.kit)}</div><div class="chips">${augmentChips(run.augments)}</div>
+        ${run.items.length || run.consumables.length ? `<div class="chips">${augmentChips([...run.items, ...run.consumables])}</div>` : ''}</div>
       <div class="vs">VS</div>
       <div class="side"><small>Opponent</small><div>${kitName(plan.opponent)}</div>
         <div class="chips">${augmentChips(plan.opponentAugments)}</div>
+        ${plan.opponentItems.length ? `<div class="chips">${augmentChips(plan.opponentItems)}</div>` : ''}
         ${plan.statMult > 1 ? `<div class="scaling">+${Math.round((plan.statMult - 1) * 100)}% health and damage</div>` : ''}</div>
     </div>
     <div class="rules">
@@ -141,6 +144,35 @@ export async function augmentPick(run: RunState, offers: () => AugmentId[], onRe
   }
 }
 
+// ---------- shop between floors ----------
+
+/** Buy items until "Next floor" is clicked. `onBuy` performs (and saves) the purchase. */
+export async function shop(run: RunState, onBuy: (id: AugmentId) => void): Promise<void> {
+  for (;;) {
+    const card = (id: AugmentId) => {
+      const it = ITEMS[id];
+      const why = cantBuy(run, id);
+      const sold = why === 'Sold out' || why === 'Owned';
+      return `<button class="card itemcard${sold ? ' sold' : ''}" data-action="buy:${id}" ${why ? 'disabled' : ''}>
+        <div class="icon">${it.icon}</div><div class="name">${it.name}</div>
+        <p>${it.describe}</p><div class="price${why === 'Not enough gold' ? ' short' : ''}">${sold ? why : `● ${it.cost}`}</div></button>`;
+    };
+    const el = show(`
+      <div class="floorhead"><small>Before floor ${run.floor + 1} · ${FLOORS[run.floor].title}</small><h1>Shop</h1></div>
+      <div class="purse">● ${run.gold} gold</div>
+      <h3>Items <small>kept for the rest of the run · ${run.items.length}/${MAX_ITEMS} slots</small></h3>
+      <div class="cards shelf">${shopStock(run).map(card).join('')}</div>
+      <h3>Consumables <small>next duel only</small></h3>
+      <div class="cards shelf">${CONSUMABLES.map(card).join('')}</div>
+      <div class="chips">${augmentChips([...run.items, ...run.consumables], true, 'Nothing bought yet')}</div>
+      <div class="actions"><button class="go" data-action="leave">Next floor →</button></div>`);
+    const action = await waitFor(el);
+    if (action === 'leave') break;
+    onBuy(action.slice('buy:'.length));
+  }
+  hide();
+}
+
 // ---------- end of run ----------
 
 export async function runEnd(run: RunState, won: boolean, meta: Meta): Promise<void> {
@@ -152,7 +184,7 @@ export async function runEnd(run: RunState, won: boolean, meta: Meta): Promise<v
       ${run.results.map((r) => `<li class="${r.won ? 'won' : 'lost'}"><b>${FLOORS[r.floor].title}</b> vs ${KITS[r.opponent].name}
         <span>${r.won ? 'won' : 'lost'}${r.reason ? ` (${REASON[r.reason]})` : ''} · ${Math.floor(r.seconds / 60)}:${String(r.seconds % 60).padStart(2, '0')}</span></li>`).join('')}
     </ol>
-    <div class="chips">${augmentChips(run.augments)}</div>
+    <div class="chips">${augmentChips([...run.augments, ...run.items], true, 'No augments or items')}</div>
     <p class="hint">Best with ${KITS[run.kit].name}: floor ${meta.best[run.kit] ?? reached} · ${meta.runs} run${meta.runs === 1 ? '' : 's'}, ${meta.wins} won</p>
     <div class="actions"><button class="go" data-action="again">New run</button></div>`);
   await waitFor(el);

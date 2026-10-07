@@ -33,6 +33,7 @@
       .tier-silver { border-color: #b8c2cc; color: #dfe6ec; }
       .tier-gold { border-color: #f2c14e; color: #ffd98a; }
       .tier-prismatic { border-color: #c58bff; color: #e6c8ff; box-shadow: 0 0 8px #b36bff66; }
+      .tier-item { border-color: #e0a96d; color: #f3d2a8; border-radius: 4px; }
       .none { opacity: 0.5; font-size: 12px; }
       #abilities .augs { display: flex; flex-direction: column; gap: 3px; align-self: center; }
       #abilities .augs .aug { padding: 1px 4px; pointer-events: auto; }
@@ -149,6 +150,19 @@
       #screen .augcard.tier-gold:hover { border-color: #f2c14e; }
       #screen .augcard.tier-prismatic:hover { border-color: #c58bff; }
       #screen .augcard.tier-silver:hover { border-color: #b8c2cc; }
+      #screen h3 { margin: 4px 0 -6px; font-size: 15px; font-weight: 600; }
+      #screen h3 small { font-weight: 400; opacity: 0.55; font-size: 12px; margin-left: 6px; }
+      #screen .purse { font-size: 20px; font-weight: 700; color: #f2c14e; }
+      #screen .shelf { gap: 10px; }
+      #screen .itemcard { width: 150px; padding: 10px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+      #screen .itemcard .icon { font-size: 28px; }
+      #screen .itemcard .name { font-size: 14px; color: #f3d2a8; }
+      #screen .itemcard p { font-size: 11.5px; line-height: 1.4; margin: 2px 0 4px; opacity: 0.85; flex: 1; }
+      #screen .itemcard .price { font-weight: 700; color: #f2c14e; }
+      #screen .itemcard .price.short { color: #ff8a80; }
+      #screen .itemcard:hover:not(:disabled) { border-color: #f2c14e; }
+      #screen .itemcard:disabled { cursor: default; opacity: 0.55; transform: none; }
+      #screen .itemcard.sold { opacity: 0.3; }
       #screen .results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; min-width: min(420px, 90vw); }
       #screen .results li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; border-radius: 6px; background: #ffffff0d; font-size: 14px; }
       #screen .results li.won span { color: #8fe08a; }

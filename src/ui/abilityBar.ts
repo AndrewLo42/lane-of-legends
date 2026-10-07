@@ -35,7 +35,7 @@ export class AbilityBar {
     this.root.style.setProperty('--accent', kit.color);
     this.root.innerHTML = `
       <div class="portrait"><b>${kit.name[0]}</b><span class="lvl"></span></div>
-      ${me.champ!.augments.length ? `<div class="augs">${augmentChips(me.champ!.augments, false)}</div>` : ''}
+      ${me.champ!.augments.length + me.champ!.items.length ? `<div class="augs">${augmentChips([...me.champ!.augments, ...me.champ!.items], false)}</div>` : ''}
       <div class="core">
         <div class="slots">
           <div class="slot passive" data-tip="-1"><i>${kit.passive.icon}</i></div>

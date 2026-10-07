@@ -19,7 +19,7 @@ export class Hud {
   constructor(private world: World, private me: Unit, private foe: Unit, label: string, private sandbox: boolean) {
     this.floor.textContent = label;
     const k = KITS[foe.champ!.kit];
-    this.foeStrip.innerHTML = `<b style="color:${k.color}">${k.name}</b> ${augmentChips(foe.champ!.augments, false)}`;
+    this.foeStrip.innerHTML = `<b style="color:${k.color}">${k.name}</b> ${augmentChips([...foe.champ!.augments, ...foe.champ!.items], false)}`;
     this.foeStrip.style.display = '';
     this.topbar.style.display = '';
   }

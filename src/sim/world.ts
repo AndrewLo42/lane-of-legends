@@ -1,5 +1,5 @@
 import { Rng } from '../core/rng';
-import { augmentsOf, combineMods } from './augments';
+import { combineMods, perksOf } from './augments';
 import { KITS, kitOf } from './kits';
 import type { CastCtx } from './kits/types';
 import { LANE, clampToLane, sideX, spawnPoint } from './lane';
@@ -58,14 +58,18 @@ export class World {
   }
 
   /**
-   * `augments` and `statMult` (opponent scaling) apply for the whole duel. Champions start at
-   * `rules.startLevel` with their first points spent Q, E, W.
+   * `augments`, `items` and `statMult` (opponent scaling) apply for the whole duel. Champions start
+   * at `rules.startLevel` (+ `extraLevels`) with their first points spent Q, E, W.
    */
-  spawnChampion(team: Team, kit: KitId, controller: Controller, opts: { augments?: AugmentId[]; statMult?: number } = {}): Unit {
+  spawnChampion(
+    team: Team, kit: KitId, controller: Controller,
+    opts: { augments?: AugmentId[]; items?: AugmentId[]; statMult?: number; extraLevels?: number } = {},
+  ): Unit {
     const k = KITS[kit].stats;
     const augments = opts.augments ?? [];
+    const items = opts.items ?? [];
     const statMult = opts.statMult ?? 1;
-    const mods = combineMods(augments, { haste: this.rules.haste });
+    const mods = combineMods([...augments, ...items], { haste: this.rules.haste });
     const hp = (k.hp * statMult + mods.hpFlat) * (1 + mods.hpPct);
     const u = this.spawn('champion', team, spawnPoint(team), {
       radius: k.radius, hp, speed: k.speed * (1 + mods.speedPct), damage: k.damage * statMult + mods.ad, range: k.range,
@@ -75,10 +79,11 @@ export class World {
     const champ: ChampState = {
       kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + mods.manaFlat, maxMana: k.mana + mods.manaFlat,
       abilities: [ability(), ability(), ability(), ability()], casting: null, queued: null, dash: null, data: {},
-      augments: [...augments], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
+      augments: [...augments], items: [...items], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
     };
     u.champ = champ;
-    while (champ.level < this.rules.startLevel) this.levelUp(u);
+    const start = this.rules.startLevel + (opts.extraLevels ?? 0);
+    while (champ.level < Math.min(MAX_LEVEL, start)) this.levelUp(u);
     for (const slot of ([0, 2, 1] as Slot[]).slice(0, champ.level)) this.levelAbility(u, slot);
     this.controllers.set(u.id, controller);
     return u;
@@ -144,7 +149,7 @@ export class World {
     for (const u of this.champions()) {
       if (u.dead) continue;
       kitOf(u).onTick?.(this, u);
-      for (const a of augmentsOf(u)) a.onTick?.(this, u);
+      for (const a of perksOf(u)) a.onTick?.(this, u);
     }
     this.regen();
     this.expire();
@@ -222,7 +227,7 @@ export class World {
     const time = recast ? def.recastTime ?? def.castTime : def.castTime;
     if (time > 0) c.casting = { slot, at: { ...at }, fireAt: this.tick + ticks(time), recast };
     else this.resolveCast(ctx, slot);
-    for (const a of augmentsOf(u)) a.onCast?.(this, u, slot, ctx.at, recast);
+    for (const a of perksOf(u)) a.onCast?.(this, u, slot, ctx.at, recast);
   }
 
   /** Run an ability's effect again with no cost, wind-up or cooldown (Double Tap). */
@@ -460,7 +465,7 @@ export class World {
   }
 
   spawnMinion(team: Team, role: MinionRole, pos: Vec2): Unit {
-    const buff = this.champions().filter((c) => c.team === team).flatMap(augmentsOf).reduce((b, a) => b + (a.minionBuff ?? 0), 0);
+    const buff = this.champions().filter((c) => c.team === team).flatMap(perksOf).reduce((b, a) => b + (a.minionBuff ?? 0), 0);
     const base = MINIONS[role];
     const m = this.spawn('minion', team, pos, { ...base, hp: base.hp * (1 + buff), damage: base.damage * (1 + buff) }, role);
     m.laneY = pos.y;
@@ -620,7 +625,7 @@ export class World {
     if (target.dead || amount <= 0) return 0;
     if (src?.champ) {
       amount *= 1 + src.champ.mods.dmgAmp;
-      for (const a of augmentsOf(src)) amount *= a.damageMult?.(this, src, target) ?? 1;
+      for (const a of perksOf(src)) amount *= a.damageMult?.(this, src, target) ?? 1;
     }
     if (target.champ) {
       amount *= target.champ.mods.takenMult;
@@ -642,16 +647,16 @@ export class World {
       if (src.champ.mods.omnivamp > 0) src.hp = Math.min(src.maxHp, src.hp + amount * src.champ.mods.omnivamp);
       const kit = kitOf(src);
       kit.onDamageDealt?.(this, src, target, amount);
-      for (const a of augmentsOf(src)) a.onDamage?.(this, src, target, amount, from);
+      for (const a of perksOf(src)) a.onDamage?.(this, src, target, amount, from);
       if (!from.proc) {
         if (from.attack) {
           kit.onAttackHit?.(this, src, target);
-          for (const a of augmentsOf(src)) a.onAttackHit?.(this, src, target);
+          for (const a of perksOf(src)) a.onAttackHit?.(this, src, target);
         }
         if (from.slot != null) kit.onAbilityHit?.(this, src, target, from.slot);
       }
     }
-    if (target.champ && !target.dead) for (const a of augmentsOf(target)) a.onHurt?.(this, target, src, amount, from);
+    if (target.champ && !target.dead) for (const a of perksOf(target)) a.onHurt?.(this, target, src, amount, from);
     return amount;
   }
 
@@ -689,7 +694,7 @@ export class World {
         (u.kind === 'champion' ? CHAMPION_BOUNTY : u.kind === 'minion' ? MINIONS[u.role!].bounty * goldMult : STRUCTURES[u.kind].bounty),
       );
       if (u.kind === 'minion') byChampion.champ!.cs++;
-      for (const a of augmentsOf(byChampion)) a.onKill?.(this, byChampion, u);
+      for (const a of perksOf(byChampion)) a.onKill?.(this, byChampion, u);
     }
     if (u.kind === 'minion') {
       for (const c of this.champions()) {
@@ -699,7 +704,7 @@ export class World {
     if (u.kind === 'champion') {
       // Any death scores for the other side (a tower execute counts), worth more with Bounty Hunter.
       const foe = this.champions().find((c) => c.team !== u.team);
-      if (foe?.champ) foe.champ.kills += byChampion ? Math.max(1, ...augmentsOf(byChampion).map((a) => a.killValue ?? 1)) : 1;
+      if (foe?.champ) foe.champ.kills += byChampion ? Math.max(1, ...perksOf(byChampion).map((a) => a.killValue ?? 1)) : 1;
       u.champ!.deaths++;
       if (byChampion) this.grantXp(byChampion, champKillXp(u.champ!.level) * xpMult);
       u.champ!.casting = null;

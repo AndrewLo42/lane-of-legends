@@ -28,8 +28,13 @@ export interface DuelSetup {
   rules: DuelRules;
   kit: KitId;
   augments: AugmentId[];
+  /** Shop items (permanent + this duel's consumables). */
+  items?: AugmentId[];
+  /** Levels above the rules' start level (Tome of Insight). */
+  extraLevels?: number;
   enemyKit: KitId;
   enemyAugments: AugmentId[];
+  enemyItems?: AugmentId[];
   enemyStatMult: number;
   enemyAccuracy: number;
   /** Shown in the top bar, e.g. "Floor 2 · Contender". */
@@ -42,6 +47,8 @@ export interface DuelOutcome {
   won: boolean;
   reason: WinReason | null;
   seconds: number;
+  /** Gold the player earned in the duel. */
+  gold: number;
 }
 
 /** Human controller: queues commands from input; the sim drains them on its next tick. */
@@ -82,9 +89,11 @@ export class Duel {
   constructor(private shell: Shell, private setup: DuelSetup) {
     this.finished = new Promise((r) => (this.resolve = r));
     const world = (this.world = new World(setup.seed, setup.rules));
-    this.me = world.spawnChampion('blue', setup.kit, this.player, { augments: setup.augments });
+    this.me = world.spawnChampion('blue', setup.kit, this.player, {
+      augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels,
+    });
     this.foe = world.spawnChampion('red', setup.enemyKit, new BotController(setup.enemyAccuracy), {
-      augments: setup.enemyAugments, statMult: setup.enemyStatMult,
+      augments: setup.enemyAugments, items: setup.enemyItems, statMult: setup.enemyStatMult,
     });
     this.view = new WorldView(shell.scene, world);
     this.effects = new EffectsView(shell.scene, world, this.me.team);
@@ -125,7 +134,7 @@ export class Duel {
       if (this.setup.sandbox && input.wasPressed('KeyR')) location.reload();
       this.decidedAt ??= performance.now();
       if (!this.setup.sandbox && performance.now() - this.decidedAt >= END_PAUSE * 1000) {
-        this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ) });
+        this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold });
       }
     }
 
