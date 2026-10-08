@@ -47,15 +47,28 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
-   * shield: damage it can still absorb; guard: fraction of damage prevented; regen: HP per second.
+   * shield: damage it can still absorb; guard: fraction of damage prevented; regen: HP per second;
+   * grievous: fraction of healing lost; haste: extra move speed fraction; rage: bonus attack damage
+   * (plus a fixed attack speed bonus); tether: tagged by a Tether, so its caster can dash to it.
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
   sourceId: number;
+}
+
+/** Summoner spells: two per champion, picked for the run and swappable between floors. */
+export type SummonerId = 'flash' | 'ignite' | 'ghost' | 'barrier' | 'tether' | 'rage';
+export type SummonerSlot = 0 | 1;
+
+export interface SummonerState {
+  id: SummonerId;
+  readyAt: number;
+  /** Tether: while tick < recastUntil, pressing again dashes to the tagged enemy. */
+  recastUntil: number;
 }
 
 export interface AbilityState {
@@ -97,6 +110,7 @@ export interface ChampState {
   deaths: number;
   /** Minion last hits. */
   cs: number;
+  summoners: SummonerState[];
 }
 
 export interface Unit {
@@ -148,7 +162,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether';
 
 export interface Missile {
   id: number;
@@ -203,7 +217,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage';
   pos: Vec2;
   dir?: number;
   radius?: number;
@@ -220,7 +234,8 @@ export type Command =
   | { type: 'attack'; target: number }
   | { type: 'stop' }
   | { type: 'cast'; slot: Slot; at: Vec2 }
-  | { type: 'levelUp'; slot: Slot };
+  | { type: 'levelUp'; slot: Slot }
+  | { type: 'summon'; slot: SummonerSlot; at: Vec2 };
 
 export interface Controller {
   /** Called once per tick; returns the commands for this tick. */

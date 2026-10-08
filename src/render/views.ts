@@ -31,6 +31,12 @@ interface UnitView {
   bubble?: THREE.Mesh;
   root?: THREE.Mesh;
   stun?: THREE.Object3D;
+  /** Rage (red) or Ghost (pale) aura at the feet. */
+  aura?: THREE.Mesh;
+  /** Ignite: a flame over the head. */
+  flame?: THREE.Mesh;
+  /** Tagged by a Tether: a line back to the caster. */
+  tether?: THREE.Line;
   /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
@@ -77,6 +83,8 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     wave: () => ({ geo: new THREE.BoxGeometry(1.2, 1.4, m.width), color: 0xffc94a, height: 0.9, opacity: 0.55 }),
     tide: () => ({ geo: new THREE.ConeGeometry(0.3, 1.0, 8).rotateZ(-Math.PI / 2), color: 0x7fe0ff, height: 1.0, opacity: 0.85 }),
     petal: () => ({ geo: new THREE.ConeGeometry(0.16, 0.9, 4).rotateZ(-Math.PI / 2).scale(1, 0.35, 1), color: 0xf7a8c8, height: 1.2 }),
+    // Tether: a glowing hook, open end forward.
+    tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
   };
   const look = looks[m.style]();
   const mat = new THREE.MeshBasicMaterial({ color: look.color, transparent: look.opacity != null, opacity: look.opacity ?? 1 });
@@ -168,6 +176,10 @@ export class WorldView {
 
   private removeView(v: UnitView) {
     this.scene.remove(v.obj);
+    if (v.tether) {
+      this.scene.remove(v.tether);
+      v.tether.geometry.dispose();
+    }
     v.anim?.dispose();
     v.obj.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -291,7 +303,52 @@ export class WorldView {
     }
   }
 
-  /** Shield bubble, a ring of water while rooted, and circling stars while stunned. */
+  /** Rage/Ghost aura, Ignite's flame, and the Tether line. */
+  private summonerVisuals(u: Unit, v: UnitView) {
+    const now = performance.now() / 1000;
+    const rage = u.statuses.some((s) => s.kind === 'rage');
+    const haste = u.statuses.some((s) => s.kind === 'haste');
+    if ((rage || haste) && !v.aura) {
+      v.aura = new THREE.Mesh(new THREE.RingGeometry(u.radius + 0.1, u.radius + 0.45, 32), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+      v.aura.rotation.x = -Math.PI / 2;
+      v.aura.position.y = 0.06;
+      v.obj.add(v.aura);
+    }
+    if (v.aura) {
+      v.aura.visible = rage || haste;
+      const m = v.aura.material as THREE.MeshBasicMaterial;
+      m.color.set(rage ? 0xff4a3d : 0xd9f4ff);
+      m.opacity = 0.45 + Math.sin(now * 8) * 0.15;
+    }
+
+    const burning = u.statuses.some((s) => s.kind === 'grievous');
+    if (burning && !v.flame) {
+      v.flame = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 8), new THREE.MeshBasicMaterial({ color: 0xff7a2e, transparent: true, opacity: 0.85 }));
+      v.flame.position.y = 2.6;
+      v.obj.add(v.flame);
+    }
+    if (v.flame) {
+      v.flame.visible = burning;
+      v.flame.scale.set(1, 0.8 + Math.sin(now * 14) * 0.25, 1);
+    }
+
+    const tag = u.statuses.find((s) => s.kind === 'tether' && s.until > this.world.tick);
+    const caster = tag && this.units.get(tag.sourceId);
+    if (tag && caster && !v.tether) {
+      v.tether = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xc9f2ff }));
+      this.scene.add(v.tether);
+    }
+    if (v.tether) {
+      v.tether.visible = !!(tag && caster);
+      if (tag && caster) {
+        const a = v.obj.position;
+        const b = caster.obj.position;
+        v.tether.geometry.setFromPoints([new THREE.Vector3(a.x, 1.1, a.z), new THREE.Vector3(b.x, 1.1, b.z)]);
+      }
+    }
+  }
+
+  /** Shield bubble, a ring of water while rooted, circling stars while stunned, and summoner spell effects. */
   private statusVisuals(u: Unit, v: UnitView, dt: number) {
     const shielded = u.statuses.some((s) => s.kind === 'shield');
     const rooted = u.statuses.some((s) => s.kind === 'root');
@@ -318,6 +375,7 @@ export class WorldView {
       v.obj.add(v.stun);
     }
     this.markVisual(u, v, dt);
+    this.summonerVisuals(u, v);
     if (v.bubble) v.bubble.visible = shielded;
     if (v.root) v.root.visible = rooted;
     if (v.stun) {

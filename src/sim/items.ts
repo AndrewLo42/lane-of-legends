@@ -95,7 +95,7 @@ const LIST: Item[] = [
       const f = store(self);
       if (self.dead || self.hp >= self.maxHp * 0.25 || w.tick < (f['r.phoenix'] ?? -Infinity)) return;
       f['r.phoenix'] = w.tick + ticks(60);
-      self.hp = Math.min(self.maxHp, self.hp + 0.2 * self.maxHp);
+      w.heal(self, 0.2 * self.maxHp);
       for (const e of w.enemiesInCircle(self.team, self.pos, 3)) w.dealDamage(self, e, 40 + 8 * self.champ!.level, { proc: true });
       w.addFx({ kind: 'erupt', pos: self.pos, radius: 3, team: self.team });
     },
@@ -135,7 +135,7 @@ const LIST: Item[] = [
       f['r.seed'] = (f['r.seed'] ?? 0) + 1;
       if (f['r.seed'] % 4 !== 0) return;
       const dealt = w.dealDamage(self, t, 40 + 0.05 * t.maxHp, { proc: true });
-      self.hp = Math.min(self.maxHp, self.hp + dealt);
+      w.heal(self, dealt);
       w.addFx({ kind: 'bloom', pos: t.pos, radius: 1, team: self.team });
     },
   },

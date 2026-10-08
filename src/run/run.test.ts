@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { AUGMENTS } from '../sim/augments';
 import { DUEL_RULES } from '../sim/rules';
 import { ITEMS, MAX_ITEMS } from '../sim/items';
-import { FLOORS, WIN_BONUS, advance, augmentOffers, buy, cantBuy, floorPlan, loadout, newRun, reroll, shopStock, starterAugments, starterItems, takeStarter } from './run';
+import { FLOORS, WIN_BONUS, advance, augmentOffers, buy, cantBuy, floorPlan, loadout, newRun, reroll, shopStock, starterAugments, starterItems, takeStarter, runSummoners, setSummoners } from './run';
+import { SIGNATURE_SUMMONERS } from '../sim/summoners';
 
 describe('run', () => {
   it('floor plans are deterministic per seed', () => {
@@ -130,5 +131,20 @@ describe('run', () => {
     const before = starterAugments(run);
     expect(reroll(run)).toBe(true);
     expect(starterAugments(run)).not.toEqual(before);
+  });
+
+  it('keeps the chosen summoner spells, lets the shop swap them, and gives opponents their signature pair', () => {
+    expect(runSummoners(newRun('arlo', 1))).toEqual(['flash', 'ignite']);
+    const run = newRun('lisha', 1, ['tether', 'rage']);
+    expect(runSummoners(run)).toEqual(['tether', 'rage']);
+    setSummoners(run, ['ghost', 'barrier']);
+    expect(runSummoners(run)).toEqual(['ghost', 'barrier']);
+    setSummoners(run, ['ghost', 'ghost']); // invalid: ignored
+    setSummoners(run, ['ghost', 'nope' as never]);
+    expect(runSummoners(run)).toEqual(['ghost', 'barrier']);
+    const { summoners: _, ...old } = run; // a save from before summoner spells
+    expect(runSummoners(old as typeof run)).toEqual(['flash', 'ignite']);
+    const plan = floorPlan(run);
+    expect(plan.opponentSummoners).toEqual(SIGNATURE_SUMMONERS[plan.opponent]);
   });
 });

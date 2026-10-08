@@ -1,12 +1,13 @@
 import { portraitHtml } from '../render/portraits';
-import { FLOORS, cantBuy, shopStock, type FloorPlan, type Meta, type RunState } from '../run/run';
+import { FLOORS, cantBuy, runSummoners, shopStock, validSummoners, type FloorPlan, type Meta, type RunState } from '../run/run';
 import { AUGMENTS } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
 import { KITS, KIT_IDS } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
-import type { AugmentId, KitId } from '../sim/types';
+import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
+import type { AugmentId, KitId, SummonerId, Unit } from '../sim/types';
 import { World } from '../sim/world';
-import { augmentChips } from './chips';
+import { augmentChips, spellChips } from './chips';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
 const REASON: Record<WinReason, string> = { kills: 'kills', cs: 'CS', tower: 'first tower', nexus: 'nexus' };
@@ -46,7 +47,7 @@ function ladder(run: RunState) {
 }
 
 const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · hold <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> to aim,
-  release to cast (right-click cancels) · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
+  release to cast (right-click cancels) · <kbd>D</kbd><kbd>F</kbd> summoner spells · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
   hold <kbd>Space</kbd> centre camera · wheel zoom · minimap: left-click to look, right-click to walk</p>`;
 
 const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].name}</b> <small>${KITS[id].title}</small>`;
@@ -54,20 +55,81 @@ const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].na
 const kitBadge = (id: KitId) =>
   `<div class="badge"><span class="mini-portrait big" style="--accent:${KITS[id].color}">${portraitHtml(id)}</span><div>${kitName(id)}</div></div>`;
 
+// ---------- summoner spell picker (champion select and shop) ----------
+
+type SpellPair = [SummonerId, SummonerId];
+const SPELL_KEYS = ['D', 'F'];
+
+/**
+ * Two slots (D, F) over a grid of every spell. Clicking a spell puts it in the highlighted slot and
+ * moves the highlight to the other one; picking the spell that's already in the other slot swaps
+ * them. Lives inside `host`, re-rendering itself; `onChange` gets each new pair.
+ */
+function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange: (p: SpellPair) => void) {
+  let active = 0;
+  let shown: SummonerId = pair[0];
+  const render = () => {
+    const d = SUMMONERS[shown];
+    host.innerHTML = `
+      <div class="spellslots">${pair.map((id, i) => `
+        <button class="sslot${i === active ? ' on' : ''}" data-sslot="${i}"><kbd>${SPELL_KEYS[i]}</kbd><i>${SUMMONERS[id].icon}</i>${SUMMONERS[id].name}</button>`).join('')}
+      </div>
+      <div class="spellgrid">${SUMMONER_IDS.map((id) => {
+        const at = pair.indexOf(id);
+        return `<button class="spell${at >= 0 ? ' in' : ''}${id === shown ? ' shown' : ''}" data-spell="${id}" title="${SUMMONERS[id].name}">
+          <i>${SUMMONERS[id].icon}</i>${at >= 0 ? `<kbd>${SPELL_KEYS[at]}</kbd>` : ''}</button>`;
+      }).join('')}</div>
+      <p class="spelldesc"><b>${d.name}</b> <small>${d.cooldown}s cooldown</small><br>${d.describe(sample)}</p>`;
+  };
+  host.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const slot = t.closest<HTMLElement>('[data-sslot]');
+    if (slot) {
+      active = Number(slot.dataset.sslot);
+      shown = pair[active];
+    }
+    const spell = t.closest<HTMLElement>('[data-spell]');
+    if (spell) {
+      const id = spell.dataset.spell as SummonerId;
+      const other = 1 - active;
+      if (pair[other] === id) pair = active === 0 ? [id, pair[0]] : [pair[1], id]; // swap
+      else pair = (active === 0 ? [id, pair[1]] : [pair[0], id]) as SpellPair;
+      shown = id;
+      active = other;
+      onChange([...pair] as SpellPair);
+    }
+    if (slot || spell) render();
+  });
+  host.addEventListener('mouseover', (e) => {
+    const spell = (e.target as HTMLElement).closest<HTMLElement>('[data-spell]');
+    if (spell && spell.dataset.spell !== shown) {
+      shown = spell.dataset.spell as SummonerId;
+      host.querySelector('.spelldesc')!.innerHTML = `<b>${SUMMONERS[shown].name}</b> <small>${SUMMONERS[shown].cooldown}s cooldown</small><br>${SUMMONERS[shown].describe(sample)}`;
+    }
+  });
+  render();
+}
+
 // ---------- champion select ----------
 
 const LAST_KIT = 'lane-rogue.lastKit';
+const LAST_SPELLS = 'lane-rogue.lastSpells';
 
 /**
  * Champion select: portraits along the top, the chosen champion on the 3D stage (via `onFocus`),
  * and their full kit in the panel beside it. Click a portrait to look, double-click it or press
  * Start (or Enter) to begin; the arrow keys step through the roster.
  */
-export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<KitId> {
+export async function pickChampion(
+  meta: Meta, onFocus: (kit: KitId | null) => void = () => {},
+): Promise<{ kit: KitId; summoners: SpellPair }> {
   let current: KitId = KIT_IDS[0];
+  let spells: SpellPair = [...DEFAULT_SUMMONERS];
   try {
     const last = localStorage.getItem(LAST_KIT) as KitId | null;
     if (last && KIT_IDS.includes(last)) current = last;
+    const lastSpells = JSON.parse(localStorage.getItem(LAST_SPELLS) ?? 'null');
+    if (validSummoners(lastSpells)) spells = lastSpells;
   } catch {
     /* storage unavailable: start on the first champion */
   }
@@ -103,8 +165,11 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
         <li><i>${k.passive.icon}</i><div><b>${k.passive.name}</b> <small>Passive</small><p>${k.passive.describe(sample)}</p></div></li>
         ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`).join('')}
       </ul>
+      <h4>Summoner spells <small>swappable in the shop between floors</small></h4>
+      <div class="spellpick"></div>
       <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
       <div class="actions"><button class="go" data-start>Start run as ${k.name}</button></div>`;
+    spellPicker(info.querySelector('.spellpick')!, spells, sample, (p) => (spells = p));
   };
 
   const kit = await new Promise<KitId>((resolve) => {
@@ -121,8 +186,12 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       const i = KIT_IDS.indexOf(current);
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') select(KIT_IDS[(i + 1) % KIT_IDS.length]);
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') select(KIT_IDS[(i - 1 + KIT_IDS.length) % KIT_IDS.length]);
-      else if (e.key === 'Enter') done();
-      else return;
+      else if (e.key === 'Enter') {
+        // A focused button (the last spell clicked) would otherwise take the Enter as a click too.
+        e.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur();
+        done();
+      } else return;
       e.preventDefault();
     };
     const done = () => {
@@ -138,12 +207,13 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   });
   try {
     localStorage.setItem(LAST_KIT, kit);
+    localStorage.setItem(LAST_SPELLS, JSON.stringify(spells));
   } catch {
     /* ignore */
   }
   el.classList.remove('select');
   hide();
-  return kit;
+  return { kit, summoners: spells };
 }
 
 // ---------- before each duel ----------
@@ -161,10 +231,10 @@ export async function floorIntro(run: RunState, plan: FloorPlan): Promise<'fight
     <div class="floorhead"><small>Floor ${run.floor + 1} of ${FLOORS.length}${boss ? ' · Boss' : ''}</small><h1>${plan.title}</h1></div>
     ${ladder(run)}
     <div class="versus">
-      <div class="side"><small>You</small>${kitBadge(run.kit)}<div class="chips">${augmentChips(run.augments)}</div>
+      <div class="side"><small>You</small>${kitBadge(run.kit)}<div class="chips">${spellChips(runSummoners(run))}</div><div class="chips">${augmentChips(run.augments)}</div>
         ${run.items.length || run.consumables.length ? `<div class="chips">${augmentChips([...run.items, ...run.consumables])}</div>` : ''}</div>
       <div class="vs">VS</div>
-      <div class="side"><small>Opponent</small>${kitBadge(plan.opponent)}
+      <div class="side"><small>Opponent</small>${kitBadge(plan.opponent)}<div class="chips">${spellChips(plan.opponentSummoners)}</div>
         <div class="chips">${augmentChips(plan.opponentAugments)}</div>
         ${plan.opponentItems.length ? `<div class="chips">${augmentChips(plan.opponentItems)}</div>` : ''}
         ${plan.statMult > 1 ? `<div class="scaling">+${Math.round((plan.statMult - 1) * 100)}% health and damage</div>` : ''}</div>
@@ -234,8 +304,11 @@ export async function starterItem(run: RunState, ids: AugmentId[]): Promise<Augm
 
 // ---------- shop between floors ----------
 
-/** Buy items until "Next floor" is clicked. `onBuy` performs (and saves) the purchase. */
-export async function shop(run: RunState, onBuy: (id: AugmentId) => void): Promise<void> {
+/**
+ * Buy items until "Next floor" is clicked. `onBuy` performs (and saves) the purchase; `onSpells`
+ * swaps (and saves) the summoner spells, which are free to change here.
+ */
+export async function shop(run: RunState, onBuy: (id: AugmentId) => void, onSpells: (pair: SpellPair) => void = () => {}): Promise<void> {
   for (;;) {
     const card = (id: AugmentId) => {
       const it = ITEMS[id];
@@ -253,7 +326,11 @@ export async function shop(run: RunState, onBuy: (id: AugmentId) => void): Promi
       <h3>Consumables <small>next duel only</small></h3>
       <div class="cards shelf">${CONSUMABLES.map(card).join('')}</div>
       <div class="chips">${augmentChips([...run.items, ...run.consumables], true, 'Nothing bought yet')}</div>
+      <h3>Summoner spells <small>free to swap</small></h3>
+      <div class="spellpick"></div>
       <div class="actions"><button class="go" data-action="leave">Next floor →</button></div>`);
+    const sample = new World(1).spawnChampion('blue', run.kit, { think: () => [] });
+    spellPicker(el.querySelector('.spellpick')!, runSummoners(run), sample, onSpells);
     const action = await waitFor(el);
     if (action === 'leave') break;
     onBuy(action.slice('buy:'.length));

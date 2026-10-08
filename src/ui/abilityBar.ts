@@ -1,11 +1,15 @@
 import { portraitHtml } from '../render/portraits';
 import { kitOf } from '../sim/kits';
+import { SUMMONERS } from '../sim/summoners';
 import { augmentChips } from './chips';
 import type { Slot, Unit } from '../sim/types';
 import { TICK_HZ, type World, xpToNext } from '../sim/world';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
 const SLOTS: Slot[] = [0, 1, 2, 3];
+const SPELL_KEYS = ['D', 'F'];
+/** Tooltip ids at or above this are summoner spells (SPELL_TIP + slot). */
+const SPELL_TIP = 10;
 
 interface SlotEls {
   root: HTMLDivElement;
@@ -17,11 +21,12 @@ interface SlotEls {
 
 /**
  * League-style bottom bar: portrait with level, passive + Q/W/E/R (cooldown sweep, rank pips,
- * level-up buttons, recast glow), health/mana/XP bars, and tooltips.
+ * level-up buttons, recast glow), the D/F summoner spells, health/mana/XP bars, and tooltips.
  */
 export class AbilityBar {
   private root = document.getElementById('abilities')!;
   private slots: SlotEls[] = [];
+  private spells: { root: HTMLDivElement; cd: HTMLDivElement; cdText: HTMLSpanElement }[] = [];
   private hp: HTMLDivElement;
   private hpText: HTMLSpanElement;
   private mana: HTMLDivElement;
@@ -48,6 +53,12 @@ export class AbilityBar {
               <span class="key">${KEYS[s]}</span>
               <div class="pips"></div>
             </div>`).join('')}
+          <div class="spells">
+            ${me.champ!.summoners.map((sp, i) => `
+              <div class="slot spell" data-tip="${SPELL_TIP + i}">
+                <i>${SUMMONERS[sp.id].icon}</i><div class="cd"></div><span class="cdtext"></span><span class="key">${SPELL_KEYS[i]}</span>
+              </div>`).join('')}
+          </div>
         </div>
         <div class="bar hp"><div></div><span></span></div>
         <div class="bar mana"><div></div><span></span></div>
@@ -60,13 +71,16 @@ export class AbilityBar {
     this.manaText = q('.mana > span');
     this.xp = q('.xp > div');
     this.level = q('.portrait .lvl');
-    this.root.querySelectorAll<HTMLDivElement>('.slot:not(.passive)').forEach((root, i) => {
+    this.root.querySelectorAll<HTMLDivElement>('.slot:not(.passive):not(.spell)').forEach((root, i) => {
       const plus = q<HTMLButtonElement>('.plus', root);
       plus.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         onLevel(i as Slot);
       });
       this.slots.push({ root, plus, cd: q('.cd', root), cdText: q('.cdtext', root), pips: q('.pips', root) });
+    });
+    this.root.querySelectorAll<HTMLDivElement>('.slot.spell').forEach((root) => {
+      this.spells.push({ root, cd: q('.cd', root), cdText: q('.cdtext', root) });
     });
     this.root.querySelectorAll<HTMLDivElement>('.slot').forEach((el) => {
       el.addEventListener('mouseenter', () => (this.tipFor = Number(el.dataset.tip)));
@@ -112,6 +126,18 @@ export class AbilityBar {
       if (el.pips.textContent !== pips) el.pips.textContent = pips;
     });
 
+    c.summoners.forEach((sp, i) => {
+      const el = this.spells[i];
+      if (!el) return;
+      const recast = sp.recastUntil > world.tick;
+      const left = Math.max(0, sp.readyAt - world.tick) / TICK_HZ;
+      const frac = recast ? 0 : Math.min(1, left / SUMMONERS[sp.id].cooldown);
+      el.cd.style.background = frac > 0 ? `conic-gradient(#000a ${frac * 360}deg, transparent 0)` : 'none';
+      el.cdText.textContent = !recast && left > 0 ? String(Math.ceil(left)) : '';
+      el.root.classList.toggle('oncd', el.cdText.textContent !== '');
+      el.root.classList.toggle('recast', recast);
+    });
+
     if (this.tipFor == null) {
       this.tip.style.display = 'none';
     } else {
@@ -123,6 +149,11 @@ export class AbilityBar {
   private tipHtml(i: number) {
     const kit = kitOf(this.me);
     if (i < 0) return `<b>${kit.passive.name}</b> <small>Passive</small><p>${kit.passive.describe(this.me)}</p>`;
+    if (i >= SPELL_TIP) {
+      const sp = SUMMONERS[this.me.champ!.summoners[i - SPELL_TIP].id];
+      return `<b>${sp.name}</b> <small>${SPELL_KEYS[i - SPELL_TIP]} · summoner spell</small><p>${sp.describe(this.me)}</p>
+        <small class="cost">${sp.cooldown}s cooldown</small>`;
+    }
     const def = kit.abilities[i];
     const rank = this.me.champ!.abilities[i].rank;
     const r = Math.max(1, rank);

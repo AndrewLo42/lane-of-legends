@@ -8,12 +8,13 @@ import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
 import {
-  advance, augmentOffers, buy, starterAugments, starterItems, takeStarter, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
+  advance, augmentOffers, buy, runSummoners, setSummoners, validSummoners, starterAugments, starterItems, takeStarter, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
   type DuelResult, type RunState,
 } from './run/run';
 import { spawnPoint } from './sim/lane';
 import { KITS, KIT_IDS } from './sim/kits';
 import { SANDBOX_RULES } from './sim/rules';
+import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
 import { augmentPick, floorIntro, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
@@ -73,10 +74,11 @@ const freePlayKit = asKit(params.get('champ'));
 
 if (freePlayKit) {
   // Free play: the old sandbox, no goals, nexus to win.
+  const spells = params.get('spells')?.split(',');
   const enemyKit = asKit(params.get('enemy')) ?? KIT_IDS.find((k) => k !== freePlayKit) ?? freePlayKit;
   duel = new Duel(shell, {
     seed: Number(params.get('seed') ?? Date.now() % 1e9), rules: SANDBOX_RULES, kit: freePlayKit, augments: [],
-    enemyKit, enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 0.8, label: 'Free play', sandbox: true,
+    summoners: validSummoners(spells) ? spells : undefined, enemyKit, enemySummoners: SIGNATURE_SUMMONERS[enemyKit], enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 0.8, label: 'Free play', sandbox: true,
   });
 } else {
   void runLoop();
@@ -89,10 +91,10 @@ async function runLoop() {
     if (!run) {
       const s = stage!;
       s.active = true;
-      const kit = await pickChampion(loadMeta(), (k) => s.focus(k));
+      const { kit, summoners } = await pickChampion(loadMeta(), (k) => s.focus(k));
       s.active = false;
       s.focus(null);
-      run = newRun(kit, Date.now() % 1e9);
+      run = newRun(kit, Date.now() % 1e9, summoners);
       saveRun(run);
     }
     // A free augment and a free item to start the run.
@@ -112,9 +114,16 @@ async function runLoop() {
     }
     if (run.shopping) {
       const r = run;
-      await shop(r, (id) => {
-        if (buy(r, id)) saveRun(r);
-      });
+      await shop(
+        r,
+        (id) => {
+          if (buy(r, id)) saveRun(r);
+        },
+        (pair) => {
+          setSummoners(r, pair);
+          saveRun(r);
+        },
+      );
       leaveShop(run);
       saveRun(run);
     }
@@ -129,7 +138,8 @@ async function runLoop() {
       }
 
       duel = new Duel(shell, {
-        seed: plan.seed, rules: plan.rules, kit: run.kit, augments: run.augments, ...loadout(run), enemyKit: plan.opponent,
+        seed: plan.seed, rules: plan.rules, kit: run.kit, augments: run.augments, ...loadout(run), summoners: runSummoners(run),
+        enemyKit: plan.opponent, enemySummoners: plan.opponentSummoners,
         enemyAugments: plan.opponentAugments, enemyItems: plan.opponentItems, enemyStatMult: plan.statMult, enemyAccuracy: plan.accuracy,
         label: `Floor ${run.floor + 1} · ${plan.title}`,
       });

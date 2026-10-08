@@ -7,7 +7,8 @@ import { WorldView } from './render/views';
 import { BotController } from './sim/bot';
 import { kitOf } from './sim/kits';
 import type { DuelRules, WinReason } from './sim/rules';
-import type { AugmentId, Command, Controller, KitId, Slot, Unit } from './sim/types';
+import { SUMMONERS } from './sim/summoners';
+import type { AugmentId, Command, Controller, KitId, Slot, SummonerId, SummonerSlot, Unit } from './sim/types';
 import { DT, TICK_HZ, World } from './sim/world';
 import { AbilityBar } from './ui/abilityBar';
 import { HealthBars } from './ui/bars';
@@ -33,7 +34,10 @@ export interface DuelSetup {
   items?: AugmentId[];
   /** Levels above the rules' start level (Tome of Insight). */
   extraLevels?: number;
+  /** Summoner spells (D, F). Flash + Ignite if not given. */
+  summoners?: SummonerId[];
   enemyKit: KitId;
+  enemySummoners?: SummonerId[];
   enemyAugments: AugmentId[];
   enemyItems?: AugmentId[];
   enemyStatMult: number;
@@ -63,6 +67,7 @@ class PlayerController implements Controller {
 }
 
 const ABILITY_KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR'];
+const SUMMONER_KEYS = ['KeyD', 'KeyF'];
 /** How long the victory/defeat banner shows before the duel hands back control. */
 const END_PAUSE = 2.5;
 
@@ -83,6 +88,8 @@ export class Duel {
   private minimap: Minimap;
   /** The ability whose key is held down: its indicator shows, and it casts on release. */
   private aiming: Slot | null = null;
+  /** The summoner spell whose key (D/F) is held; same hold-to-aim, release-to-cast as abilities. */
+  private aimingSpell: SummonerSlot | null = null;
   private acc = 0;
   private reissue = 0;
   /** Wall-clock time the duel was decided (so a throttled background tab still moves on). */
@@ -92,10 +99,10 @@ export class Duel {
     this.finished = new Promise((r) => (this.resolve = r));
     const world = (this.world = new World(setup.seed, setup.rules));
     this.me = world.spawnChampion('blue', setup.kit, this.player, {
-      augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels,
+      augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels, summoners: setup.summoners,
     });
     this.foe = world.spawnChampion('red', setup.enemyKit, new BotController(setup.enemyAccuracy), {
-      augments: setup.enemyAugments, items: setup.enemyItems, statMult: setup.enemyStatMult,
+      augments: setup.enemyAugments, items: setup.enemyItems, statMult: setup.enemyStatMult, summoners: setup.enemySummoners,
     });
     this.view = new WorldView(shell.scene, world);
     this.effects = new EffectsView(shell.scene, world, this.me.team);
@@ -191,6 +198,24 @@ export class Duel {
     return best;
   }
 
+  private handleSummoner(slot: SummonerSlot, cursor: THREE.Vector3 | null) {
+    const { world, me, player } = this;
+    const { input, indicator } = this.shell;
+    if (input.rmbClicked || me.dead) {
+      this.aimingSpell = null;
+      return indicator.hide();
+    }
+    const at = cursor ? { x: cursor.x, y: cursor.z } : { ...me.pos };
+    if (!input.isDown(SUMMONER_KEYS[slot])) {
+      player.queue.push({ type: 'summon', slot, at });
+      this.aimingSpell = null;
+      return indicator.hide();
+    }
+    const spell = me.champ!.summoners[slot];
+    if (!spell) return indicator.hide();
+    indicator.show(SUMMONERS[spell.id].aim, this.view.positionOf(me.id)!, at, world.summonerBlocker(me, slot) === null);
+  }
+
   private handleAbilities() {
     const { world, me, player } = this;
     const { input, cam, indicator } = this.shell;
@@ -198,8 +223,17 @@ export class Duel {
     ABILITY_KEYS.forEach((code, i) => {
       if (!input.wasPressed(code)) return;
       if (input.isDown('AltLeft') || input.isDown('AltRight')) player.queue.push({ type: 'levelUp', slot: i as Slot });
-      else this.aiming = i as Slot;
+      else {
+        this.aiming = i as Slot;
+        this.aimingSpell = null;
+      }
     });
+    SUMMONER_KEYS.forEach((code, i) => {
+      if (!input.wasPressed(code)) return;
+      this.aimingSpell = i as SummonerSlot;
+      this.aiming = null;
+    });
+    if (this.aimingSpell != null) return this.handleSummoner(this.aimingSpell, cursor);
     if (this.aiming == null) return indicator.hide();
     if (input.rmbClicked || me.dead) {
       this.aiming = null; // right-click cancels, like League

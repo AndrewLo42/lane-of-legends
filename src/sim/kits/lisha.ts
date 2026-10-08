@@ -85,7 +85,7 @@ export const LISHA: Kit = {
           const c = self.champ!;
           if (marked) {
             // Petal Harvest.
-            self.hp = Math.min(self.maxHp, self.hp + HARVEST.flat + HARVEST.hp * self.maxHp);
+            world.heal(self, HARVEST.flat + HARVEST.hp * self.maxHp);
             c.mana = Math.min(c.maxMana, c.mana + Q.manaBack * at(Q.cost, rank));
             world.addFx({ kind: 'bloom', pos: self.pos, radius: 1, team: self.team });
           }

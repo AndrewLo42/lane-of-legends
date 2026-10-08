@@ -3,7 +3,8 @@ import { AUGMENTS, AUGMENT_IDS, type AugmentTier } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS, PERMANENT_ITEMS, STARTER_ITEMS } from '../sim/items';
 import { KIT_IDS } from '../sim/kits';
 import { DUEL_RULES, type DuelRules, type WinReason } from '../sim/rules';
-import type { AugmentId, KitId } from '../sim/types';
+import { DEFAULT_SUMMONERS, SIGNATURE_SUMMONERS, SUMMONERS } from '../sim/summoners';
+import type { AugmentId, KitId, SummonerId } from '../sim/types';
 
 /** A lane rule change for one floor. */
 export interface Modifier {
@@ -90,6 +91,8 @@ export interface RunState {
   bought: AugmentId[];
   /** The free starting picks still to make, in order (absent once both are taken, and on older saves). */
   starter?: 'augment' | 'item';
+  /** Summoner spells (D, F); swappable in the shop. Absent on older saves (Flash + Ignite). */
+  summoners?: [SummonerId, SummonerId];
 }
 
 export interface FloorPlan {
@@ -98,6 +101,7 @@ export interface FloorPlan {
   opponent: KitId;
   opponentAugments: AugmentId[];
   opponentItems: AugmentId[];
+  opponentSummoners: [SummonerId, SummonerId];
   accuracy: number;
   statMult: number;
   modifier: Modifier | null;
@@ -116,9 +120,9 @@ const shuffle = <T>(rng: Rng, xs: T[]) => {
 };
 const ofTier = (tier: AugmentTier) => AUGMENT_IDS.filter((id) => AUGMENTS[id].tier === tier);
 
-export function newRun(kit: KitId, seed: number): RunState {
+export function newRun(kit: KitId, seed: number, summoners: [SummonerId, SummonerId] = DEFAULT_SUMMONERS): RunState {
   return {
-    version: 1, seed, kit, floor: 0, augments: [], rerolls: 1, offerRoll: 0, results: [],
+    summoners: [...summoners], version: 1, seed, kit, floor: 0, augments: [], rerolls: 1, offerRoll: 0, results: [],
     gold: 0, items: [], consumables: [], shopping: false, bought: [], starter: 'augment',
   };
 }
@@ -149,7 +153,7 @@ export function floorPlan(run: RunState): FloorPlan {
   const rules = { ...DUEL_RULES };
   modifier?.apply(rules);
   return {
-    floor: run.floor, title: def.title, opponent, opponentAugments, opponentItems, accuracy: def.accuracy, statMult: def.statMult, modifier, rules,
+    floor: run.floor, title: def.title, opponent, opponentAugments, opponentItems, opponentSummoners: SIGNATURE_SUMMONERS[opponent], accuracy: def.accuracy, statMult: def.statMult, modifier, rules,
     seed: (run.seed * 131 + run.floor * 977) % 1e9,
   };
 }
@@ -244,6 +248,18 @@ export function buy(run: RunState, id: AugmentId): boolean {
   return true;
 }
 
+/** The run's summoner spells (older saves predate them). */
+export const runSummoners = (run: RunState): [SummonerId, SummonerId] => run.summoners ?? [...DEFAULT_SUMMONERS];
+
+/** Two different, known spells. */
+export const validSummoners = (pair: unknown): pair is [SummonerId, SummonerId] =>
+  Array.isArray(pair) && pair.length === 2 && pair[0] !== pair[1] && pair.every((id) => typeof id === 'string' && id in SUMMONERS);
+
+/** Swap summoner spells (free, in the shop between floors). */
+export function setSummoners(run: RunState, pair: [SummonerId, SummonerId]) {
+  if (validSummoners(pair)) run.summoners = [pair[0], pair[1]];
+}
+
 export function leaveShop(run: RunState) {
   run.shopping = false;
 }
@@ -287,7 +303,7 @@ export function loadRun(): RunState | null {
     const run = saved && ({ gold: 0, items: [], consumables: [], shopping: false, bought: [], ...saved } as RunState);
     if (
       run?.version === 1 && KIT_IDS.includes(run.kit) && run.floor < FLOORS.length && run.augments.every((a) => AUGMENTS[a]) &&
-      [...run.items, ...run.consumables].every((i) => ITEMS[i])
+      [...run.items, ...run.consumables].every((i) => ITEMS[i]) && (run.summoners == null || validSummoners(run.summoners))
     ) return run;
   } catch {
     /* corrupt or unavailable */

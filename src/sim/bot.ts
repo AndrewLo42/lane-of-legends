@@ -2,7 +2,8 @@ import { lead, leadTime, minionInTheWay } from './aim';
 import { kitOf } from './kits';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
-import type { Command, Controller, Slot, Unit, Vec2 } from './types';
+import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
+import type { Command, Controller, Slot, SummonerId, SummonerSlot, Unit, Vec2 } from './types';
 import { dirTo, dist, inCone } from './util';
 import { enemyOf, gap, type World } from './world';
 
@@ -36,6 +37,7 @@ const cast = (slot: Slot, at: Vec2): Command => ({ type: 'cast', slot, at });
  */
 export class BotController implements Controller {
   private nextDecision = 0;
+  private nextSummoner = 0;
   private retreating = false;
 
   constructor(private accuracy = 0.8) {}
@@ -47,6 +49,15 @@ export class BotController implements Controller {
       const order = [...([0, 1, 2] as Slot[]).filter((s) => self.champ!.abilities[s].rank === 0), ...kitOf(self).levelOrder];
       const slot = order.find((s) => world.canLevel(self, s));
       if (slot != null) cmds.push({ type: 'levelUp', slot });
+    }
+    // Summoner spells are checked more often than the main decision: Barrier and Flash are reactions.
+    if (world.tick >= this.nextSummoner) {
+      this.nextSummoner = world.tick + 3;
+      const spell = this.summoners(world, self);
+      if (spell) {
+        cmds.push(spell);
+        return cmds;
+      }
     }
     if (world.tick < this.nextDecision || world.isBusy(self)) return cmds;
     this.nextDecision = world.tick + 6; // ~5 decisions a second
@@ -111,6 +122,82 @@ export class BotController implements Controller {
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
     return { type: 'move', to: spot };
+  }
+
+  // ---------- summoner spells ----------
+
+  private summoners(world: World, self: Unit): Command | null {
+    const c = self.champ!;
+    const foe = world.champions().find((u) => u.team !== self.team && !u.dead);
+    if (!foe || self.dead) return null;
+    const slotOf = (id: SummonerId) => {
+      const i = c.summoners.findIndex((s) => s.id === id);
+      return i >= 0 && world.summonerBlocker(self, i as SummonerSlot) === null ? (i as SummonerSlot) : null;
+    };
+    const use = (id: SummonerId, at: Vec2): Command | null => {
+      const slot = slotOf(id);
+      return slot == null ? null : { type: 'summon', slot, at };
+    };
+    const d = gap(self, foe);
+    const hp = self.hp / self.maxHp;
+    const foeHp = foe.hp / foe.maxHp;
+    const home = spawnPoint(self.team);
+    const hurtLately = world.tick - self.lastHurtTick < 10;
+    const towerCovers = (p: Vec2) =>
+      world.units.some((t) => !t.dead && t.kind === 'tower' && t.team !== self.team && dist(p, t.pos) < t.range + t.radius);
+
+    // Save yourself first.
+    if (hp < 0.25 && hurtLately && d < 7) {
+      const save = use('barrier', self.pos);
+      if (save && self.hp < BARRIER.base * 3) return save;
+    }
+    if (hp < 0.2 && d < 4 && hurtLately) {
+      const away = { x: self.pos.x + Math.sign(home.x - self.pos.x) * 6, y: self.pos.y };
+      return use('flash', away) ?? use('ghost', self.pos);
+    }
+    if (this.retreating && d < 6) {
+      const run = use('ghost', self.pos);
+      if (run) return run;
+    }
+
+    // Then press an advantage.
+    const winning = hp > 0.4 && (foeHp < 0.35 || self.hp > foe.hp * 1.4);
+    if (winning && !towerCovers(foe.pos)) {
+      const burn = IGNITE.base + IGNITE.perLevel * c.level;
+      if (igniteTarget(world, self, foe.pos) && (foe.hp < burn + self.damage * 2 || foeHp < 0.3)) {
+        const ig = use('ignite', foe.pos);
+        if (ig) return ig;
+      }
+      if (foeHp < 0.2 && d > self.range + 0.5 && d < self.range + 4) {
+        const jump = use('flash', foe.pos);
+        if (jump) return jump;
+      }
+      if (foeHp < 0.3 && d > 3 && d < 9) {
+        const chase = use('ghost', self.pos);
+        if (chase) return chase;
+      }
+    }
+    if (d < self.range + 1 && self.attackTarget === foe.id && hp > 0.3) {
+      const rage = use('rage', self.pos);
+      if (rage) return rage;
+    }
+
+    // Tether: throw at a weakened champion with a clear line, dash in if it lands somewhere safe.
+    const tSlot = c.summoners.findIndex((s) => s.id === 'tether');
+    if (tSlot >= 0) {
+      const st = c.summoners[tSlot];
+      const tagged = world.status(foe, 'tether', self.id);
+      if (st.recastUntil > world.tick) {
+        if (tagged && hp > 0.35 && !towerCovers(foe.pos)) return { type: 'summon', slot: tSlot as SummonerSlot, at: foe.pos };
+      } else if (hp > 0.5 && foeHp < 0.55 && d > 3 && d < TETHER.range - 1 && !towerCovers(foe.pos)) {
+        const p = this.miss(world, lead(world, self.pos, foe, TETHER.speed));
+        if (!minionInTheWay(world, self, p, TETHER.width)) {
+          const throwIt = use('tether', p);
+          if (throwIt) return throwIt;
+        }
+      }
+    }
+    return null;
   }
 
   /** Scatter an aim point by this bot's inaccuracy. */

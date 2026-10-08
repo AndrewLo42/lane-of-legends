@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BotController } from './bot';
 import { KITS } from './kits';
+import { SIGNATURE_SUMMONERS } from './summoners';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -445,8 +446,8 @@ describe('bots', () => {
   for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
-      const a = w.spawnChampion('blue', blue, new BotController());
-      const b = w.spawnChampion('red', red, new BotController());
+      const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });
+      const b = w.spawnChampion('red', red, new BotController(), { summoners: SIGNATURE_SUMMONERS[red] });
       run(w, 240);
       for (const c of [a, b]) {
         expect(c.champ!.level).toBeGreaterThanOrEqual(3); // leveled at least twice; whoever loses lane can trail far behind

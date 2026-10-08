@@ -76,6 +76,8 @@
       #abilities .slot { position: relative; width: 50px; height: 50px; border-radius: 6px; background: #1b1e26; border: 2px solid #ffffff30;
         display: grid; place-items: center; font-size: 24px; color: var(--accent); }
       #abilities .slot i { font-style: normal; }
+      #abilities .spells { display: flex; gap: 5px; align-items: center; margin-left: 6px; padding-left: 8px; border-left: 1px solid #ffffff1a; }
+      #abilities .slot.spell { width: 38px; height: 38px; font-size: 18px; color: #e8e6df; }
       #abilities .slot.passive { width: 34px; height: 34px; font-size: 16px; align-self: center; border-radius: 50%; }
       #abilities .slot .cd { position: absolute; inset: 0; border-radius: 4px; }
       #abilities .slot .cdtext { position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; }
@@ -101,7 +103,7 @@
       #abilities .xp { height: 4px; }
       #abilities .xp > div { background: #b78cff; }
       /* Shrinks on narrow screens so it never runs under the ability bar. */
-      #minimap { position: fixed; right: 12px; bottom: 14px; width: clamp(160px, calc(50vw - 200px), 300px); height: auto; border: 2px solid #ffffff30; border-radius: 6px; background: #0c0f14;
+      #minimap { position: fixed; right: 12px; bottom: 14px; width: clamp(150px, calc(50vw - 270px), 300px); height: auto; border: 2px solid #ffffff30; border-radius: 6px; background: #0c0f14;
         box-shadow: 0 2px 10px #0008; cursor: pointer; }
       #tip { position: fixed; display: none; bottom: 150px; left: 50%; transform: translateX(-50%); width: 320px; background: #12141bf2;
         border: 1px solid #ffffff30; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; }
@@ -153,8 +155,31 @@
       #screen .champinfo .abilities kbd { margin-left: 4px; font-size: 10px; background: #ffffff22; border-radius: 3px; padding: 0 4px; font-family: inherit; }
       #screen .champinfo .abilities p { margin: 2px 0 0; font-size: 12px; line-height: 1.4; opacity: 0.8; }
       #screen .champinfo .best { margin: 0; }
-      #screen .champinfo .actions { justify-content: flex-end; }
+      /* Start stays in reach while the panel scrolls. */
+      #screen .champinfo .actions { justify-content: flex-end; position: sticky; bottom: -16px; margin: 0 -18px -16px; padding: 10px 18px 14px;
+        background: linear-gradient(#15192200, #151922f2 30%); }
       #screen .champinfo .go { font-size: 16px; padding: 9px 22px; }
+      @media (min-width: 820px) { #screen .champinfo { max-height: calc(100vh - 230px); overflow-y: auto; } }
+      #screen h4 { margin: 4px 0 -2px; font-size: 13px; font-weight: 600; }
+      #screen h4 small { font-weight: 400; opacity: 0.55; font-size: 11px; margin-left: 4px; }
+      /* Summoner spell picker: D/F slots over a grid of every spell. */
+      #screen .spellpick { display: flex; flex-direction: column; gap: 8px; }
+      #screen .spellslots { display: flex; gap: 8px; }
+      #screen .sslot { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #ffffff0a;
+        border: 1px solid #ffffff22; cursor: pointer; font-size: 13px; text-align: left; }
+      #screen .sslot i { font-style: normal; font-size: 16px; }
+      #screen .sslot.on { border-color: #ffd76a; box-shadow: 0 0 0 1px #ffd76a55; }
+      #screen kbd { background: #ffffff22; border-radius: 3px; padding: 0 4px; font-family: inherit; font-size: 11px; }
+      #screen .spellgrid { display: flex; gap: 6px; flex-wrap: wrap; }
+      #screen .spell { position: relative; width: 40px; height: 40px; border-radius: 8px; background: #ffffff0d; border: 1px solid #ffffff22;
+        cursor: pointer; font-size: 19px; display: grid; place-items: center; }
+      #screen .spell i { font-style: normal; }
+      #screen .spell.in { border-color: #ffd76a88; background: #3a2f1066; }
+      #screen .spell.shown { outline: 1px solid #ffffff66; }
+      #screen .spell kbd { position: absolute; right: -5px; bottom: -5px; font-size: 9px; background: #3a2f10; color: #ffd76a; border: 1px solid #ffd76a88; }
+      #screen .spelldesc { margin: 0; font-size: 12px; line-height: 1.45; opacity: 0.85; min-height: 3.2em; }
+      #screen .spelldesc small { opacity: 0.6; }
+      .aug.tier-spell { border-color: #9fd3ff88; color: #cfe8ff; }
       @media (max-width: 819px) {
         #screen.select { background: linear-gradient(#0b0d12cc 0%, #0b0d1200 20%, #0b0d1200 45%, #0b0d12ee 60%); }
         #screen .selectmain { flex: none; flex-direction: column; padding: 0 16px; }

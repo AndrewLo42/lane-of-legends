@@ -4,13 +4,14 @@ import { KITS, kitOf } from './kits';
 import type { CastCtx } from './kits/types';
 import { LANE, clampToLane, sideX, spawnPoint } from './lane';
 import { SANDBOX_RULES, type DuelRules, type WinReason } from './rules';
+import { DEFAULT_SUMMONERS, RAGE, SUMMONERS } from './summoners';
 import {
   CALL_FOR_HELP, CHAMPION_BOUNTY, CHAMPION_REGEN, FOUNTAIN, MAX_LEVEL, MINION_AGGRO, MINION_XP, MINIONS, RESPAWN_SECONDS,
   STRUCTURES, WAVE, XP_BASE, XP_RANGE, XP_STEP, champKillXp, type BaseStats,
 } from './stats';
 import type {
-  AugmentId, ChampState, Command, DamageSource, Controller, Fx, KitId, MinionRole, Missile, MissileStyle, Slot, Status, Team, Telegraph, Unit,
-  UnitKind, Vec2, Zone,
+  AugmentId, ChampState, Command, DamageSource, Controller, Fx, KitId, MinionRole, Missile, MissileStyle, Slot, Status, SummonerId, SummonerSlot,
+  Team, Telegraph, Unit, UnitKind, Vec2, Zone,
 } from './types';
 import { DT, TICK_HZ, angleTo, dist, dirTo, enemyOf, gap, inCone, segmentDistance, ticks, toward } from './util';
 
@@ -62,11 +63,12 @@ export class World {
 
   /**
    * `augments`, `items` and `statMult` (opponent scaling) apply for the whole duel. Champions start
-   * at `rules.startLevel` (+ `extraLevels`) with their first points spent Q, E, W.
+   * at `rules.startLevel` (+ `extraLevels`) with their first points spent Q, E, W, and carry two
+   * summoner spells (Flash and Ignite unless told otherwise).
    */
   spawnChampion(
     team: Team, kit: KitId, controller: Controller,
-    opts: { augments?: AugmentId[]; items?: AugmentId[]; statMult?: number; extraLevels?: number } = {},
+    opts: { augments?: AugmentId[]; items?: AugmentId[]; statMult?: number; extraLevels?: number; summoners?: SummonerId[] } = {},
   ): Unit {
     const k = KITS[kit].stats;
     const augments = opts.augments ?? [];
@@ -83,6 +85,7 @@ export class World {
       kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + mods.manaFlat, maxMana: k.mana + mods.manaFlat,
       abilities: [ability(), ability(), ability(), ability()], casting: null, lastCast: null, queued: null, dash: null, data: {},
       augments: [...augments], items: [...items], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
+      summoners: (opts.summoners ?? DEFAULT_SUMMONERS).slice(0, 2).map((id) => ({ id, readyAt: 0, recastUntil: 0 })),
     };
     u.champ = champ;
     const start = this.rules.startLevel + (opts.extraLevels ?? 0);
@@ -184,6 +187,9 @@ export class World {
         break;
       case 'levelUp':
         this.levelAbility(u, cmd.slot);
+        break;
+      case 'summon':
+        this.castSummoner(u, cmd.slot, cmd.at);
         break;
     }
   }
@@ -371,7 +377,44 @@ export class World {
 
   effectiveSpeed(u: Unit) {
     const slow = u.statuses.reduce((m, s) => (s.kind === 'slow' ? Math.max(m, s.value) : m), 0);
-    return u.speed * (1 - slow);
+    const haste = u.statuses.reduce((m, s) => (s.kind === 'haste' ? Math.max(m, s.value) : m), 0);
+    return u.speed * (1 - slow) * (1 + haste);
+  }
+
+  /**
+   * Restore health, cut by Ignite's grievous wounds. Every heal (regen, lifesteal, kit and augment
+   * heals) goes through here. Returns how much was actually restored.
+   */
+  heal(u: Unit, amount: number) {
+    if (u.dead || amount <= 0) return 0;
+    const cut = u.statuses.reduce((m, s) => (s.kind === 'grievous' ? Math.max(m, s.value) : m), 0);
+    const before = u.hp;
+    u.hp = Math.min(u.maxHp, u.hp + amount * (1 - cut));
+    return u.hp - before;
+  }
+
+  // ---------- summoner spells ----------
+
+  /** Why a summoner spell can't be cast right now, or null if it can. */
+  summonerBlocker(u: Unit, slot: SummonerSlot): 'cooldown' | 'busy' | null {
+    const c = u.champ;
+    const st = c?.summoners[slot];
+    if (!c || !st || u.dead || this.isStunned(u) || u.forced || c.dash) return 'busy';
+    if (this.tick < st.recastUntil) return null;
+    return this.tick < st.readyAt ? 'cooldown' : null;
+  }
+
+  /** Summoner spells are instant: they don't interrupt a wind-up, and Flash works while rooted. */
+  castSummoner(u: Unit, slot: SummonerSlot, at: Vec2) {
+    if (this.summonerBlocker(u, slot)) return;
+    const st = u.champ!.summoners[slot];
+    const def = SUMMONERS[st.id];
+    if (this.tick < st.recastUntil && def.recast) {
+      st.recastUntil = 0;
+      def.recast(this, u, at, st);
+      return;
+    }
+    if (def.cast(this, u, at, st)) st.readyAt = Math.max(st.readyAt, this.tick + ticks(def.cooldown));
   }
 
   /** Ticks between attacks, after level and momentum attack speed. */
@@ -381,6 +424,7 @@ export class World {
       bonus += kitOf(u).stats.attackSpeedPerLevel * (u.champ.level - 1);
       bonus += 0.1 * (this.status(u, 'momentum')?.value ?? 0);
       bonus += u.champ.mods.attackSpeed;
+      if (this.status(u, 'rage')) bonus += RAGE.attackSpeed;
     }
     return ticks(u.attackInterval / (1 + bonus));
   }
@@ -555,7 +599,8 @@ export class World {
   }
 
   private fire(u: Unit, target: Unit) {
-    const hit = (t: Unit) => this.dealDamage(this.get(u.id) ?? null, t, u.damage, { attack: true });
+    const rage = this.status(u, 'rage')?.value ?? 0;
+    const hit = (t: Unit) => this.dealDamage(this.get(u.id) ?? null, t, u.damage + rage, { attack: true });
     if (u.projectileSpeed <= 0) return hit(target);
     const off = u.kind === 'tower' ? 0 : u.radius;
     const from = { x: u.pos.x + Math.cos(u.facing) * off, y: u.pos.y + Math.sin(u.facing) * off };
@@ -657,7 +702,7 @@ export class World {
     if (src?.kind === 'champion' && target.kind === 'champion') this.callForHelp(src, target);
     if (target.hp <= 0) this.kill(target, src);
     if (src?.champ && !src.dead) {
-      if (src.champ.mods.omnivamp > 0) src.hp = Math.min(src.maxHp, src.hp + amount * src.champ.mods.omnivamp);
+      if (src.champ.mods.omnivamp > 0) this.heal(src, amount * src.champ.mods.omnivamp);
       const kit = kitOf(src);
       kit.onDamageDealt?.(this, src, target, amount);
       for (const a of perksOf(src)) a.onDamage?.(this, src, target, amount, from);
@@ -736,13 +781,13 @@ export class World {
       if (u.dead) continue;
       const atFountain = dist(u.pos, spawnPoint(u.team)) <= FOUNTAIN.radius;
       const c = u.champ!;
-      u.hp = Math.min(u.maxHp, u.hp + (CHAMPION_REGEN + (atFountain ? u.maxHp * FOUNTAIN.healPerSec : 0)) * DT);
+      this.heal(u, (CHAMPION_REGEN + (atFountain ? u.maxHp * FOUNTAIN.healPerSec : 0)) * DT);
       c.mana = Math.min(c.maxMana, c.mana + (kitOf(u).stats.manaRegen + c.mods.manaRegen + (atFountain ? c.maxMana * FOUNTAIN.healPerSec : 0)) * DT);
     }
     for (const u of this.champions()) {
       if (u.dead) continue;
       const heal = u.statuses.reduce((h, st) => (st.kind === 'regen' ? h + st.value : h), 0);
-      if (heal) u.hp = Math.min(u.maxHp, u.hp + heal * DT);
+      if (heal) this.heal(u, heal * DT);
     }
     for (const u of this.units) {
       for (const b of u.statuses) {

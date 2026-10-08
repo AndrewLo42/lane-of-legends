@@ -75,7 +75,7 @@ const LIST: Augment[] = [
     id: 'secondwind', name: 'Second Wind', icon: '🍃', tier: 'gold',
     describe: 'After 4s without taking damage, regenerate 4% of your max health per second.',
     onTick: (w, self) => {
-      if (w.tick - self.lastHurtTick > ticks(4)) self.hp = Math.min(self.maxHp, self.hp + (self.maxHp * 0.04) / TICK_HZ);
+      if (w.tick - self.lastHurtTick > ticks(4)) w.heal(self, (self.maxHp * 0.04) / TICK_HZ);
     },
   },
   {
@@ -86,9 +86,9 @@ const LIST: Augment[] = [
   },
   {
     id: 'scavenger', name: 'Scavenger', icon: '🦴', tier: 'gold', describe: 'Last-hitting a minion restores 20 health and 15 mana.',
-    onKill: (_w, self, v) => {
+    onKill: (w, self, v) => {
       if (v.kind !== 'minion') return;
-      self.hp = Math.min(self.maxHp, self.hp + 20);
+      w.heal(self, 20);
       self.champ!.mana = Math.min(self.champ!.maxMana, self.champ!.mana + 15);
     },
   },

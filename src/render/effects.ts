@@ -271,6 +271,31 @@ export class EffectsView {
         });
         break;
       }
+      // ---- summoner spells ----
+      case 'ignite': {
+        // A flare of fire on the target.
+        const s = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 10), basic(0xff7a2e, 0.75));
+        s.position.y = 1.2;
+        add(s, 0.45, (k) => {
+          fade(s, 0.75)(k);
+          s.scale.set(0.5 + k, 0.5 + k * 1.8, 0.5 + k);
+          s.position.y = 1.2 + k * 0.8;
+        });
+        break;
+      }
+      case 'ghost':
+      case 'barrier':
+      case 'rage': {
+        // A ring that sweeps up the body: pale for Ghost, gold for Barrier, red for Rage.
+        const color = fx.kind === 'ghost' ? 0xd9f4ff : fx.kind === 'barrier' ? 0xffd76a : 0xff4a3d;
+        const r = ringShape(0.9, 0.16, basic(color, 0.9));
+        add(r, 0.6, (k) => {
+          fade(r, 0.9)(k);
+          r.scale.setScalar(1.3 - k * 0.4);
+          r.position.y = 0.06 + k * 2.2;
+        });
+        break;
+      }
       case 'rewind': {
         const c = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 3, 20, 1, true), basic(TIME, 0.6));
         c.position.y = 1.5;
