@@ -3,6 +3,7 @@ import { Input } from './core/input';
 import { Duel, type Shell } from './duel';
 import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
+import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
 import { ClickMarker, buildArena, toV3 } from './render/scene';
@@ -63,6 +64,7 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 await loadModels(); // missing models fall back to placeholders
+bakePortraits();
 stage = new SelectStage();
 
 const params = new URLSearchParams(location.search);

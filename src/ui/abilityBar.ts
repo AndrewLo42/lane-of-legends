@@ -1,3 +1,4 @@
+import { portraitHtml } from '../render/portraits';
 import { kitOf } from '../sim/kits';
 import { augmentChips } from './chips';
 import type { Slot, Unit } from '../sim/types';
@@ -34,7 +35,7 @@ export class AbilityBar {
     const kit = kitOf(me);
     this.root.style.setProperty('--accent', kit.color);
     this.root.innerHTML = `
-      <div class="portrait"><b>${kit.name[0]}</b><span class="lvl"></span></div>
+      <div class="portrait">${portraitHtml(me.champ!.kit)}<span class="lvl"></span></div>
       ${me.champ!.augments.length + me.champ!.items.length ? `<div class="augs">${augmentChips([...me.champ!.augments, ...me.champ!.items], false)}</div>` : ''}
       <div class="core">
         <div class="slots">

@@ -1,3 +1,4 @@
+import { portraitHtml } from '../render/portraits';
 import { FLOORS, cantBuy, shopStock, type FloorPlan, type Meta, type RunState } from '../run/run';
 import { AUGMENTS } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
@@ -49,6 +50,9 @@ const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · ho
   hold <kbd>Space</kbd> centre camera · wheel zoom · minimap: left-click to look, right-click to walk</p>`;
 
 const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].name}</b> <small>${KITS[id].title}</small>`;
+/** Portrait and name, for the floor intro's versus panel. */
+const kitBadge = (id: KitId) =>
+  `<div class="badge"><span class="mini-portrait big" style="--accent:${KITS[id].color}">${portraitHtml(id)}</span><div>${kitName(id)}</div></div>`;
 
 // ---------- champion select ----------
 
@@ -105,10 +109,10 @@ export async function floorIntro(run: RunState, plan: FloorPlan): Promise<'fight
     <div class="floorhead"><small>Floor ${run.floor + 1} of ${FLOORS.length}${boss ? ' · Boss' : ''}</small><h1>${plan.title}</h1></div>
     ${ladder(run)}
     <div class="versus">
-      <div class="side"><small>You</small><div>${kitName(run.kit)}</div><div class="chips">${augmentChips(run.augments)}</div>
+      <div class="side"><small>You</small>${kitBadge(run.kit)}<div class="chips">${augmentChips(run.augments)}</div>
         ${run.items.length || run.consumables.length ? `<div class="chips">${augmentChips([...run.items, ...run.consumables])}</div>` : ''}</div>
       <div class="vs">VS</div>
-      <div class="side"><small>Opponent</small><div>${kitName(plan.opponent)}</div>
+      <div class="side"><small>Opponent</small>${kitBadge(plan.opponent)}
         <div class="chips">${augmentChips(plan.opponentAugments)}</div>
         ${plan.opponentItems.length ? `<div class="chips">${augmentChips(plan.opponentItems)}</div>` : ''}
         ${plan.statMult > 1 ? `<div class="scaling">+${Math.round((plan.statMult - 1) * 100)}% health and damage</div>` : ''}</div>
