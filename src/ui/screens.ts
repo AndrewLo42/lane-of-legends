@@ -56,39 +56,91 @@ const kitBadge = (id: KitId) =>
 
 // ---------- champion select ----------
 
-/** `onFocus` tells the 3D stage which champion the pointer is on (cards are in the stage's order). */
+const LAST_KIT = 'lane-rogue.lastKit';
+
+/**
+ * Champion select: portraits along the top, the chosen champion on the 3D stage (via `onFocus`),
+ * and their full kit in the panel beside it. Click a portrait to look, double-click it or press
+ * Start (or Enter) to begin; the arrow keys step through the roster.
+ */
 export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<KitId> {
-  const esc = (t: string) => t.replace(/"/g, '&quot;');
+  let current: KitId = KIT_IDS[0];
+  try {
+    const last = localStorage.getItem(LAST_KIT) as KitId | null;
+    if (last && KIT_IDS.includes(last)) current = last;
+  } catch {
+    /* storage unavailable: start on the first champion */
+  }
+
   const el = show(`
     <div class="selecthead"><h1>Lane Rogue</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p></div>
-    <div class="stagegap"></div>
-    <div class="cards champs">
-      ${KIT_IDS.map((id) => {
-        const k = KITS[id];
-        const best = meta.best[id];
-        // Tooltip numbers come from a real level-1 champion in a throwaway world.
-        const sample = new World(1).spawnChampion('blue', id, { think: () => [] });
-        const icons = [
-          `<i title="${esc(`${k.passive.name} (Passive): ${k.passive.describe(sample)}`)}">${k.passive.icon}</i>`,
-          ...k.abilities.map((a, s) => `<i title="${esc(`${a.name} (${KEYS[s]}): ${a.describe(1, sample)}`)}">${a.icon}</i>`),
-        ].join('');
-        return `
-          <button class="card champ" data-action="${id}" data-kit="${id}" style="--accent:${k.color}">
-            <div class="name">${k.name} <span>${k.title}</span></div>
-            <p class="blurb">${k.blurb}</p>
-            <div class="kit">${icons}</div>
-            <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
-          </button>`;
-      }).join('')}
+    <div class="roster">
+      ${KIT_IDS.map((id) => `
+        <button class="pick" data-kit="${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
+          <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
+        </button>`).join('')}
     </div>
-    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Hover an ability icon for details · Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
+    <div class="selectmain"><div class="stagegap"></div><div class="champinfo"></div></div>
+    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}←/→ to browse · Enter to start ·
+      Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
   el.classList.add('select');
-  el.querySelectorAll<HTMLElement>('[data-kit]').forEach((card) => {
-    card.addEventListener('mouseenter', () => onFocus(card.dataset.kit as KitId));
-    card.addEventListener('focus', () => onFocus(card.dataset.kit as KitId));
+  const info = el.querySelector<HTMLElement>('.champinfo')!;
+
+  const select = (kit: KitId) => {
+    current = kit;
+    onFocus(kit);
+    el.querySelectorAll<HTMLElement>('.pick').forEach((b) => b.classList.toggle('on', b.dataset.kit === kit));
+    const k = KITS[kit];
+    // Ability numbers come from a real level-1 champion in a throwaway world.
+    const sample = new World(1).spawnChampion('blue', kit, { think: () => [] });
+    const best = meta.best[kit];
+    info.style.setProperty('--accent', k.color);
+    info.innerHTML = `
+      <div class="name">${k.name} <span>${k.title}</span></div>
+      <p class="blurb">${k.blurb}</p>
+      <ul class="abilities">
+        <li><i>${k.passive.icon}</i><div><b>${k.passive.name}</b> <small>Passive</small><p>${k.passive.describe(sample)}</p></div></li>
+        ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`).join('')}
+      </ul>
+      <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
+      <div class="actions"><button class="go" data-start>Start run as ${k.name}</button></div>`;
+  };
+
+  const kit = await new Promise<KitId>((resolve) => {
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      const pick = t.closest<HTMLElement>('[data-kit]');
+      if (pick) select(pick.dataset.kit as KitId);
+      if (t.closest('[data-start]')) done();
+    };
+    const onDouble = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('[data-kit]')) done();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const i = KIT_IDS.indexOf(current);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') select(KIT_IDS[(i + 1) % KIT_IDS.length]);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') select(KIT_IDS[(i - 1 + KIT_IDS.length) % KIT_IDS.length]);
+      else if (e.key === 'Enter') done();
+      else return;
+      e.preventDefault();
+    };
+    const done = () => {
+      el.removeEventListener('click', onClick);
+      el.removeEventListener('dblclick', onDouble);
+      removeEventListener('keydown', onKey);
+      resolve(current);
+    };
+    el.addEventListener('click', onClick);
+    el.addEventListener('dblclick', onDouble);
+    addEventListener('keydown', onKey);
+    select(current);
   });
-  const kit = (await waitFor(el)) as KitId;
+  try {
+    localStorage.setItem(LAST_KIT, kit);
+  } catch {
+    /* ignore */
+  }
   el.classList.remove('select');
   hide();
   return kit;
