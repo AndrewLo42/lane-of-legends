@@ -84,6 +84,8 @@ export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion:
 const FROZEN = new THREE.Color(0xd8fffb);
 /** Champions that float instead of walking, and how high (Aurelle). */
 const FLOAT_HEIGHT: Partial<Record<KitId, number>> = { aurelle: 0.35 };
+/** How fast a floater's idle plays while she glides (1 = normal). */
+const GLIDE_IDLE_SPEED = 0.3;
 
 /** Mesh per missile style, built pointing along +x. */
 function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMaterial; height: number } {
@@ -267,8 +269,9 @@ export class WorldView {
         const moving = !u.dead && Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
         // Library cycles are paced for a ~1.8 m human (walk ≈ 3.2 m/s, run ≈ 5.8 m/s); match the unit's pace.
         const gait = v.anim.has('Run') ? 'Run' : 'Walk';
-        const glides = hover != null; // floaters keep their idle pose while they move
-        v.anim.setBase(moving && !glides ? gait : 'Idle', moving && !glides ? u.speed / (gait === 'Run' ? 5.8 : 3.2) : 1);
+        const glides = hover != null; // floaters keep their idle pose while they move, slowed right down so its
+        // hand gestures come round rarely and she reads as calmly gliding
+        v.anim.setBase(moving && !glides ? gait : 'Idle', moving ? (glides ? GLIDE_IDLE_SPEED : u.speed / (gait === 'Run' ? 5.8 : 3.2)) : 1);
         const cast = u.champ?.lastCast;
         if (cast && cast.tick !== v.lastCastSeen && !u.dead) {
           v.lastCastSeen = cast.tick;

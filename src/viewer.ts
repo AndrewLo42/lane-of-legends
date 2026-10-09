@@ -110,4 +110,4 @@ renderer.setAnimationLoop((now) => {
   renderer.render(scene, camera);
 });
 
-if (import.meta.env.DEV) Object.assign(window, { viewer: { get current() { return current; }, play } });
+if (import.meta.env.DEV) Object.assign(window, { viewer: { get current() { return current; }, play, camera, controls } });

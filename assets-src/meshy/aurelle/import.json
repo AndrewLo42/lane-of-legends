@@ -1,0 +1,24 @@
+{
+  "out": "public/assets/meshy/Aurelle.glb",
+  "rigged": "assets-src/meshy/aurelle/rigged_a924f811.glb",
+  "anims": [
+    "assets-src/meshy/aurelle/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": { "src": "Idle_03" },
+    "Attack": { "src": "mage_soell_cast_3", "start": 0.65, "end": 1.25 },
+    "Attack2": { "src": "mage_soell_cast", "start": 0.35, "end": 1.05 },
+    "CastQ": { "src": "mage_soell_cast_2", "start": 0.9, "end": 1.6 },
+    "CastW": { "src": "mage_soell_cast_4", "start": 0.25, "end": 0.95 },
+    "CastE": { "src": "Charged_Ground_Slam", "start": 1.2, "end": 2.1 },
+    "CastR": { "src": "Charged_Spell_Cast", "start": 0.0, "end": 1.2 },
+    "Death": { "src": "Shot_and_Slow_Fall_Backward", "start": 1.9, "end": 3.6 },
+    "Hit": { "src": "Hit_Reaction", "start": 0.3, "end": 1.2 },
+    "Select": { "src": "Charged_Spell_Cast_1", "start": 0.3, "end": 2.3 }
+  }
+}

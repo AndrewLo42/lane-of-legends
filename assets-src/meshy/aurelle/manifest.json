@@ -1,0 +1,104 @@
+[
+  {
+    "at": "2026-10-09T22:45:03.972Z",
+    "cmd": "concept",
+    "taskId": "01a122d6-4308-70c0-86e2-ce6498d2454d",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a radiant young battle mage woman, calm and effortlessly powerful, long light-gold hair in a high flowing ponytail with a few loose strands, softly glowing violet eyes, elegant white and polished gold light armor (a fitted chestplate, layered pauldrons, gold vambraces) over long flowing ivory robes with violet inner lining that reach the ground, a violet arcane sash, delicate gold circlet with a small violet gem, faint violet rune patterns etched along the armor trim. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no wand, no staff, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/aurelle/concepts/98d2454d_0.png",
+      "assets-src/meshy/aurelle/concepts/98d2454d_1.png",
+      "assets-src/meshy/aurelle/concepts/98d2454d_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-09T22:45:04.279Z",
+    "cmd": "concept",
+    "taskId": "01a122d6-45e0-7151-a7c8-eec1d92d00ef",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a radiant young battle mage woman, calm and effortlessly powerful, long light-gold hair in a high flowing ponytail with a few loose strands, softly glowing violet eyes, elegant white and polished gold light armor (a fitted chestplate, layered pauldrons, gold vambraces) over long flowing ivory robes with violet inner lining that reach the ground, a violet arcane sash, delicate gold circlet with a small violet gem, faint violet rune patterns etched along the armor trim. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands, shoulders and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no wand, no staff, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/aurelle/concepts/d92d00ef_0.png",
+      "assets-src/meshy/aurelle/concepts/d92d00ef_1.png",
+      "assets-src/meshy/aurelle/concepts/d92d00ef_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-09T22:48:32.166Z",
+    "cmd": "model",
+    "taskId": "01a122d7-d823-75a7-bae2-0412453dce4c",
+    "request": {
+      "image_urls": [
+        "98d2454d_0.png",
+        "98d2454d_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "long light-gold hair in a high ponytail, glowing violet eyes, polished gold chestplate and pauldrons with faint violet runes, white armored sleeves with gold vambraces, long ivory robes with violet inner lining and gold trim reaching the ground, small gold circlet with a violet gem, gold boots"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/aurelle/model_453dce4c.glb"
+    ]
+  },
+  {
+    "at": "2026-10-09T22:49:05.894Z",
+    "cmd": "rig",
+    "taskId": "01a122da-cb4f-71d8-b6f5-a043a924f811",
+    "request": {
+      "input_task_id": "01a122d7-d823-75a7-bae2-0412453dce4c",
+      "animation_type": "biped",
+      "height_meters": 1.75
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/aurelle/rigged_a924f811.glb"
+    ]
+  },
+  {
+    "at": "2026-10-09T22:49:43.663Z",
+    "cmd": "animate",
+    "taskId": "01a122db-36f8-7703-a7d0-04a50b818996",
+    "request": {
+      "rig_task_id": "01a122da-cb4f-71d8-b6f5-a043a924f811",
+      "action_ids": [
+        12,
+        132,
+        133,
+        131,
+        129,
+        127,
+        125,
+        126,
+        185,
+        178
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/aurelle/anims_batch1.glb"
+    ]
+  }
+]

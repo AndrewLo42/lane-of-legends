@@ -117,7 +117,9 @@ export class SelectStage {
     if (!c) return;
     // Rise onto the podium over a quarter second, then turn gently toward the camera and back.
     const k = Math.min(1, this.shown / 0.25);
-    c.root.position.y = 0.3 - (1 - k) * (1 - k) * 0.35;
+    // Aurelle floats above the podium with a slow bob, as she does in the lane.
+    const hover = this.focused === 'aurelle' ? 0.3 + Math.sin(this.t * 1.7) * 0.06 : 0;
+    c.root.position.y = 0.3 + hover - (1 - k) * (1 - k) * 0.35;
     c.root.rotation.y = -Math.PI / 2 + Math.sin(this.t * 0.6) * 0.25;
     c.anim?.update(dt);
     c.syncProps?.(dt);

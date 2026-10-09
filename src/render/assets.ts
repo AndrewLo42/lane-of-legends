@@ -19,7 +19,7 @@ export const MODELS = {
   champ_maren: 'Maren.glb',
   champ_lisha: 'Lisha.glb',
   champ_mabel: 'Mabel.glb',
-  champ_aurelle: 'Aurelle.glb', // not generated yet: she uses her placeholder
+  champ_aurelle: 'Aurelle.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 
@@ -86,7 +86,8 @@ type PropSpec = { refHeight: number; build: () => THREE.Object3D } & (
   | { mode: 'upright'; bone: string; lean: number }
   | { mode: 'held'; bone: string; dir: [number, number, number]; grip: number }
   | { mode: 'float'; offset: [number, number, number] }
-  | { mode: 'twin'; offset: [number, number, number]; glow: number }
+  /** `count` 1 floats a single weapon on her right (Aurelle's spear); `name` lets the view find (and hide) it. */
+  | { mode: 'twin'; offset: [number, number, number]; glow: number; count?: 1 | 2; name?: string; ring?: boolean }
 );
 
 const brass = () => new THREE.MeshStandardMaterial({ color: 0xb8893a, metalness: 0.7, roughness: 0.35 });
@@ -106,6 +107,11 @@ function gear(radius: number, thickness: number, teeth: number, mat: THREE.Mater
   }
   return g;
 }
+
+/** Glowing eyes, as fractions of model height from the head bone: forward (+x), up, and apart. */
+const EYES: Partial<Record<ModelName, { color: number; forward: number; up: number; spread: number; size: number }>> = {
+  champ_aurelle: { color: 0xcdb6ff, forward: 0.076, up: 0.034, spread: 0.019, size: 0.0042 },
+};
 
 const PROPS: Partial<Record<ModelName, PropSpec>> = {
   minion_caster: {
@@ -168,6 +174,34 @@ const PROPS: Partial<Record<ModelName, PropSpec>> = {
       blade.rotation.y = Math.PI / 2; // into the same plane as the bob
       blade.position.set(0.015, 1.35, 0);
       g.add(grip, pommel, guard, core, shaft, bob, face, blade);
+      return g;
+    },
+  },
+  // Aurelle's rune spear, floating at her right side, point forward: hidden while it's thrown.
+  champ_aurelle: {
+    mode: 'twin',
+    count: 1,
+    name: 'heldSpear',
+    ring: false,
+    offset: [0.25, 1.45, 0.75],
+    glow: 0xa98bff,
+    refHeight: 2.5,
+    build: () => {
+      const g = new THREE.Group();
+      const steel = new THREE.MeshStandardMaterial({ color: 0xece6f2, metalness: 0.8, roughness: 0.25, emissive: 0xa98bff, emissiveIntensity: 0.35 });
+      const gold = new THREE.MeshStandardMaterial({ color: 0xd8b25a, metalness: 0.7, roughness: 0.3 });
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.7, 8), steel);
+      shaft.position.y = 0.35;
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.12, 8), gold);
+      collar.position.y = 1.18;
+      const rune = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), glow(0xa98bff));
+      rune.position.y = 1.18;
+      // Leaf-shaped blade: a flattened diamond.
+      const blade = new THREE.Mesh(new THREE.OctahedronGeometry(0.12).scale(0.6, 2.6, 0.25), steel);
+      blade.position.y = 1.52;
+      const butt = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.14, 6).rotateX(Math.PI), gold);
+      butt.position.y = -0.55;
+      g.add(shaft, collar, rune, blade, butt);
       return g;
     },
   },
@@ -278,18 +312,23 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
       // One blade on each side, laid point-forward (+x) and tipped slightly down, each with a soft
       // glowing ring at the hilt.
       const [ox, oy, oz] = spec.offset;
-      const blades = [-1, 1].map((side, i) => {
+      const blades = (spec.count === 1 ? [1] : [-1, 1]).map((side, i) => {
         const pivot = new THREE.Group();
+        if (spec.name) pivot.name = spec.name;
         const b = i === 0 ? p : spec.build();
         b.scale.setScalar(ps);
         b.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = true) : null));
         b.rotation.z = -Math.PI / 2 - 0.12; // +y (the point) to +x, a touch downward
-        const ring = new THREE.Mesh(
+        // A glowing ring at the hilt (Lisha's blades); `ring: false` leaves it off (Aurelle's spear).
+        const ring = spec.ring === false ? undefined : new THREE.Mesh(
           new THREE.TorusGeometry(0.12 * ps, 0.012 * ps, 6, 24),
           new THREE.MeshBasicMaterial({ color: spec.glow, transparent: true, opacity: 0.7 }),
         );
-        ring.rotation.y = Math.PI / 2;
-        pivot.add(b, ring);
+        pivot.add(b);
+        if (ring) {
+          ring.rotation.y = Math.PI / 2;
+          pivot.add(ring);
+        }
         pivot.position.set(ox * ps, oy * ps, side * oz * ps);
         root.add(pivot);
         return { pivot, blade: b, ring, phase: i * Math.PI, swingT: Infinity };
@@ -305,14 +344,16 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
           s.pivot.position.y = (oy + Math.sin(t * 2.1 + s.phase) * 0.06 - k * 0.15) * ps;
           s.pivot.rotation.y = Math.sin(t * 0.9 + s.phase) * 0.12 * (s.pivot.position.z > 0 ? 1 : -1);
           s.blade.rotation.x = k * Math.PI * 2;
-          s.ring.rotation.x += dt * 2;
-          (s.ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.3 * Math.sin(t * 3 + s.phase) + k * 0.3;
+          if (s.ring) {
+            s.ring.rotation.x += dt * 2;
+            (s.ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.3 * Math.sin(t * 3 + s.phase) + k * 0.3;
+          }
         }
       };
       swingProp = () => {
-        // The right blade strikes first, the left a beat later.
-        blades[1].swingT = 0;
-        blades[0].swingT = -0.12;
+        // The right blade strikes first, the left (if there is one) a beat later.
+        blades[blades.length - 1].swingT = 0;
+        if (blades.length > 1) blades[0].swingT = -0.12;
       };
       syncProps();
     } else if (spec.mode === 'held' && hand) {
@@ -335,6 +376,20 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
         p.position.copy(root.worldToLocal(hand.getWorldPosition(at)));
       };
       syncProps();
+    }
+  }
+  // Glowing eyes (Aurelle): two small lights parented to the head bone, so they follow every clip.
+  const eyes = EYES[name];
+  const head = eyes && (model.getObjectByName('Head') ?? model.getObjectByName('head'));
+  if (eyes && head) {
+    root.updateMatrixWorld(true);
+    const at = head.getWorldPosition(new THREE.Vector3());
+    const mat = new THREE.MeshBasicMaterial({ color: eyes.color });
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(eyes.size * height, 8, 6), mat);
+      eye.position.set(at.x + eyes.forward * height, at.y + eyes.up * height, at.z + side * eyes.spread * height);
+      root.add(eye);
+      head.attach(eye); // keep the bind-pose spot, then ride the head
     }
   }
   return { root, model, clips: gltf.animations, materials, syncProps, swingProp };
