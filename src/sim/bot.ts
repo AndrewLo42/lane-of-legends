@@ -38,6 +38,8 @@ const cast = (slot: Slot, at: Vec2): Command => ({ type: 'cast', slot, at });
 export class BotController implements Controller {
   private nextDecision = 0;
   private nextSummoner = 0;
+  /** Telegraphs and missiles already judged: id -> whether this bot reacts to it. */
+  private noticed = new Map<number, boolean>();
   private retreating = false;
 
   constructor(private accuracy = 0.8) {}
@@ -49,6 +51,12 @@ export class BotController implements Controller {
       const order = [...([0, 1, 2] as Slot[]).filter((s) => self.champ!.abilities[s].rank === 0), ...kitOf(self).levelOrder];
       const slot = order.find((s) => world.canLevel(self, s));
       if (slot != null) cmds.push({ type: 'levelUp', slot });
+    }
+    // Step out of telegraphed attacks first (Skyline Barrage, Maren's geyser, Mabel's honey).
+    const dodge = world.isBusy(self) ? null : this.dodge(world, self);
+    if (dodge) {
+      cmds.push(dodge);
+      return cmds;
     }
     // Summoner spells are checked more often than the main decision: Barrier and Flash are reactions.
     if (world.tick >= this.nextSummoner) {
@@ -123,6 +131,58 @@ export class BotController implements Controller {
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
     return { type: 'move', to: spot };
+  }
+
+  // ---------- dodging ----------
+
+  /**
+   * Where to step to get out of an enemy line or circle telegraph (or a lane-crossing wave in flight)
+   * that covers us, or null if nothing threatens. Whether it reacts at all is rolled once per threat
+   * against this bot's accuracy, so low floors still get caught.
+   */
+  private dodge(world: World, self: Unit): Command | null {
+    const reacts = (id: number) => {
+      if (!this.noticed.has(id)) this.noticed.set(id, world.rng.next() < this.accuracy);
+      return this.noticed.get(id)!;
+    };
+    const margin = self.radius + 0.3;
+    const fromLine = (pos: Vec2, dir: number, length: number, width: number): Vec2 | null => {
+      const dx = Math.cos(dir);
+      const dy = Math.sin(dir);
+      const rx = self.pos.x - pos.x;
+      const ry = self.pos.y - pos.y;
+      const along = rx * dx + ry * dy;
+      const side = rx * -dy + ry * dx; // signed distance from the line
+      if (along < -1 || along > length || Math.abs(side) > width / 2 + margin) return null;
+      const need = width / 2 + margin + 0.8 - Math.abs(side);
+      for (const sgn of [Math.sign(side) || 1, -(Math.sign(side) || 1)]) {
+        const to = { x: self.pos.x - dy * need * sgn, y: self.pos.y + dx * need * sgn };
+        if (Math.abs(to.y) < LANE.halfWidth - self.radius) return to; // stay inside the lane
+      }
+      return null;
+    };
+    for (const t of world.telegraphs) {
+      if (t.team === self.team || !reacts(t.id)) continue;
+      if (t.shape === 'line') {
+        const to = fromLine(t.pos, t.dir, t.length, t.width);
+        if (to) return { type: 'move', to };
+      } else if (t.shape === 'circle') {
+        const d = dist(self.pos, t.pos);
+        if (d < t.length + margin) {
+          const out = dirTo(t.pos, self.pos);
+          const r = t.length + margin + 0.8;
+          return { type: 'move', to: { x: t.pos.x + out.x * r, y: t.pos.y + out.y * r } };
+        }
+      }
+    }
+    // A wide line missile (Skyline Barrage) still crossing the lane.
+    for (const m of world.missiles) {
+      if (m.team === self.team || m.targetId != null || m.width < 1.5 || !reacts(m.id)) continue;
+      const to = fromLine(m.pos, Math.atan2(m.dir.y, m.dir.x), m.range - m.travelled, m.width);
+      if (to) return { type: 'move', to };
+    }
+    if (this.noticed.size > 200) this.noticed.clear();
+    return null;
   }
 
   // ---------- summoner spells ----------
@@ -259,6 +319,13 @@ export class BotController implements Controller {
     }
     if (!foe) return this.tockFarm(ctx);
     const healthy = self.hp > self.maxHp * 0.5;
+
+    // Against ranged champions: drop Stopwatch on them (35% slow), then Skip in while they're stuck.
+    if (foe.range >= 3 && !unsafe(foe.pos)) {
+      const inField = world.zones.some((z) => z.kind === 'stasis' && z.ownerId === self.id && dist(z.pos, foe.pos) <= z.radius + foe.radius);
+      if (ready(1) && healthy && near(7) && !near(2)) return cast(1, ctx.aimAfter(foe, 0.3));
+      if (ready(2) && inField && near(6.5) && !near(1.5)) return cast(2, foe.pos);
+    }
 
     if (ready(3) && !healthy && near(4)) return cast(3, self.pos);
     if (ready(1) && near(2.5)) return cast(1, self.pos); // slow them and shield himself in a melee trade
