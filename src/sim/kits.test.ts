@@ -109,14 +109,34 @@ describe('Arlo', () => {
     expect(m.maxHp - m.hp).toBeCloseTo(full / 2, 5);
   });
 
-  it('Momentum stacks attack speed from ability hits', () => {
-    const { w, me, cast } = setup('arlo');
-    dummy(w, 5);
+  it('Triangulate: the third hit on the same enemy within 4s procs bonus damage and attack speed', () => {
+    const { w, me } = setup('arlo');
+    const t = dummy(w, 5);
     const slow = w.attackTicks(me);
-    cast(0, 10);
-    run(w, 0.5);
-    expect(w.status(me, 'momentum')?.value).toBe(1);
+    w.dealDamage(me, t, 10, { attack: true });
+    w.dealDamage(me, t, 10, { slot: 0 });
+    expect(w.status(t, 'bearing', me.id)?.value).toBe(2);
+    expect(lost(t)).toBeCloseTo(20, 0);
+    w.dealDamage(me, t, 10, { attack: true });
+    const bonus = 15 + 3 * me.champ!.level + 0.1 * me.damage;
+    expect(lost(t)).toBeCloseTo(30 + bonus, 0);
+    expect(w.status(t, 'bearing', me.id)).toBeUndefined(); // spent
     expect(w.attackTicks(me)).toBeLessThan(slow);
+    run(w, 2.1);
+    expect(w.attackTicks(me)).toBe(slow); // the burst wore off
+  });
+
+  it('Triangulate bearings lapse after 4s and are per target', () => {
+    const { w, me } = setup('arlo');
+    const a = dummy(w, 5);
+    const b = dummy(w, -5);
+    w.dealDamage(me, a, 10, { attack: true });
+    w.dealDamage(me, a, 10, { attack: true });
+    w.dealDamage(me, b, 10, { attack: true }); // a different target: no proc on a
+    expect(lost(a)).toBeCloseTo(20, 0);
+    run(w, 4.2);
+    w.dealDamage(me, a, 10, { attack: true }); // the old bearings expired: this is the first again
+    expect(w.status(a, 'bearing', me.id)?.value).toBe(1);
   });
 });
 

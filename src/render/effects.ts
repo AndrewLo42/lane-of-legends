@@ -306,6 +306,17 @@ export class EffectsView {
         });
         break;
       }
+      case 'triangulate': {
+        // Arlo's Triangulate: a gold triangle that flashes out from the target.
+        const tri = flat(new THREE.Mesh(new THREE.RingGeometry(0.75, 1, 3), basic(0xffd76a, 0.95)));
+        tri.position.set(0, 0.08, 0);
+        add(tri, 0.45, (k) => {
+          fade(tri, 0.95)(k);
+          tri.scale.setScalar(0.6 + k * 1.4);
+          tri.rotation.z = k * 1.2;
+        });
+        break;
+      }
       // ---- summoner spells ----
       case 'ignite': {
         // A flare of fire on the target.

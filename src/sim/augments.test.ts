@@ -156,7 +156,8 @@ describe('items', () => {
 
   it('Stormcaller Bow strikes every third attack', () => {
     const w = new World(1);
-    const me = w.spawnChampion('blue', 'arlo', idle, { items: ['i.storm'] });
+    // Maren: no on-attack passive of her own (Arlo's Triangulate would proc on the third hit too).
+    const me = w.spawnChampion('blue', 'maren', idle, { items: ['i.storm'] });
     const foe = w.spawnChampion('red', 'arlo', idle);
     for (let i = 0; i < 3; i++) w.dealDamage(me, foe, 10, { attack: true });
     expect(foe.maxHp - foe.hp).toBeCloseTo(30 + 40 + 0.3 * me.damage);

@@ -10,7 +10,23 @@ const E = { base: [80, 130, 180, 230, 280], ad: 0.5, cost: [90, 90, 90, 90, 90],
 const R = { base: [320, 500], ad: 1.0, cost: [100, 100], cd: [90, 75], minionFactor: 0.5 };
 const RANGE = 11;
 
-const momentum = (world: World, self: Unit) => world.addStatus(self, { kind: 'momentum', value: 1, sourceId: self.id, seconds: 6 });
+/** Passive: three hits on the same enemy within `window` seconds triangulate it. */
+const TRI = { window: 4, base: 15, perLevel: 3, ad: 0.1, attackSpeed: 0.15, seconds: 2 };
+
+/** Triangulate's bonus damage right now. */
+const triDamage = (self: Unit) => TRI.base + TRI.perLevel * self.champ!.level + TRI.ad * self.damage;
+
+/** Take a bearing on `target`; the third within the window procs bonus damage and a burst of attack speed. */
+function bearing(world: World, self: Unit, target: Unit) {
+  if (target.dead || !champsAndMinions(target)) return;
+  world.addStatus(target, { kind: 'bearing', value: 1, sourceId: self.id, seconds: TRI.window });
+  const st = world.status(target, 'bearing', self.id)!;
+  if (st.value < 3) return;
+  world.removeStatus(target, st);
+  world.dealDamage(self, target, triDamage(self), { proc: true });
+  if (TRI.attackSpeed > 0) world.addStatus(self, { kind: 'frenzy', value: TRI.attackSpeed, sourceId: self.id, seconds: TRI.seconds });
+  world.addFx({ kind: 'triangulate', pos: target.pos, team: self.team });
+}
 
 /** Arlo's W mark on `target`, if any. */
 const markOf = (world: World, self: Unit, target: Unit) => world.status(target, 'mark', self.id);
@@ -41,9 +57,12 @@ export const ARLO: Kit = {
     attackInterval: 0.72, attackSpeedPerLevel: 0.025, windup: 0.18, range: 5.5, projectileSpeed: 24, speed: 6.5, radius: 0.6,
   },
   passive: {
-    name: 'Momentum',
-    icon: '⚡',
-    describe: () => 'Each ability hit grants 10% attack speed for 6s, stacking up to 5 times.',
+    name: 'Triangulate',
+    icon: '◬',
+    describe: (self) =>
+      `Every attack or ability that hits an enemy takes a bearing on it. The third bearing within ${TRI.window}s ` +
+      `triangulates it for ${Math.round(triDamage(self))} bonus damage, and Arlo gains ${TRI.attackSpeed * 100}% attack ` +
+      `speed for ${TRI.seconds}s.`,
   },
   levelOrder: [3, 0, 2, 1],
   abilities: [
@@ -88,7 +107,7 @@ export const ARLO: Kit = {
           canHit: (u) => u.kind === 'champion',
           onHit: (t) => {
             world.addStatus(t, { kind: 'mark', value: 1, sourceId: self.id, seconds: 4 });
-            momentum(world, self); // a hit, though it deals no damage itself
+            bearing(world, self, t); // a hit, though it deals no damage itself
           },
         });
       },
@@ -142,8 +161,13 @@ export const ARLO: Kit = {
     },
   ],
   onAbilityHit: (world, self, target, slot) => {
-    momentum(world, self);
     if (slot !== 1) detonate(world, self, target, ARLO.abilities[slot].cost(self.champ!.abilities[slot].rank));
+    bearing(world, self, target);
   },
-  onAttackHit: (world, self, target) => detonate(world, self, target, 0),
+  onAttackHit: (world, self, target) => {
+    detonate(world, self, target, 0);
+    bearing(world, self, target);
+  },
 };
+
+export const ARLO_TUNING = { TRI };

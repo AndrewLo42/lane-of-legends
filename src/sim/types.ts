@@ -47,14 +47,15 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
    * shield: damage it can still absorb; guard: fraction of damage prevented; regen: HP per second;
    * grievous: fraction of healing lost; haste: extra move speed fraction; rage: bonus attack damage
    * (plus a fixed attack speed bonus); tether: tagged by a Tether, so its caster can dash to it;
-   * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder.
+   * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder;
+   * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction.
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -218,7 +219,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate';
   pos: Vec2;
   dir?: number;
   radius?: number;

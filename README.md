@@ -20,7 +20,7 @@ npm test           # sim tests
 
 | | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
 |---|---|---|---|
-| Passive | **Momentum**: ability hits grant +10% attack speed, up to 5 stacks | **Second Hand**: every 3rd attack echoes 0.4s later for 60% | **Undertow**: abilities Soak champions; the 3rd stack roots for 1s |
+| Passive | **Triangulate**: every attack or ability hit takes a bearing; the 3rd on the same enemy within 4s deals bonus damage and gives +15% attack speed for 2s | **Second Hand**: every 3rd attack echoes 0.4s later for 60% | **Undertow**: abilities Soak champions; the 3rd stack roots for 1s |
 | Q | **Sparkshot**: skillshot that hits the first enemy; on hit, all cooldowns -1.5s | **Pendulum**: telegraphed cone sweep; recast within 3s to backswing (+50% to anything hit twice) | **Riptide**: lobbed wave lands after 0.6s (telegraphed) for damage + 30% slow |
 | W | **Rune Flare**: passes minions and marks a champion; an attack or ability detonates it for damage + mana | **Stopwatch**: field that slows enemies 35% and freezes enemy skillshots in mid-air (auto-attacks pass through); they crumble when it ends. Standing in his own field shields Tock (once per field), fading 1s after he leaves | **Tide Shield**: absorb shield; bursts around her when it breaks or fades |
 | E | **Phase Step**: blink, then a homing bolt at the nearest enemy (marked first) | **Skip**: dash through enemies, leaving an echo; recast within 4s to snap back | **Undertow Hook**: skillshot that drags the first enemy 4 units toward her |

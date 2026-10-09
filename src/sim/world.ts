@@ -358,11 +358,11 @@ export class World {
 
   addStatus(u: Unit, s: Omit<Status, 'until'> & { seconds: number }) {
     const until = this.tick + ticks(s.seconds);
-    if (s.kind === 'momentum' || s.kind === 'mark' || s.kind === 'soak') {
+    if (s.kind === 'momentum' || s.kind === 'mark' || s.kind === 'soak' || s.kind === 'bearing') {
       const cur = u.statuses.find((o) => o.kind === s.kind && o.sourceId === s.sourceId);
       if (cur) {
         cur.until = until;
-        cur.value = s.kind === 'momentum' ? Math.min(5, cur.value + s.value) : s.kind === 'soak' ? cur.value + s.value : s.value;
+        cur.value = s.kind === 'momentum' ? Math.min(5, cur.value + s.value) : s.kind === 'soak' || s.kind === 'bearing' ? cur.value + s.value : s.value;
         return;
       }
     }
@@ -419,7 +419,7 @@ export class World {
     if (def.cast(this, u, at, st)) st.readyAt = Math.max(st.readyAt, this.tick + ticks(def.cooldown));
   }
 
-  /** Ticks between attacks, after level and momentum attack speed. */
+  /** Ticks between attacks, after level, momentum, Rage and frenzy attack speed. */
   attackTicks(u: Unit) {
     let bonus = 0;
     if (u.champ) {
@@ -427,6 +427,7 @@ export class World {
       bonus += 0.1 * (this.status(u, 'momentum')?.value ?? 0);
       bonus += u.champ.mods.attackSpeed;
       if (this.status(u, 'rage')) bonus += RAGE.attackSpeed;
+      bonus += u.statuses.reduce((m, s) => (s.kind === 'frenzy' && s.until > this.tick ? Math.max(m, s.value) : m), 0);
     }
     return ticks(u.attackInterval / (1 + bonus));
   }

@@ -41,6 +41,8 @@ interface UnitView {
   stings?: THREE.Group;
   /** Honeyed: an amber ring at the feet. */
   honey?: THREE.Mesh;
+  /** Arlo's Triangulate bearings: gold rune pips, one per stack. */
+  bearings?: THREE.Group;
   /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
@@ -342,6 +344,23 @@ export class WorldView {
       v.obj.add(v.honey);
     }
     if (v.honey) v.honey.visible = honeyed;
+
+    const bearings = u.statuses.find((s) => s.kind === 'bearing' && s.until > this.world.tick)?.value ?? 0;
+    if (bearings && !v.bearings) {
+      v.bearings = new THREE.Group();
+      const gold = new THREE.MeshBasicMaterial({ color: 0xffd76a });
+      for (let i = 0; i < 2; i++) v.bearings.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.11), gold));
+      v.bearings.position.y = 1.6;
+      v.obj.add(v.bearings);
+    }
+    if (v.bearings) {
+      v.bearings.visible = bearings > 0;
+      v.bearings.children.forEach((pip, i) => {
+        pip.visible = i < bearings;
+        const a = now * 3 + i * Math.PI;
+        pip.position.set(Math.cos(a) * (u.radius + 0.3), 0, Math.sin(a) * (u.radius + 0.3));
+      });
+    }
   }
 
   /** Rage/Ghost aura, Ignite's flame, and the Tether line. */
