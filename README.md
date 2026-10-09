@@ -14,7 +14,7 @@ npm run dev        # http://localhost:5173 (?seed=42 for a fixed seed)
 npm test           # sim tests
 ```
 
-**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha`, `&enemy=…` (defaults to the other one), `&seed=42`.
+**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel`, `&enemy=…` (defaults to the other one), `&seed=42`.
 
 **Champions** (kits in `src/sim/kits/`):
 
@@ -27,6 +27,8 @@ npm test           # sim tests
 | R | **Skyline Barrage**: 1s wind-up, then a wave across the whole lane (minions take half) | **Rewind**: plant an anchor; after 3s (or recast) snap back, recover all HP lost since, and replay 50/75% of the damage you dealt to champions | **Maelstrom**: 3s whirlpool that drags enemies inward and damages, then erupts and stuns 1s |
 
 **Lisha, the Blossom Blade** (melee duelist, Irelia-like): **Petal Harvest** passive: consuming a mark with Q heals her · **Q Petal Step**: dash to a clicked enemy and cut it; resets if it was marked (also refunds half the mana) or dies · **W Find Your Center**: 1s meditation (rooted), then 3s of 35–55% damage reduction and 3% max HP/s regeneration · **E Twin Petals**: a pincer: two blades start beside her and close on the aimed point; everything inside the V is cut (outermost first) and marked (minions take 80%) · **R Blossom Storm**: a fan of 9 blades, up to 3 per enemy, marking everything.
+
+**Mabel, the Beekeeper** (a mouse; short-range lane pusher, smallest hitbox): spends **bees** instead of mana (4 rising to 8, one regrows every 4s, last hits give one). **The Swarm** passive: each bee adds damage to her attacks, honeyed enemies take 30% more from her bees, minions that die stung or honeyed count as her last hits (**Pollinated**), and getting hit by a champion makes her scurry (+30% speed). **Q Sting**: a bee latches on and stings over 3s; stings stack · **W Honey Pot**: a slowing puddle that honeys enemies · **E Hive**: a 12s hive that fires bees, buffs nearby allied minions and doubles her bee regrowth · **R Queen's Fury**: refill the swarm and dive one champion with every bee. Placeholder model for now.
 
 Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
 

@@ -112,7 +112,49 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'lisha') {
+  if (u.champ!.kit === 'mabel') {
+    // A small mouse beekeeper: round body, big ears, a tail, a veiled hat, one paw pointing with a bee at its tip.
+    const fur = new THREE.MeshStandardMaterial({ color: 0x9b8576, flatShading: true });
+    const pink = new THREE.MeshStandardMaterial({ color: 0xf0a7b4 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.5, 4, 12), teamMat);
+    body.position.y = 0.6;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), fur);
+    head.position.y = 1.25;
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.28, 10).rotateZ(-Math.PI / 2), fur);
+    snout.position.set(0.3, 1.2, 0);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), pink);
+    nose.position.set(0.45, 1.2, 0);
+    g.add(body, head, snout, nose);
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 16).rotateX(Math.PI / 2), fur);
+      ear.position.set(-0.02, 1.52, side * 0.24);
+      ear.rotation.y = side * 0.3;
+      const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.05, 14).rotateX(Math.PI / 2), pink);
+      inner.position.copy(ear.position).add(new THREE.Vector3(0.02, 0, 0));
+      inner.rotation.y = ear.rotation.y;
+      g.add(ear, inner);
+    }
+    const tail = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.035, 6, 16, Math.PI * 1.2), pink);
+    tail.position.set(-0.45, 0.45, 0);
+    tail.rotation.y = Math.PI / 2;
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 20), new THREE.MeshStandardMaterial({ color: 0xf3ead8 }));
+    brim.position.y = 1.5;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.18, 16), new THREE.MeshStandardMaterial({ color: 0xf3ead8 }));
+    crown.position.y = 1.6;
+    const veil = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.44, 0.35, 20, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
+    );
+    veil.position.y = 1.32;
+    // No staff: she points, and a bee flies out (her autos are bees).
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.38, 4, 8).rotateZ(-Math.PI / 2), fur);
+    arm.position.set(0.32, 0.92, 0.3);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), pink);
+    paw.position.set(0.58, 0.92, 0.3);
+    const bee = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6).scale(1.5, 1, 1), glow);
+    bee.position.set(0.7, 1.1, 0.3);
+    g.add(tail, brim, crown, veil, arm, paw, bee);
+  } else if (u.champ!.kit === 'lisha') {
     // Slim duelist with a topknot and a blade on each hip.
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 1.05, 4, 12), teamMat);
     body.position.y = 0.9;

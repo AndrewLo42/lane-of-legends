@@ -1,4 +1,4 @@
-import type { Slot, Unit, Vec2 } from '../types';
+import type { DamageSource, MissileStyle, Slot, Unit, Vec2 } from '../types';
 import type { World } from '../world';
 
 /** How the player aims an ability; drives the cast indicator. */
@@ -78,6 +78,13 @@ export interface Kit {
   color: string;
   stats: KitStats;
   passive: { name: string; icon: string; describe: (self: Unit) => string };
+  /**
+   * What the mana bar holds. 'bees' (Mabel): a small whole-number pool; mana items and augments
+   * don't add to it, and the HUD shows it as bees.
+   */
+  resource?: 'mana' | 'bees';
+  /** Missile look for ranged auto-attacks (default 'auto'). */
+  autoStyle?: MissileStyle;
   abilities: [AbilityDef, AbilityDef, AbilityDef, AbilityDef];
   /** Order the bot spends skill points in. */
   levelOrder: Slot[];
@@ -87,6 +94,12 @@ export interface Kit {
   onAbilityHit?: (world: World, self: Unit, target: Unit, slot: Slot) => void;
   /** We dealt damage of any kind. */
   onDamageDealt?: (world: World, self: Unit, target: Unit, amount: number) => void;
+  /** We were credited with a kill (last hit, or a minion we claimed). */
+  onKill?: (world: World, self: Unit, victim: Unit) => void;
+  /** Claim an enemy minion that died without a champion's last hit (it counts as ours: gold, CS, bee). */
+  claimsMinion?: (world: World, self: Unit, minion: Unit) => boolean;
+  /** We took damage (after shields). */
+  onHurt?: (world: World, self: Unit, src: Unit | null, amount: number, from: DamageSource) => void;
   onDeath?: (world: World, self: Unit) => void;
   /** Runs every tick while alive. */
   onTick?: (world: World, self: Unit) => void;

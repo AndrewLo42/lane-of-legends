@@ -1,5 +1,6 @@
 import type { AugmentId, DamageSource, Mods, Slot, Unit, Vec2 } from './types';
 import { ITEMS } from './items';
+import { KITS } from './kits';
 import { TICK_HZ, ticks } from './util';
 import type { World } from './world';
 
@@ -89,7 +90,9 @@ const LIST: Augment[] = [
     onKill: (w, self, v) => {
       if (v.kind !== 'minion') return;
       w.heal(self, 20);
-      self.champ!.mana = Math.min(self.champ!.maxMana, self.champ!.mana + 15);
+      // Bee champions get one bee instead (15 would refill the whole swarm).
+      const gain = KITS[self.champ!.kit].resource === 'bees' ? 1 : 15;
+      self.champ!.mana = Math.min(self.champ!.maxMana, self.champ!.mana + gain);
     },
   },
   { id: 'bounty', name: 'Bounty Hunter', icon: '🎯', tier: 'gold', describe: 'Champion kills count double toward the kill goal.', killValue: 2 },

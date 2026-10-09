@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,13 +47,14 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
    * shield: damage it can still absorb; guard: fraction of damage prevented; regen: HP per second;
    * grievous: fraction of healing lost; haste: extra move speed fraction; rage: bonus attack damage
-   * (plus a fixed attack speed bonus); tether: tagged by a Tether, so its caster can dash to it.
+   * (plus a fixed attack speed bonus); tether: tagged by a Tether, so its caster can dash to it;
+   * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder.
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -162,7 +163,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee';
 
 export interface Missile {
   id: number;
@@ -190,7 +191,7 @@ export interface Missile {
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive';
   team: Team;
   ownerId: number;
   pos: Vec2;

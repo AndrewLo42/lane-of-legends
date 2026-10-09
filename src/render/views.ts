@@ -37,6 +37,10 @@ interface UnitView {
   flame?: THREE.Mesh;
   /** Tagged by a Tether: a line back to the caster. */
   tether?: THREE.Line;
+  /** Mabel's stings: bees buzzing around the target, one per sting (up to five). */
+  stings?: THREE.Group;
+  /** Honeyed: an amber ring at the feet. */
+  honey?: THREE.Mesh;
   /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
@@ -83,6 +87,8 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     wave: () => ({ geo: new THREE.BoxGeometry(1.2, 1.4, m.width), color: 0xffc94a, height: 0.9, opacity: 0.55 }),
     tide: () => ({ geo: new THREE.ConeGeometry(0.3, 1.0, 8).rotateZ(-Math.PI / 2), color: 0x7fe0ff, height: 1.0, opacity: 0.85 }),
     petal: () => ({ geo: new THREE.ConeGeometry(0.16, 0.9, 4).rotateZ(-Math.PI / 2).scale(1, 0.35, 1), color: 0xf7a8c8, height: 1.2 }),
+    // Bee: a small striped body (Mabel's autos, stings, hive and Queen's Fury).
+    bee: () => ({ geo: new THREE.SphereGeometry(0.13, 8, 6).scale(1.5, 1, 1), color: 0xf2b632, height: 1.0 }),
     // Tether: a glowing hook, open end forward.
     tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
   };
@@ -303,6 +309,41 @@ export class WorldView {
     }
   }
 
+  /** Mabel's stings (orbiting bees) and honey (an amber ring). */
+  private beeVisuals(u: Unit, v: UnitView) {
+    const now = performance.now() / 1000;
+    const stings = u.statuses.filter((s) => s.kind === 'sting' && s.until > this.world.tick).length;
+    if (stings && !v.stings) {
+      v.stings = new THREE.Group();
+      const body = new THREE.MeshBasicMaterial({ color: 0xf2b632 });
+      for (let i = 0; i < 5; i++) {
+        const bee = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6).scale(1.5, 1, 1), body);
+        bee.name = `bee${i}`;
+        v.stings.add(bee);
+      }
+      v.stings.position.y = 1.3;
+      v.obj.add(v.stings);
+    }
+    if (v.stings) {
+      v.stings.visible = stings > 0;
+      v.stings.children.forEach((bee, i) => {
+        bee.visible = i < stings;
+        const a = now * 6 + (i / 5) * Math.PI * 2;
+        const r = u.radius + 0.25;
+        bee.position.set(Math.cos(a) * r, Math.sin(now * 11 + i) * 0.2, Math.sin(a) * r);
+        bee.rotation.y = -a;
+      });
+    }
+    const honeyed = u.statuses.some((s) => s.kind === 'honey' && s.until > this.world.tick);
+    if (honeyed && !v.honey) {
+      v.honey = new THREE.Mesh(new THREE.RingGeometry(u.radius, u.radius + 0.3, 24), new THREE.MeshBasicMaterial({ color: 0xf2a516, transparent: true, opacity: 0.75, depthWrite: false }));
+      v.honey.rotation.x = -Math.PI / 2;
+      v.honey.position.y = 0.07;
+      v.obj.add(v.honey);
+    }
+    if (v.honey) v.honey.visible = honeyed;
+  }
+
   /** Rage/Ghost aura, Ignite's flame, and the Tether line. */
   private summonerVisuals(u: Unit, v: UnitView) {
     const now = performance.now() / 1000;
@@ -376,6 +417,7 @@ export class WorldView {
     }
     this.markVisual(u, v, dt);
     this.summonerVisuals(u, v);
+    this.beeVisuals(u, v);
     if (v.bubble) v.bubble.visible = shielded;
     if (v.root) v.root.visible = rooted;
     if (v.stun) {

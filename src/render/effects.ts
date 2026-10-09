@@ -119,7 +119,8 @@ export class EffectsView {
       const timer = v.g.getObjectByName('timer') as THREE.Mesh | undefined;
       if (timer) {
         timer.geometry.dispose();
-        timer.geometry = new THREE.RingGeometry(z.radius + 0.15, z.radius + 0.35, 48, 1, Math.PI / 2, Math.PI * 2 * Math.max(0, left / total));
+        const [r0, r1] = z.kind === 'hive' ? [0.9, 1.05] : [z.radius + 0.15, z.radius + 0.35];
+        timer.geometry = new THREE.RingGeometry(r0, r1, 48, 1, Math.PI / 2, Math.PI * 2 * Math.max(0, left / total));
       }
       v.g.traverse((o) => {
         const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
@@ -174,6 +175,40 @@ export class EffectsView {
         }
       }
       g.add(floor, rim, hand);
+    } else if (z.kind === 'honey') {
+      // A glossy amber puddle with a few darker drips.
+      const puddle = ringShape(z.radius, z.radius, mat(0xf2a516, 0.55));
+      puddle.position.y = 0.03;
+      const rim = ringShape(z.radius, 0.1, mat(0xc97a00, 0.8));
+      rim.position.y = 0.04;
+      g.add(puddle, rim);
+      for (let i = 0; i < 5; i++) {
+        const blob = flat(new THREE.Mesh(new THREE.CircleGeometry(0.25 + (i % 2) * 0.15, 12), mat(0xd98a00, 0.7)));
+        const a = i * 2.4;
+        blob.position.set(Math.cos(a) * z.radius * 0.55, 0.05, Math.sin(a) * z.radius * 0.45);
+        g.add(blob);
+      }
+    } else if (z.kind === 'hive') {
+      // A stacked straw skep with a dark entrance, a faint range ring, and a countdown ring.
+      const straw = new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.9, flatShading: true });
+      for (let i = 0; i < 4; i++) {
+        const r = 0.62 - i * 0.12;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.13, 6, 16), straw);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = 0.15 + i * 0.24;
+        g.add(ring);
+      }
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), straw);
+      cap.position.y = 0.95;
+      const door = new THREE.Mesh(new THREE.CircleGeometry(0.13, 10), new THREE.MeshBasicMaterial({ color: 0x2a1a08 }));
+      door.position.set(0.66, 0.2, 0);
+      door.rotation.y = Math.PI / 2;
+      const range = ringShape(z.radius, 0.08, mat(team, 0.35));
+      range.position.y = 0.03;
+      const timer = flat(new THREE.Mesh(new THREE.RingGeometry(0.9, 1.05, 48), mat(0xf2b632, 0.9)));
+      timer.name = 'timer';
+      timer.position.y = 0.04;
+      g.add(cap, door, range, timer);
     } else {
       // Echo / anchor: a ghost of Tock plus a ring (the anchor's ring counts down).
       const ghost = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 1.3, 8), mat(TIME, z.kind === 'anchor' ? 0.4 : 0.28));

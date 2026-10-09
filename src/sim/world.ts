@@ -1,6 +1,7 @@
 import { Rng } from '../core/rng';
 import { combineMods, perksOf } from './augments';
 import { KITS, kitOf } from './kits';
+import { hiveMinionMult } from './kits/mabel';
 import type { CastCtx } from './kits/types';
 import { LANE, clampToLane, sideX, spawnPoint } from './lane';
 import { SANDBOX_RULES, type DuelRules, type WinReason } from './rules';
@@ -81,8 +82,9 @@ export class World {
       attackInterval: k.attackInterval, windup: k.windup, projectileSpeed: k.projectileSpeed, bounty: CHAMPION_BOUNTY,
     });
     const ability = () => ({ rank: 0, readyAt: 0, recastUntil: 0 });
+    const manaFlat = KITS[kit].resource === 'bees' ? 0 : mods.manaFlat; // mana items don't grow bees
     const champ: ChampState = {
-      kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + mods.manaFlat, maxMana: k.mana + mods.manaFlat,
+      kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + manaFlat, maxMana: k.mana + manaFlat,
       abilities: [ability(), ability(), ability(), ability()], casting: null, lastCast: null, queued: null, dash: null, data: {},
       augments: [...augments], items: [...items], augData: {}, mods, statMult, kills: 0, deaths: 0, cs: 0,
       summoners: (opts.summoners ?? DEFAULT_SUMMONERS).slice(0, 2).map((id) => ({ id, readyAt: 0, recastUntil: 0 })),
@@ -604,7 +606,7 @@ export class World {
     if (u.projectileSpeed <= 0) return hit(target);
     const off = u.kind === 'tower' ? 0 : u.radius;
     const from = { x: u.pos.x + Math.cos(u.facing) * off, y: u.pos.y + Math.sin(u.facing) * off };
-    this.fireHoming(u, target, u.kind === 'tower' ? 'tower' : 'auto', u.projectileSpeed, hit, from);
+    this.fireHoming(u, target, u.kind === 'tower' ? 'tower' : (u.champ && kitOf(u).autoStyle) || 'auto', u.projectileSpeed, hit, from);
   }
 
   private updateMissiles() {
@@ -679,6 +681,7 @@ export class World {
   /** Apply damage (after augment and rule multipliers) and fire kit and augment hooks. Returns damage dealt. */
   dealDamage(src: Unit | null, target: Unit, amount: number, from: DamageSource = {}): number {
     if (target.dead || amount <= 0) return 0;
+    if (src?.kind === 'minion') amount *= hiveMinionMult(this, src);
     if (src?.champ) {
       amount *= 1 + src.champ.mods.dmgAmp;
       for (const a of perksOf(src)) amount *= a.damageMult?.(this, src, target) ?? 1;
@@ -714,7 +717,10 @@ export class World {
         if (from.slot != null) kit.onAbilityHit?.(this, src, target, from.slot);
       }
     }
-    if (target.champ && !target.dead) for (const a of perksOf(target)) a.onHurt?.(this, target, src, amount, from);
+    if (target.champ && !target.dead) {
+      kitOf(target).onHurt?.(this, target, src, amount, from);
+      for (const a of perksOf(target)) a.onHurt?.(this, target, src, amount, from);
+    }
     return amount;
   }
 
@@ -744,14 +750,19 @@ export class World {
     u.attackTarget = null;
     u.moveTarget = null;
     u.windup = 0;
-    u.statuses = [];
     const { xpMult, goldMult } = this.rules;
-    const byChampion = killer?.champ && killer.team !== u.team ? killer : null;
+    let byChampion = killer?.champ && killer.team !== u.team ? killer : null;
+    // A minion no champion finished off can still be claimed (Mabel's Pollinated: stung or honeyed).
+    if (!byChampion && u.kind === 'minion') {
+      byChampion = this.champions().find((c) => !c.dead && c.team !== u.team && kitOf(c).claimsMinion?.(this, c, u)) ?? null;
+    }
+    u.statuses = [];
     if (byChampion) {
       byChampion.gold += Math.round(
         (u.kind === 'champion' ? CHAMPION_BOUNTY : u.kind === 'minion' ? MINIONS[u.role!].bounty * goldMult : STRUCTURES[u.kind].bounty),
       );
       if (u.kind === 'minion') byChampion.champ!.cs++;
+      kitOf(byChampion).onKill?.(this, byChampion, u);
       for (const a of perksOf(byChampion)) a.onKill?.(this, byChampion, u);
     }
     if (u.kind === 'minion') {
@@ -782,7 +793,8 @@ export class World {
       const atFountain = dist(u.pos, spawnPoint(u.team)) <= FOUNTAIN.radius;
       const c = u.champ!;
       this.heal(u, (CHAMPION_REGEN + (atFountain ? u.maxHp * FOUNTAIN.healPerSec : 0)) * DT);
-      c.mana = Math.min(c.maxMana, c.mana + (kitOf(u).stats.manaRegen + c.mods.manaRegen + (atFountain ? c.maxMana * FOUNTAIN.healPerSec : 0)) * DT);
+      const bonusRegen = kitOf(u).resource === 'bees' ? 0 : c.mods.manaRegen; // mana items don't grow bees
+      c.mana = Math.min(c.maxMana, c.mana + (kitOf(u).stats.manaRegen + bonusRegen + (atFountain ? c.maxMana * FOUNTAIN.healPerSec : 0)) * DT);
     }
     for (const u of this.champions()) {
       if (u.dead) continue;
@@ -791,7 +803,7 @@ export class World {
     }
     for (const u of this.units) {
       for (const b of u.statuses) {
-        if (b.kind === 'burn' && !u.dead) this.dealDamage(this.get(b.sourceId) ?? null, u, b.value * DT, { proc: true });
+        if ((b.kind === 'burn' || b.kind === 'sting') && !u.dead) this.dealDamage(this.get(b.sourceId) ?? null, u, b.value * DT, { proc: true });
       }
     }
   }

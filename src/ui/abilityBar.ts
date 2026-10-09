@@ -8,6 +8,9 @@ import { TICK_HZ, type World, xpToNext } from '../sim/world';
 const KEYS = ['Q', 'W', 'E', 'R'];
 const SLOTS: Slot[] = [0, 1, 2, 3];
 const SPELL_KEYS = ['D', 'F'];
+/** "40 mana", or for Mabel "1 bee" / "No bees". */
+const costText = (n: number, resource: 'mana' | 'bees' = 'mana') =>
+  resource === 'bees' ? (n ? `${n} bee${n === 1 ? '' : 's'}` : 'No bees') : `${n} mana`;
 /** Tooltip ids at or above this are summoner spells (SPELL_TIP + slot). */
 const SPELL_TIP = 10;
 
@@ -61,7 +64,7 @@ export class AbilityBar {
           </div>
         </div>
         <div class="bar hp"><div></div><span></span></div>
-        <div class="bar mana"><div></div><span></span></div>
+        <div class="bar mana${kit.resource === 'bees' ? ' bees' : ''}"><div></div><span></span></div>
         <div class="bar xp"><div></div></div>
       </div>`;
     const q = <T extends Element>(sel: string, el: ParentNode = this.root) => el.querySelector(sel) as T;
@@ -103,7 +106,9 @@ export class AbilityBar {
     this.hp.style.width = `${(100 * me.hp) / me.maxHp}%`;
     this.hpText.textContent = `${Math.ceil(me.hp)} / ${Math.round(me.maxHp)}`;
     this.mana.style.width = `${(100 * c.mana) / c.maxMana}%`;
-    this.manaText.textContent = `${Math.floor(c.mana)} / ${Math.round(c.maxMana)}`;
+    this.manaText.textContent = kit.resource === 'bees'
+      ? `🐝 ${Math.floor(c.mana)} / ${Math.floor(c.maxMana)}`
+      : `${Math.floor(c.mana)} / ${Math.round(c.maxMana)}`;
     this.xp.style.width = c.level >= 11 ? '100%' : `${(100 * c.xp) / xpToNext(c.level)}%`;
 
     SLOTS.forEach((s) => {
@@ -159,6 +164,6 @@ export class AbilityBar {
     const r = Math.max(1, rank);
     return `<b>${def.name}</b> <small>${KEYS[i]} · rank ${rank}/${def.maxRank}</small>
       <p>${def.describe(r, this.me)}</p>
-      <small class="cost">${def.cost(r)} mana · ${def.cooldown(r)}s cooldown${def.recastWindow ? ` · recast within ${def.recastWindow}s` : ''}</small>`;
+      <small class="cost">${costText(def.cost(r), kit.resource)} · ${def.cooldown(r)}s cooldown${def.recastWindow ? ` · recast within ${def.recastWindow}s` : ''}</small>`;
   }
 }

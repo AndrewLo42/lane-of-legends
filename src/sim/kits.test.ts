@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BotController } from './bot';
 import { KITS } from './kits';
 import { SIGNATURE_SUMMONERS } from './summoners';
+import { MABEL_TUNING } from './kits/mabel';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -442,8 +443,120 @@ describe('levels and resources', () => {
   });
 });
 
+describe('Mabel', () => {
+  const { SWARM, HONEY_BONUS, SCURRY, Q, W, E, R } = MABEL_TUNING;
+
+  it('spends bees, not mana: 4 at level 1, and mana items do not add any', () => {
+    const w = new World(1);
+    const m = w.spawnChampion('blue', 'mabel', new Script(), { items: ['i.seaglass'] });
+    expect(m.champ!.maxMana).toBe(4);
+    expect(m.radius).toBeLessThan(0.6); // a small mouse
+  });
+
+  it('last-hitting a minion gives a bee', () => {
+    const { w, me } = setup('mabel');
+    me.champ!.mana = 1;
+    const m = w.spawnMinion('red', 'melee', { x: 3, y: 0 });
+    m.hp = 5;
+    w.dealDamage(me, m, 10, { attack: true });
+    expect(me.champ!.mana).toBeCloseTo(1 + SWARM.lastHitBees);
+  });
+
+  it('Sting latches on and stacks; honey makes it hurt more', () => {
+    const { w, me, cast } = setup('mabel');
+    me.champ!.mana = me.champ!.maxMana = 8;
+    const t = dummy(w, 5);
+    cast(0, 5);
+    run(w, 0.4);
+    me.champ!.abilities[0].readyAt = 0;
+    cast(0, 5);
+    run(w, Q.seconds + 0.6);
+    const one = KITS.mabel.abilities[0].damage!(1, me);
+    near(lost(t), 2 * one, 12);
+
+    const h = dummy(w, -5);
+    w.addStatus(h, { kind: 'honey', value: 1, sourceId: me.id, seconds: 10 });
+    me.champ!.abilities[0].readyAt = 0;
+    cast(0, -5);
+    run(w, Q.seconds + 0.6);
+    near(lost(h), one * (1 + HONEY_BONUS), 10);
+  });
+
+  it('Honey Pot lands after a moment, slowing and honeying enemies inside', () => {
+    const { w, cast } = setup('mabel');
+    const t = dummy(w, 5);
+    const base = w.effectiveSpeed(t);
+    cast(1, 5);
+    expect(w.status(t, 'honey')).toBeUndefined();
+    run(w, W.delay + 0.3);
+    expect(w.status(t, 'honey')).toBeTruthy();
+    expect(w.effectiveSpeed(t)).toBeCloseTo(base * (1 - W.slow));
+  });
+
+  it('the Hive fires bees, buffs nearby allied minions, and expires', () => {
+    const { w, me, cast } = setup('mabel');
+    me.champ!.mana = 8;
+    const t = dummy(w, 6);
+    cast(2, 1);
+    expect(me.champ!.mana).toBeCloseTo(8 - E.cost[0], 1);
+    run(w, 3);
+    expect(lost(t)).toBeGreaterThan(KITS.mabel.abilities[2].damage!(1, me) * 1.5);
+    const ally = w.spawnMinion('blue', 'melee', { x: 1, y: 1 });
+    const foeMinion = w.spawnMinion('red', 'melee', { x: 30, y: 0 });
+    for (const m of [ally, foeMinion]) {
+      m.speed = 0;
+      m.damage = 0;
+      m.maxHp = m.hp = 5000;
+    }
+    near(w.dealDamage(ally, foeMinion, 100), 100 * (1 + E.minionBuff), 0.5);
+    run(w, E.lasts);
+    expect(w.zones.some((z) => z.kind === 'hive')).toBe(false);
+    near(w.dealDamage(ally, foeMinion, 100), 100, 0.5);
+  });
+
+  it('Pollinated: a stung or honeyed minion counts as hers even if something else kills it', () => {
+    const { w, me } = setup('mabel');
+    const blue = w.spawnMinion('blue', 'melee', { x: 20, y: 0 });
+    const plain = w.spawnMinion('red', 'melee', { x: 21, y: 0 });
+    const stung = w.spawnMinion('red', 'melee', { x: 22, y: 0 });
+    w.addStatus(stung, { kind: 'honey', value: 1, sourceId: me.id, seconds: 4 });
+    me.champ!.mana = 1;
+    w.dealDamage(blue, plain, 99999);
+    expect(me.champ!.cs).toBe(0);
+    const gold = me.gold;
+    w.dealDamage(blue, stung, 99999);
+    expect(me.champ!.cs).toBe(1);
+    expect(me.gold).toBeGreaterThan(gold);
+    expect(me.champ!.mana).toBeCloseTo(1 + SWARM.lastHitBees);
+  });
+
+  it("Queen's Fury refills the swarm and sends it all at one champion", () => {
+    const { w, me, cast } = setup('mabel');
+    me.champ!.mana = 0;
+    const t = dummy(w, 5);
+    cast(3, 5);
+    run(w, 0.3);
+    expect(me.champ!.mana).toBeGreaterThanOrEqual(me.champ!.maxMana - 0.1);
+    expect(w.status(t, 'slow')?.value).toBe(R.slow);
+    run(w, R.seconds + 1);
+    near(lost(t), KITS.mabel.abilities[3].damage!(1, me), 15);
+  });
+
+  it('scurries when an enemy champion hits her, at most once per cooldown', () => {
+    const w = new World(1);
+    const me = w.spawnChampion('blue', 'mabel', new Script());
+    const foe = dummy(w, 3);
+    const base = w.effectiveSpeed(me);
+    w.dealDamage(foe, me, 10);
+    expect(w.effectiveSpeed(me)).toBeCloseTo(base * (1 + SCURRY.speed));
+    run(w, SCURRY.seconds + 0.1);
+    w.dealDamage(foe, me, 10);
+    expect(w.effectiveSpeed(me)).toBeCloseTo(base); // still on cooldown
+  });
+});
+
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });

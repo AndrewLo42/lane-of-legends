@@ -4,7 +4,7 @@ import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
 import type { Command, Controller, Slot, SummonerId, SummonerSlot, Unit, Vec2 } from './types';
-import { dirTo, dist, inCone } from './util';
+import { dirTo, dist, inCone, toward } from './util';
 import { enemyOf, gap, type World } from './world';
 
 /** Shared view of the lane for one decision. */
@@ -94,6 +94,7 @@ export class BotController implements Controller {
       tock: { play: this.tock, escape: this.tockEscape },
       maren: { play: this.maren, escape: this.marenEscape },
       lisha: { play: this.lisha, escape: this.lishaEscape },
+      mabel: { play: this.mabel, escape: this.mabelEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -356,5 +357,55 @@ export class BotController implements Controller {
 
   private lishaEscape({ self, near, ready }: Ctx): Command | null {
     return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
+  }
+
+  // ---------- Mabel ----------
+
+  private mabel(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim, aimAfter } = ctx;
+    const bees = Math.floor(self.champ!.mana);
+    const hive = world.zones.some((z) => z.kind === 'hive' && z.ownerId === self.id);
+    const towardFoe = self.team === 'blue' ? 1 : -1;
+    if (foe) {
+      const honeyed = !!world.status(foe, 'honey');
+      if (ready(3) && near(7) && (foe.hp < foe.maxHp * 0.5 || (honeyed && self.hp > self.maxHp * 0.5)) && !unsafe(foe.pos)) {
+        return cast(3, foe.pos);
+      }
+      // Honey first: the slow sets up stings, and honeyed targets take more from the bees.
+      if (ready(1) && near(8)) return cast(1, aimAfter(foe, 0.6));
+      // Keep a bee in reserve for the hive unless the target is honeyed or low.
+      if (ready(0) && near(9) && (bees >= 3 || honeyed || foe.hp < foe.maxHp * 0.35)) {
+        const p = aim(foe, 22);
+        if (!minionInTheWay(world, self, p, 0.5)) return cast(0, p);
+      }
+      // Plant the hive between her and the fight when they come at her.
+      if (ready(2) && !hive && near(6)) return cast(2, { x: self.pos.x + towardFoe * 1.5, y: self.pos.y });
+    }
+    // Farm with Pollinated: honey a clump of enemy minions, so every one that dies counts as hers.
+    const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 9 && !unsafe(u.pos));
+    if (ready(1) && enemyMinions.length >= 3 && !near(5)) {
+      const c = enemyMinions.reduce((p, m) => ({ x: p.x + m.pos.x / enemyMinions.length, y: p.y + m.pos.y / enemyMinions.length }), { x: 0, y: 0 });
+      return cast(1, c);
+    }
+    // Siege: plant the hive by her wave when it's near enemy minions or a tower.
+    if (ready(2) && !hive && bees >= 3) {
+      const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 8);
+      if (wave.length >= 3) return cast(2, toward(self.pos, wave[0].pos, 4));
+    }
+    // Spare bees go into stinging the weakest unclaimed minion (stung minions are hers when they die).
+    if (ready(0) && bees >= 2) {
+      const m = enemyMinions
+        .filter((u) => !u.statuses.some((st) => (st.kind === 'sting' || st.kind === 'honey') && st.sourceId === self.id))
+        .sort((a, b) => a.hp - b.hp)[0];
+      if (m && m.hp < m.maxHp * 0.6) return cast(0, m.pos);
+    }
+    return null;
+  }
+
+  private mabelEscape({ world, self, foe, near, ready, aimAfter }: Ctx): Command | null {
+    // Drop honey on the chaser.
+    if (foe && ready(1) && near(5)) return cast(1, aimAfter(foe, 0.5));
+    if (ready(2) && near(5) && !world.zones.some((z) => z.kind === 'hive' && z.ownerId === self.id)) return cast(2, self.pos);
+    return null;
   }
 }
