@@ -49,7 +49,7 @@ export class SelectStage {
 
     KIT_IDS.forEach((kit, i) => {
       const model: ModelName = `champ_${kit}`;
-      const built = hasModel(model) ? instantiate(model, kit === 'tock' ? 2.3 : 2.1, null) : null;
+      const built = hasModel(model) ? instantiate(model, kit === 'tock' ? 2.3 : kit === 'mabel' ? 1.7 : 2.1, null) : null;
       if (!built) {
         // No Meshy model yet: stand the placeholder figure on the podium instead.
         const stand = placeholderFor(new World(1).spawnChampion('blue', kit, { think: () => [] }));

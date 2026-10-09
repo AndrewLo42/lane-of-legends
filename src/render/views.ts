@@ -13,7 +13,8 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'tower') return { name: 'tower', height: 7.2 };
   if (u.kind === 'nexus') return { name: 'nexus', height: 6.2 };
   // Champions are oversized next to structures, as in League, so they read from the MOBA camera.
-  if (u.champ) return { name: `champ_${u.champ.kit}`, height: u.champ.kit === 'tock' ? 2.8 : 2.5 };
+  // Tock is a big clockwork knight; Mabel a small mouse.
+  if (u.champ) return { name: `champ_${u.champ.kit}`, height: u.champ.kit === 'tock' ? 2.8 : u.champ.kit === 'mabel' ? 2.0 : 2.5 };
   return undefined;
 }
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];

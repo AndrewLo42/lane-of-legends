@@ -1,0 +1,25 @@
+{
+  "out": "public/assets/meshy/Mabel.glb",
+  "rigged": "assets-src/meshy/mabel/rigged_12a2d40d.glb",
+  "anims": [
+    "assets-src/meshy/mabel/anims_batch1.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": { "src": "Idle" },
+    "Run": { "src": "RunFast" },
+    "Attack": { "src": "mage_soell_cast_3", "start": 0.65, "end": 1.35 },
+    "Attack2": { "src": "mage_soell_cast_3", "start": 0.55, "end": 1.3 },
+    "CastQ": { "src": "mage_soell_cast_3", "start": 0.6, "end": 1.3 },
+    "CastW": { "src": "Female_Crouch_Pick_Throw_Forward", "start": 1.9, "end": 2.9 },
+    "CastE": { "src": "Female_Crouch_Pick_Up_Place_Side", "start": 0.6, "end": 1.8 },
+    "CastR": { "src": "Charged_Spell_Cast", "start": 0.0, "end": 1.2 },
+    "Death": { "src": "Shot_and_Slow_Fall_Backward", "start": 1.9, "end": 3.6 },
+    "Hit": { "src": "Hit_Reaction", "start": 0.3, "end": 1.2 },
+    "Select": { "src": "Happy_jump_f", "start": 0.5, "end": 1.5 }
+  }
+}

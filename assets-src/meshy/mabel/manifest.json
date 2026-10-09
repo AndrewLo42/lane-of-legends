@@ -1,0 +1,104 @@
+[
+  {
+    "at": "2026-10-09T21:49:44.916Z",
+    "cmd": "concept",
+    "taskId": "01a122a2-7f88-75d8-866e-f86bf37b4896",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a cute anthropomorphic mouse girl beekeeper standing upright on two legs, soft grey-brown fur, big round ears with pink insides, a long thin pink tail, a small pink nose and whiskers, a wide-brimmed cream beekeeper hat with a sheer mesh veil pulled back over the brim, patched honey-yellow and denim-blue overalls with little honey drips, a red neckerchief, small leather boots, two tiny cartoon bees perched on her hat brim. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, cute heroic proportions about 4 heads tall, oversized hands, head and ears, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no staff, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/mabel/concepts/f37b4896_0.png",
+      "assets-src/meshy/mabel/concepts/f37b4896_1.png",
+      "assets-src/meshy/mabel/concepts/f37b4896_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-09T21:49:45.524Z",
+    "cmd": "concept",
+    "taskId": "01a122a2-825a-77a4-bff7-94f83d806ebb",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a cute anthropomorphic mouse girl beekeeper standing upright on two legs, soft grey-brown fur, big round ears with pink insides, a long thin pink tail, a small pink nose and whiskers, a wide-brimmed cream beekeeper hat with a sheer mesh veil pulled back over the brim, patched honey-yellow and denim-blue overalls with little honey drips, a red neckerchief, small leather boots, two tiny cartoon bees perched on her hat brim. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, cute heroic proportions about 4 heads tall, oversized hands, head and ears, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no staff, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/mabel/concepts/3d806ebb_0.png",
+      "assets-src/meshy/mabel/concepts/3d806ebb_1.png",
+      "assets-src/meshy/mabel/concepts/3d806ebb_2.png"
+    ]
+  },
+  {
+    "at": "2026-10-09T21:53:06.074Z",
+    "cmd": "model",
+    "taskId": "01a122a5-57c3-776a-8b0c-2a1f2882c0a9",
+    "request": {
+      "image_urls": [
+        "3d806ebb_0.png",
+        "3d806ebb_1.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom",
+      "texture_prompt": "soft grey-brown mouse fur, big round ears with pink insides, long pink tail, pink nose, cream beekeeper hat with a tan band and a pale veil, honey-yellow and denim-blue patched overalls with honey drips on the pocket, red neckerchief, brown leather boots, two small striped bees on the hat"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/mabel/model_2882c0a9.glb"
+    ]
+  },
+  {
+    "at": "2026-10-09T21:53:39.654Z",
+    "cmd": "rig",
+    "taskId": "01a122a8-068b-7066-a411-346512a2d40d",
+    "request": {
+      "input_task_id": "01a122a5-57c3-776a-8b0c-2a1f2882c0a9",
+      "animation_type": "biped",
+      "height_meters": 1.3
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/mabel/rigged_12a2d40d.glb"
+    ]
+  },
+  {
+    "at": "2026-10-09T21:54:44.318Z",
+    "cmd": "animate",
+    "taskId": "01a122a8-80b9-7580-9351-aeb8496e3985",
+    "request": {
+      "rig_task_id": "01a122a8-068b-7066-a411-346512a2d40d",
+      "action_ids": [
+        0,
+        16,
+        130,
+        132,
+        280,
+        274,
+        125,
+        185,
+        178,
+        44
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/mabel/anims_batch1.glb"
+    ]
+  }
+]
