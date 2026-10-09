@@ -4,10 +4,10 @@ import type { World } from '../world';
 import { at, champsAndMinions } from './common';
 import type { Kit } from './types';
 
-const Q = { base: [90, 130, 170, 210, 250], ad: 0.6, cost: [50, 50, 50, 50, 50], cd: [6, 5.75, 5.5, 5.25, 5], range: 9, radius: 2, delay: 0.6, slow: 0.3 };
+const Q = { base: [90, 130, 170, 210, 250], ad: 0.6, cost: [50, 50, 50, 50, 50], cd: [6, 5.75, 5.5, 5.25, 5], range: 9, radius: 2, delay: 0.6, slow: 0.3, warnSlow: 0.45 };
 const W = { shield: [80, 120, 160, 200, 240], hpRatio: 0.08, burst: [60, 90, 120, 150, 180], ad: 0.4, cost: [60, 60, 60, 60, 60], cd: [14, 13.5, 13, 12.5, 12], duration: 2.5, radius: 2.6 };
 const E = { base: [50, 75, 100, 125, 150], ad: 0.4, cost: [70, 70, 70, 70, 70], cd: [16, 15, 14, 13, 12], range: 9, pull: 4 };
-const R = { perSec: [60, 100], tickAd: 0.25, erupt: [150, 250], ad: 0.6, cost: [100, 100], cd: [90, 75], range: 8, radius: 4.5, duration: 3, drag: 1.6, stun: 1 };
+const R = { perSec: [60, 100], tickAd: 0.25, erupt: [150, 250], ad: 0.6, cost: [100, 100], cd: [90, 75], range: 8, radius: 4.5, duration: 3, drag: 1.6, stun: 1, warn: 0.75 };
 const SOAK = { stacks: 3, root: 1, lasts: 4 };
 
 interface MarenData {
@@ -77,11 +77,15 @@ export const MAREN: Kit = {
       aim: { shape: 'circle', range: Q.range, radius: Q.radius },
       damage: (r, self) => at(Q.base, r) + Q.ad * self.damage,
       describe: (r, self) =>
-        `Lob a wave at an area. After ${Q.delay}s it crashes down for ${Math.round(MAREN.abilities[0].damage!(r, self))} damage ` +
-        `and slows by ${Q.slow * 100}% for 1.5s.`,
+        `Lob a wave at an area. Enemies already inside are slowed ${Q.warnSlow * 100}% while it falls. After ${Q.delay}s it ` +
+        `crashes down for ${Math.round(MAREN.abilities[0].damage!(r, self))} damage and slows by ${Q.slow * 100}% for 1.5s.`,
       cast: ({ world, self, at: aim, rank }) => {
         const p = toward(self.pos, aim, Q.range);
         world.telegraph({ team: self.team, shape: 'circle', pos: p, dir: 0, length: Q.radius, width: 0 }, Q.delay);
+        if (Q.warnSlow > 0) {
+          // The undertow drags at anyone already standing where the wave will land.
+          for (const e of world.enemiesInCircle(self.team, p, Q.radius)) world.addStatus(e, { kind: 'slow', value: Q.warnSlow, sourceId: self.id, seconds: Q.delay });
+        }
         world.after(Q.delay, () => {
           world.addFx({ kind: 'splash', pos: p, radius: Q.radius, team: self.team });
           for (const e of world.enemiesInCircle(self.team, p, Q.radius)) {
@@ -148,8 +152,8 @@ export const MAREN: Kit = {
         const pos = toward(self.pos, aim, R.range);
         const zone = world.addZone('maelstrom', self, pos, R.radius, R.duration);
         data(self).maelstrom = { zone: zone.id, pos, until: zone.until, rank, nextTick: world.tick };
-        world.after(R.duration - 0.75, () => {
-          if (data(self).maelstrom?.zone === zone.id) world.telegraph({ team: self.team, shape: 'circle', pos, dir: 0, length: R.radius, width: 0 }, 0.75);
+        world.after(R.duration - R.warn, () => {
+          if (data(self).maelstrom?.zone === zone.id) world.telegraph({ team: self.team, shape: 'circle', pos, dir: 0, length: R.radius, width: 0 }, R.warn);
         });
       },
     },
@@ -175,3 +179,5 @@ export const MAREN: Kit = {
     self.champ!.data = {};
   },
 };
+
+export const MAREN_TUNING = { Q, R };

@@ -140,6 +140,20 @@ describe('Arlo', () => {
   });
 });
 
+describe('Maren', () => {
+  it("Riptide slows enemies already under it while the wave falls", () => {
+    const { w, me, cast } = setup('maren');
+    const t = dummy(w, 5);
+    const base = w.effectiveSpeed(t);
+    cast(0, 5);
+    run(w, 0.2); // past the wind-up, before the wave lands
+    expect(w.effectiveSpeed(t)).toBeLessThan(base * 0.6);
+    expect(t.hp).toBe(t.maxHp);
+    run(w, 0.6);
+    near(lost(t), KITS.maren.abilities[0].damage!(1, me));
+  });
+});
+
 describe('Tock', () => {
   it('Pendulum hits a cone; the backswing hits twice-caught enemies harder', () => {
     const { w, me, cast } = setup('tock');
