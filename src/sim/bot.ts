@@ -366,6 +366,21 @@ export class BotController implements Controller {
     const bees = Math.floor(self.champ!.mana);
     const hive = world.zones.some((z) => z.kind === 'hive' && z.ownerId === self.id);
     const towardFoe = self.team === 'blue' ? 1 : -1;
+    // Kite melee champions: honey the chaser, drop the hive behind her, and between shots step back
+    // along the lane (toward her side) so they never get to swing.
+    if (foe && foe.range < 3) {
+      const theirReach = foe.range + foe.radius + self.radius;
+      const d = dist(self.pos, foe.pos);
+      if (d < theirReach + 2.5) {
+        if (ready(1)) return cast(1, aimAfter(foe, 0.5));
+        if (ready(2) && !hive && bees >= 2) return cast(2, { x: self.pos.x - towardFoe * 1.5, y: self.pos.y });
+        if (self.windup > 0) return { type: 'attack', target: foe.id }; // let the bee leave her paw
+        const canShoot = self.attackCd === 0 && gap(self, foe) <= self.range;
+        if (canShoot && d > theirReach + 0.4) return { type: 'attack', target: foe.id };
+        const away = { x: self.pos.x - towardFoe * 3, y: self.pos.y + Math.sign(self.pos.y - foe.pos.y || 1) * 1.2 };
+        if (!unsafe(away)) return { type: 'move', to: away };
+      }
+    }
     if (foe) {
       const honeyed = !!world.status(foe, 'honey');
       if (ready(3) && near(7) && (foe.hp < foe.maxHp * 0.5 || (honeyed && self.hp > self.maxHp * 0.5)) && !unsafe(foe.pos)) {
@@ -381,7 +396,7 @@ export class BotController implements Controller {
       // Plant the hive between her and the fight when they come at her.
       if (ready(2) && !hive && near(6)) return cast(2, { x: self.pos.x + towardFoe * 1.5, y: self.pos.y });
     }
-    // Farm with Pollinated: honey a clump of enemy minions, so every one that dies counts as hers.
+    // Honey a clump of enemy minions: slowed and honeyed, they melt under her bees and the hive.
     const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 9 && !unsafe(u.pos));
     if (ready(1) && enemyMinions.length >= 3 && !near(5)) {
       const c = enemyMinions.reduce((p, m) => ({ x: p.x + m.pos.x / enemyMinions.length, y: p.y + m.pos.y / enemyMinions.length }), { x: 0, y: 0 });
@@ -392,10 +407,10 @@ export class BotController implements Controller {
       const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 8);
       if (wave.length >= 3) return cast(2, toward(self.pos, wave[0].pos, 4));
     }
-    // Spare bees go into stinging the weakest unclaimed minion (stung minions are hers when they die).
+    // Spare bees go into stinging the weakest unclaimed minion (Pollinated: stung minions are hers when they die).
     if (ready(0) && bees >= 2) {
       const m = enemyMinions
-        .filter((u) => !u.statuses.some((st) => (st.kind === 'sting' || st.kind === 'honey') && st.sourceId === self.id))
+        .filter((u) => !u.statuses.some((st) => st.kind === 'sting' && st.sourceId === self.id))
         .sort((a, b) => a.hp - b.hp)[0];
       if (m && m.hp < m.maxHp * 0.6) return cast(0, m.pos);
     }

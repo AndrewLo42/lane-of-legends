@@ -514,12 +514,13 @@ describe('Mabel', () => {
     near(w.dealDamage(ally, foeMinion, 100), 100, 0.5);
   });
 
-  it('Pollinated: a stung or honeyed minion counts as hers even if something else kills it', () => {
+  it('Pollinated: a stung minion counts as hers even if something else kills it (honey alone does not)', () => {
     const { w, me } = setup('mabel');
     const blue = w.spawnMinion('blue', 'melee', { x: 20, y: 0 });
     const plain = w.spawnMinion('red', 'melee', { x: 21, y: 0 });
     const stung = w.spawnMinion('red', 'melee', { x: 22, y: 0 });
-    w.addStatus(stung, { kind: 'honey', value: 1, sourceId: me.id, seconds: 4 });
+    w.addStatus(stung, { kind: 'sting', value: 1, sourceId: me.id, seconds: 4 });
+    w.addStatus(plain, { kind: 'honey', value: 1, sourceId: me.id, seconds: 4 });
     me.champ!.mana = 1;
     w.dealDamage(blue, plain, 99999);
     expect(me.champ!.cs).toBe(0);

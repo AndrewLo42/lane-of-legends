@@ -12,7 +12,7 @@ const SCURRY = { speed: 0.3, seconds: 1.5, cooldown: 8 };
 const Q = { base: [45, 70, 95, 120, 145], ad: 0.35, cost: [1, 1, 1, 1, 1], cd: [3.5, 3.25, 3, 2.75, 2.5], range: 9, speed: 22, width: 0.5, seconds: 3, minion: 0.6 };
 const W = { cost: [0, 0, 0, 0, 0], cd: [14, 13, 12, 11, 10], range: 8, radius: 1.8, delay: 0.45, lasts: 3, slow: 0.4, honey: 4 };
 const E = {
-  base: [20, 30, 40, 50, 60], perLevel: 4, ad: 0.2, cost: [2, 2, 2, 2, 2], cd: [26, 24, 22, 20, 18], range: 6, radius: 5.5, lasts: 12,
+  base: [17, 25, 34, 42, 51], perLevel: 4, ad: 0.2, cost: [2, 2, 2, 2, 2], cd: [26, 24, 22, 20, 18], range: 6, radius: 5.5, lasts: 10,
   every: 1, minionBuff: 0.2, regenMult: 2, speed: 16,
 };
 const R = { base: [280, 420], ad: 1.2, cost: [0, 0], cd: [90, 75], range: 7, pick: 2.5, seconds: 4, slow: 0.25 };
@@ -40,17 +40,12 @@ function furyTarget(world: World, self: Unit, aim: Vec2): Unit | undefined {
     .sort((a, b) => dist(a.pos, aim) - dist(b.pos, aim))[0];
 }
 
-/**
- * What the hive shoots: the Fury target, then a minion this shot finishes (a last hit for Mabel), then
- * whoever just hurt her, then the nearest minion, then any champion.
- */
-function hiveTarget(world: World, self: Unit, pos: Vec2, shot: number): Unit | undefined {
+/** What the hive shoots: the Fury target, then whoever just hurt Mabel, then the nearest minion, then any champion. */
+function hiveTarget(world: World, self: Unit, pos: Vec2): Unit | undefined {
   const d = data(self);
   const inRange = (u: Unit | undefined) => !!u && !u.dead && world.canAttack(self, u) && dist(u.pos, pos) <= E.radius + u.radius;
   const fury = d.fury && world.tick < d.fury.until ? world.get(d.fury.targetId) : undefined;
   if (inRange(fury)) return fury;
-  const finish = world.units.find((u) => u.kind === 'minion' && inRange(u) && u.hp <= beeDamage(world, u, shot));
-  if (finish) return finish;
   const attacker = d.lastAttacker && world.tick - d.lastAttacker.tick < ticks(3) ? world.get(d.lastAttacker.id) : undefined;
   if (inRange(attacker)) return attacker;
   const near = (kind: Unit['kind']) =>
@@ -80,7 +75,7 @@ export const MABEL: Kit = {
     icon: '🐝',
     describe: (self) =>
       `Mabel spends bees instead of mana: she regrows one every 4s, and last-hitting a minion gives one more. Pollinated: ` +
-      `an enemy minion that dies stung or honeyed counts as her last hit, whoever finished it. Each bee ` +
+      `an enemy minion that dies stung counts as her last hit, whoever finished it. Each bee ` +
       `in her swarm adds ${SWARM.perBee} damage to her attacks (she points and a bee flies out) (${SWARM.perBee * bees(self)} now). Honeyed enemies take ` +
       `${HONEY_BONUS * 100}% more from her bees. When an enemy champion hits her she scurries ${SCURRY.speed * 100}% faster ` +
       `for ${SCURRY.seconds}s (once every ${SCURRY.cooldown}s).`,
@@ -195,8 +190,8 @@ export const MABEL: Kit = {
     const c = self.champ!;
     c.mana = Math.min(c.maxMana, c.mana + SWARM.lastHitBees);
   },
-  // Pollinated: minions that die stung or honeyed are hers, whoever finished them.
-  claimsMinion: (world, self, m) => m.statuses.some((s) => (s.kind === 'sting' || s.kind === 'honey') && s.sourceId === self.id && s.until > world.tick),
+  // Pollinated: minions that die stung are hers, whoever finished them (each claim costs a bee).
+  claimsMinion: (world, self, m) => m.statuses.some((s) => s.kind === 'sting' && s.sourceId === self.id && s.until > world.tick),
   onHurt: (world, self, src: Unit | null, _amount, _from: DamageSource) => {
     if (src?.kind !== 'champion' || src.team === self.team) return;
     const d = data(self);
@@ -228,7 +223,7 @@ export const MABEL: Kit = {
     if (dist(self.pos, hive.pos) <= E.radius) c.mana = Math.min(c.maxMana, c.mana + MABEL.stats.manaRegen * (E.regenMult - 1) * DT);
     if (world.tick >= hive.nextShot) {
       const dmg = MABEL.abilities[2].damage!(hive.rank, self);
-      const t = hiveTarget(world, self, hive.pos, dmg);
+      const t = hiveTarget(world, self, hive.pos);
       if (t) {
         hive.nextShot = world.tick + ticks(E.every);
         world.fireHoming(self, t, 'bee', E.speed, (u) => world.dealDamage(self, u, beeDamage(world, u, dmg), { slot: 2 }), { x: hive.pos.x, y: hive.pos.y });
