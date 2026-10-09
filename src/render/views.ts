@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import type { Missile, MissileStyle, Unit, Vec2 } from '../sim/types';
+import { holdingSpear } from '../sim/kits/aurelle';
+import type { KitId, Missile, MissileStyle, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
@@ -44,6 +45,10 @@ interface UnitView {
   honey?: THREE.Mesh;
   /** Arlo's Triangulate bearings: gold rune pips, one per stack. */
   bearings?: THREE.Group;
+  /** Aurelle's Arsenal Ascendant: spectral lances circling her. */
+  lances?: THREE.Group;
+  /** Aurelle's spear stuck in this unit. */
+  impaled?: THREE.Mesh;
   /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
@@ -77,6 +82,8 @@ const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b
 export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6 };
 
 const FROZEN = new THREE.Color(0xd8fffb);
+/** Champions that float instead of walking, and how high (Aurelle). */
+const FLOAT_HEIGHT: Partial<Record<KitId, number>> = { aurelle: 0.35 };
 
 /** Mesh per missile style, built pointing along +x. */
 function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMaterial; height: number } {
@@ -92,6 +99,9 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     petal: () => ({ geo: new THREE.ConeGeometry(0.16, 0.9, 4).rotateZ(-Math.PI / 2).scale(1, 0.35, 1), color: 0xf7a8c8, height: 1.2 }),
     // Bee: a small striped body (Mabel's autos, stings, hive and Queen's Fury).
     bee: () => ({ geo: new THREE.SphereGeometry(0.13, 8, 6).scale(1.5, 1, 1), color: 0xf2b632, height: 1.0 }),
+    // Aurelle's spear: a long glowing shaft with a leaf blade, point forward; Arsenal's lances are ghostly copies.
+    spear: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xc9b6ff, height: 1.2 }),
+    lance: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xe6dcff, height: 1.3, opacity: 0.55 }),
     // Tether: a glowing hook, open end forward.
     tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
   };
@@ -247,13 +257,18 @@ export class WorldView {
       // Blinks and rewinds teleport: don't smear them across the lane.
       if (Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 3) v.obj.position.set(u.pos.x, 0, u.pos.y);
       if (u.speed > 0) v.obj.rotation.y = -lerpAngle(v.prevFacing, u.facing, alpha); // sim angle runs the other way round +Y
+      // Floaters (Aurelle) hover off the ground with a slow bob and glide instead of running.
+      const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
+      if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
+      if (u.champ?.kit === 'aurelle') this.aurelleVisuals(u, v);
 
       if (v.anim) {
         // Skeletal: run/walk while moving, idle otherwise, one-shot clips for attacks and casts.
         const moving = !u.dead && Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
         // Library cycles are paced for a ~1.8 m human (walk ≈ 3.2 m/s, run ≈ 5.8 m/s); match the unit's pace.
         const gait = v.anim.has('Run') ? 'Run' : 'Walk';
-        v.anim.setBase(moving ? gait : 'Idle', moving ? u.speed / (gait === 'Run' ? 5.8 : 3.2) : 1);
+        const glides = hover != null; // floaters keep their idle pose while they move
+        v.anim.setBase(moving && !glides ? gait : 'Idle', moving && !glides ? u.speed / (gait === 'Run' ? 5.8 : 3.2) : 1);
         const cast = u.champ?.lastCast;
         if (cast && cast.tick !== v.lastCastSeen && !u.dead) {
           v.lastCastSeen = cast.tick;
@@ -364,6 +379,47 @@ export class WorldView {
     }
   }
 
+  /**
+   * Aurelle: her floating spear (hidden while it's thrown), a ring of spectral lances during Arsenal
+   * Ascendant, and a spear stuck in whoever she impaled (drawn on them, below).
+   */
+  private aurelleVisuals(u: Unit, v: UnitView) {
+    const held = v.obj.getObjectByName('heldSpear');
+    if (held) held.visible = holdingSpear(u) && !u.statuses.some((s) => s.kind === 'arsenal');
+    const arsenal = u.statuses.some((s) => s.kind === 'arsenal' && s.until > this.world.tick);
+    if (arsenal && !v.lances) {
+      v.lances = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xe6dcff, transparent: true, opacity: 0.6 });
+      for (let i = 0; i < 6; i++) {
+        const l = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.09, 1.3, 6), mat);
+        l.rotation.z = Math.PI; // points down
+        v.lances.add(l);
+      }
+      v.lances.position.y = 1.6;
+      v.obj.add(v.lances);
+    }
+    if (v.lances) {
+      v.lances.visible = arsenal;
+      const t = performance.now() / 1000;
+      v.lances.children.forEach((l, i) => {
+        const a = t * 1.5 + (i / 6) * Math.PI * 2;
+        l.position.set(Math.cos(a) * 1.2, Math.sin(t * 3 + i) * 0.1, Math.sin(a) * 1.2);
+      });
+    }
+  }
+
+  /** A spear stuck in a unit Aurelle impaled. */
+  private impaleVisual(u: Unit, v: UnitView) {
+    const on = u.statuses.some((s) => s.kind === 'impale' && s.until > this.world.tick);
+    if (on && !v.impaled) {
+      v.impaled = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.1, 1.5, 6), new THREE.MeshBasicMaterial({ color: 0xc9b6ff }));
+      v.impaled.position.set(-0.2, 1.3, 0.1);
+      v.impaled.rotation.z = 1.1;
+      v.obj.add(v.impaled);
+    }
+    if (v.impaled) v.impaled.visible = on;
+  }
+
   /** Rage/Ghost aura, Ignite's flame, and the Tether line. */
   private summonerVisuals(u: Unit, v: UnitView) {
     const now = performance.now() / 1000;
@@ -438,6 +494,7 @@ export class WorldView {
     this.markVisual(u, v, dt);
     this.summonerVisuals(u, v);
     this.beeVisuals(u, v);
+    this.impaleVisual(u, v);
     if (v.bubble) v.bubble.visible = shielded;
     if (v.root) v.root.visible = rooted;
     if (v.stun) {

@@ -1,10 +1,11 @@
 import { lead, leadTime, minionInTheWay } from './aim';
 import { kitOf } from './kits';
+import { holdingSpear, spearOnGround } from './kits/aurelle';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
 import type { Command, Controller, Slot, SummonerId, SummonerSlot, Unit, Vec2 } from './types';
-import { TICK_HZ, dirTo, dist, inCone, toward } from './util';
+import { TICK_HZ, dirTo, dist, inCone, segmentDistance, toward } from './util';
 import { enemyOf, gap, type World } from './world';
 
 /** Shared view of the lane for one decision. */
@@ -103,6 +104,7 @@ export class BotController implements Controller {
       maren: { play: this.maren, escape: this.marenEscape },
       lisha: { play: this.lisha, escape: this.lishaEscape },
       mabel: { play: this.mabel, escape: this.mabelEscape },
+      aurelle: { play: this.aurelle, escape: this.aurelleEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -449,6 +451,36 @@ export class BotController implements Controller {
       if (out) return cast(0, out.pos);
     }
     return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
+  }
+
+  // ---------- Aurelle ----------
+
+  private aurelle(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, recasting, aim } = ctx;
+    if (foe) {
+      // Arsenal when a fight is on: three lances a volley and cleaving bolts.
+      if (ready(3) && near(6) && (foe.hp < foe.maxHp * 0.6 || self.hp > self.maxHp * 0.6) && !unsafe(foe.pos)) return cast(3, self.pos);
+      // The spear is in them: rip it back through them right away.
+      if (recasting(0)) return cast(0, foe.pos);
+      if (ready(0) && near(9) && !unsafe(foe.pos)) {
+        // Don't feed the spear to a Stopwatch field: it would freeze there and drop.
+        const p = aim(foe, 26);
+        const frozen = world.zones.some((z) => z.kind === 'stasis' && z.team !== self.team && segmentDistance(z.pos, self.pos, p).d < z.radius);
+        if (!frozen) return cast(0, p);
+      }
+      // Sweep with the spear in hand, Nova without it, each only when they're inside it.
+      if (ready(2) && (holdingSpear(self) ? near(2.2) : near(3))) return cast(2, self.pos);
+    }
+    // Walk back for a dropped spear when it's somewhere safe.
+    const spear = spearOnGround(self);
+    if (spear && !unsafe(spear) && !(foe && near(3) && self.hp < self.maxHp * 0.5)) return { type: 'move', to: spear };
+    return null;
+  }
+
+  private aurelleEscape({ self, near, ready }: Ctx): Command | null {
+    // Blink home, leaving a glyph on the chaser.
+    if (ready(1) && near(4)) return cast(1, spawnPoint(self.team));
+    return null;
   }
 
   // ---------- Mabel ----------

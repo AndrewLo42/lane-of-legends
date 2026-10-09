@@ -19,6 +19,7 @@ export const MODELS = {
   champ_maren: 'Maren.glb',
   champ_lisha: 'Lisha.glb',
   champ_mabel: 'Mabel.glb',
+  champ_aurelle: 'Aurelle.glb', // not generated yet: she uses her placeholder
 } as const;
 export type ModelName = keyof typeof MODELS;
 

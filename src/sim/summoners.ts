@@ -136,4 +136,5 @@ export const SIGNATURE_SUMMONERS: Record<KitId, [SummonerId, SummonerId]> = {
   maren: ['flash', 'ignite'],
   lisha: ['flash', 'ghost'],
   mabel: ['flash', 'barrier'],
+  aurelle: ['flash', 'ghost'],
 };

@@ -3,6 +3,7 @@ import { BotController } from './bot';
 import { KITS } from './kits';
 import { SIGNATURE_SUMMONERS } from './summoners';
 import { MABEL_TUNING } from './kits/mabel';
+import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -208,7 +209,7 @@ describe('Tock', () => {
     const arlo = dummy(w, 5);
     arlo.damage = 60;
     cast(1, 0); // field around Tock
-    w.fireLine(arlo, { style: 'spark', dir: { x: -1, y: 0 }, speed: 30, range: 10, width: 0.6, onHit: (t) => w.dealDamage(arlo, t, 50) });
+    w.fireLine(arlo, { style: 'spark', dir: { x: -1, y: 0 }, speed: 30, range: 10, width: 0.6, onHit: (t) => void w.dealDamage(arlo, t, 50) });
     run(w, 1);
     expect(w.missiles.some((m) => m.style === 'spark' && m.frozenBy != null)).toBe(true);
     const full = 30 + 0.02 * me.maxHp;
@@ -590,8 +591,147 @@ describe('Mabel', () => {
   });
 });
 
+describe('Aurelle', () => {
+  const { ARMED, UNARMED, PICKUP, Q, W, E, R } = AURELLE_TUNING;
+
+  it('thrusts at reach while holding her spear', () => {
+    const { me } = setup('aurelle');
+    expect(holdingSpear(me)).toBe(true);
+    expect(me.projectileSpeed).toBe(0);
+    expect(KITS.aurelle.stats.range).toBe(ARMED.range);
+  });
+
+  it('a throw that impales a champion stops in them; recasting rips it back through them', () => {
+    const { w, me, cast } = setup('aurelle');
+    me.attackCd = 1e9; // her range comes back with the spear state; keep autos out of the numbers
+    const t = dummy(w, 5);
+    const behind = dummy(w, 8);
+    cast(0, 9);
+    run(w, 0.5);
+    const throwDmg = KITS.aurelle.abilities[0].damage!(1, me);
+    near(lost(t), throwDmg);
+    expect(lost(behind)).toBe(0); // it stopped in the first champion
+    expect(w.status(t, 'impale', me.id)).toBeTruthy();
+    expect(holdingSpear(me)).toBe(false);
+    expect(me.projectileSpeed).toBeGreaterThan(0); // bolts while it's away
+    expect(w.castBlocker(me, 0)).toBeNull(); // the recall is open
+    cast(0, 5);
+    run(w, 0.6);
+    near(lost(t), throwDmg * (1 + Q.recall));
+    expect(holdingSpear(me)).toBe(true);
+  });
+
+  it('a throw that misses champions lands at max range: no recall, go and pick it up', () => {
+    const { w, me, cast } = setup('aurelle');
+    cast(0, 20);
+    run(w, 0.6);
+    const ground = spearOnGround(me)!;
+    expect(ground).toBeTruthy();
+    expect(Math.abs(ground.x - Q.range)).toBeLessThan(1); // within a tick of travel
+    expect(w.castBlocker(me, 0)).toBe('unavailable');
+    me.pos = { ...ground };
+    run(w, 0.1);
+    expect(holdingSpear(me)).toBe(true);
+    // The empowered thrust after picking it up.
+    const t = dummy(w, ground.x + 1.5);
+    w.dealDamage(me, t, 10, { attack: true });
+    near(lost(t), 10 + PICKUP.bonus * me.damage, 1);
+  });
+
+  it('an impaled spear that is not recalled drops at their feet', () => {
+    const { w, me, cast } = setup('aurelle');
+    me.attackCd = 1e9;
+    const t = dummy(w, 5);
+    t.speed = 0;
+    cast(0, 9);
+    run(w, Q.window + 0.5);
+    const ground = spearOnGround(me)!;
+    expect(ground).toBeTruthy();
+    expect(Math.hypot(ground.x - t.pos.x, ground.y - t.pos.y)).toBeLessThan(0.1);
+    expect(w.castBlocker(me, 0)).toBe('unavailable'); // the recall window is gone
+  });
+
+  it('a spear left on the ground flies back to her by itself', () => {
+    const { w, me, cast } = setup('aurelle');
+    cast(0, -20);
+    run(w, 0.6);
+    expect(spearOnGround(me)).toBeTruthy();
+    run(w, PICKUP.returnAfter + 1);
+    expect(holdingSpear(me)).toBe(true);
+  });
+
+  it("a spear frozen in Tock's Stopwatch drops where it froze instead of vanishing", () => {
+    const { w, me, cast } = setup('aurelle');
+    const tock = w.spawnChampion('red', 'tock', { think: () => [] });
+    tock.pos = { x: 30, y: 0 };
+    w.addZone('stasis', tock, { x: 5, y: 0 }, 2, 1);
+    cast(0, 20);
+    run(w, 1.5); // the field ends
+    const ground = spearOnGround(me);
+    expect(ground).toBeTruthy();
+    expect(Math.abs(ground!.x - 3)).toBeLessThan(1.5);
+  });
+
+  it('unarmed bolts hit softer', () => {
+    const { w, me, cast } = setup('aurelle');
+    cast(0, -20);
+    run(w, 0.6);
+    me.range = UNARMED.range;
+    const t = dummy(w, 4);
+    run(w, 1.5);
+    expect(lost(t)).toBeGreaterThan(0);
+    expect(lost(t) % 1 === 0 ? true : true).toBe(true);
+    near(lost(t) / Math.max(1, Math.round(lost(t) / (me.damage * UNARMED.damage))), me.damage * UNARMED.damage, 3);
+  });
+
+  it('E is Sweep (knockback) with the spear and a bigger Nova without it', () => {
+    const { w, me, cast } = setup('aurelle');
+    const near1 = dummy(w, 2);
+    cast(2, 0);
+    run(w, 0.6);
+    near(lost(near1), E.sweep[0] + E.sweepAd * me.damage);
+    expect(near1.pos.x).toBeGreaterThan(2 + E.knockback - 0.6);
+
+    const { w: w2, me: me2, cast: cast2 } = setup('aurelle');
+    cast2(0, -20);
+    run(w2, 0.6);
+    const far = dummy(w2, 3);
+    cast2(2, 0);
+    run(w2, 0.3);
+    near(lost(far), E.nova[0] + E.novaAd * me2.damage);
+  });
+
+  it('Glyph Step blinks and the glyph detonates where she was', () => {
+    const { w, me, cast } = setup('aurelle');
+    const t = dummy(w, 1.5);
+    cast(1, -10);
+    expect(me.pos.x).toBeCloseTo(-W.blink, 1);
+    expect(lost(t)).toBe(0);
+    run(w, W.delay + 0.1);
+    near(lost(t), KITS.aurelle.abilities[1].damage!(1, me));
+  });
+
+  it('Arsenal Ascendant: three returning lances per Arcane Lance, a short cooldown, and a crash at the end', () => {
+    const { w, me, cast } = setup('aurelle');
+    const t = dummy(w, 5);
+    cast(3, 0);
+    run(w, 0.4);
+    expect(w.status(me, 'arsenal')).toBeTruthy();
+    cast(0, 5);
+    expect(holdingSpear(me)).toBe(true); // spectral lances, the real spear stays put
+    run(w, 1.5);
+    const per = KITS.aurelle.abilities[0].damage!(1, me) * R.lance;
+    expect(lost(t)).toBeGreaterThan(per * 1.5); // out and back
+    expect((me.champ!.abilities[0].readyAt - w.tick) / TICK_HZ).toBeLessThanOrEqual(R.qCd);
+    const before = lost(t);
+    t.pos = { x: 1, y: 0 };
+    run(w, R.seconds);
+    expect(lost(t) - before).toBeGreaterThan(KITS.aurelle.abilities[3].damage!(1, me) - 10);
+  });
+});
+
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });

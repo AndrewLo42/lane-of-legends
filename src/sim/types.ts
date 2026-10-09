@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,7 +47,7 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
@@ -55,7 +55,9 @@ export interface Status {
    * grievous: fraction of healing lost; haste: extra move speed fraction; rage: bonus attack damage
    * (plus a fixed attack speed bonus); tether: tagged by a Tether, so its caster can dash to it;
    * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder;
-   * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction.
+   * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction;
+   * impale: Aurelle's spear is stuck in this unit (she can recall it through them); arsenal: Aurelle's
+   * ultimate is up (spectral lances ring her).
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -164,7 +166,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance';
 
 export interface Missile {
   id: number;
@@ -185,14 +187,17 @@ export interface Missile {
   /** Line missiles: which units can stop/take it. */
   canHit: (u: Unit) => boolean;
   hit: number[];
-  onHit: (target: Unit) => void;
+  /** Return true from a piercing line missile's hit to stop it there (Aurelle's spear stops in a champion). */
+  onHit: (target: Unit) => void | boolean;
+  /** Line missiles: called with where it came to rest (range spent, stopped, or left the lane). */
+  onEnd?: (pos: Vec2) => void;
   /** Id of the stasis field holding it in place, if any. */
   frozenBy: number | null;
 }
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear';
   team: Team;
   ownerId: number;
   pos: Vec2;

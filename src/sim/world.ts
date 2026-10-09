@@ -199,7 +199,7 @@ export class World {
   // ---------- abilities ----------
 
   /** Why a cast would fail right now, or null if it would go through. */
-  castBlocker(u: Unit, slot: Slot): 'rank' | 'cooldown' | 'mana' | 'busy' | 'rooted' | null {
+  castBlocker(u: Unit, slot: Slot): 'rank' | 'cooldown' | 'mana' | 'busy' | 'rooted' | 'unavailable' | null {
     const c = u.champ;
     if (!c || u.dead) return 'busy';
     if (this.isBusy(u)) return 'busy';
@@ -208,6 +208,7 @@ export class World {
     if (def.aim.shape === 'dash' && this.isRooted(u)) return 'rooted';
     if (st.rank === 0) return 'rank';
     if (def.recast && this.tick < st.recastUntil) return null;
+    if (def.available && !def.available(this, u)) return 'unavailable';
     if (this.tick < st.readyAt) return 'cooldown';
     if (c.mana < def.cost(st.rank)) return 'mana';
     return null;
@@ -485,11 +486,17 @@ export class World {
     u.windup = 0;
   }
 
-  fireLine(src: Unit, o: { style: MissileStyle; dir: Vec2; speed: number; range: number; width: number; pierce?: boolean; canHit?: (u: Unit) => boolean; onHit: (t: Unit) => void; from?: Vec2 }) {
+  fireLine(
+    src: Unit,
+    o: {
+      style: MissileStyle; dir: Vec2; speed: number; range: number; width: number; pierce?: boolean; canHit?: (u: Unit) => boolean;
+      onHit: (t: Unit) => void | boolean; onEnd?: (pos: Vec2) => void; from?: Vec2;
+    },
+  ) {
     this.missiles.push({
       id: this.nextId++, team: src.team, sourceId: src.id, style: o.style, pos: { ...(o.from ?? src.pos) }, speed: o.speed, targetId: null,
       dir: o.dir, range: o.range, travelled: 0, width: o.width, pierce: !!o.pierce,
-      canHit: o.canHit ?? ((u) => u.kind === 'minion' || u.kind === 'champion'), hit: [], onHit: o.onHit, frozenBy: null,
+      canHit: o.canHit ?? ((u) => u.kind === 'minion' || u.kind === 'champion'), hit: [], onHit: o.onHit, onEnd: o.onEnd, frozenBy: null,
     });
   }
 
@@ -603,7 +610,8 @@ export class World {
 
   private fire(u: Unit, target: Unit) {
     const rage = this.status(u, 'rage')?.value ?? 0;
-    const hit = (t: Unit) => this.dealDamage(this.get(u.id) ?? null, t, u.damage + rage, { attack: true });
+    const mult = u.champ ? kitOf(u).autoDamageMult?.(this, u) ?? 1 : 1;
+    const hit = (t: Unit) => this.dealDamage(this.get(u.id) ?? null, t, (u.damage + rage) * mult, { attack: true });
     if (u.projectileSpeed <= 0) return hit(target);
     const off = u.kind === 'tower' ? 0 : u.radius;
     const from = { x: u.pos.x + Math.cos(u.facing) * off, y: u.pos.y + Math.sin(u.facing) * off };
@@ -643,15 +651,20 @@ export class World {
       let stopped = false;
       for (const h of hits) {
         m.hit.push(h.u.id);
-        m.onHit(h.u);
-        if (!m.pierce) {
+        if (m.onHit(h.u) === true || !m.pierce) {
           stopped = true;
+          m.pos = { ...h.u.pos };
           break;
         }
       }
-      m.pos = next;
-      m.travelled += stepLen;
-      if (stopped || m.travelled >= m.range || Math.abs(m.pos.x) > LANE.halfLength + 5) this.missiles.splice(i, 1);
+      if (!stopped) {
+        m.pos = next;
+        m.travelled += stepLen;
+      }
+      if (stopped || m.travelled >= m.range || Math.abs(m.pos.x) > LANE.halfLength + 5) {
+        this.missiles.splice(i, 1);
+        m.onEnd?.(clampToLane(m.pos, 0.5));
+      }
     }
   }
 
@@ -660,7 +673,12 @@ export class World {
       const z = this.zones[i];
       if (this.tick >= z.until) {
         this.zones.splice(i, 1);
-        for (let j = this.missiles.length - 1; j >= 0; j--) if (this.missiles[j].frozenBy === z.id) this.missiles.splice(j, 1);
+        for (let j = this.missiles.length - 1; j >= 0; j--) {
+          const m = this.missiles[j];
+          if (m.frozenBy !== z.id) continue;
+          this.missiles.splice(j, 1);
+          m.onEnd?.(clampToLane(m.pos, 0.5)); // crumbled where it froze (Aurelle's spear drops there)
+        }
         continue;
       }
       if (z.kind === 'stasis') {

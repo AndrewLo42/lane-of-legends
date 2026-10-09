@@ -37,6 +37,8 @@ export interface AbilityDef {
    * no valid target the cast doesn't start (no mana or cooldown spent).
    */
   target?: (world: World, self: Unit, at: Vec2) => Unit | undefined;
+  /** Can't be cast right now, whatever the cooldown (Aurelle's Arcane Lance while her spear is away). */
+  available?: (world: World, self: Unit) => boolean;
   /** Main damage at a rank, if it deals any (bots and tooltips use this). */
   damage?: (rank: number, self: Unit) => number;
   /** Tooltip text for a rank (0 = not learned yet; describe rank 1). */
@@ -85,6 +87,8 @@ export interface Kit {
   resource?: 'mana' | 'bees';
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
+  /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */
+  autoDamageMult?: (world: World, self: Unit) => number;
   abilities: [AbilityDef, AbilityDef, AbilityDef, AbilityDef];
   /** Order the bot spends skill points in. */
   levelOrder: Slot[];

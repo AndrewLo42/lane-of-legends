@@ -112,7 +112,39 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'mabel') {
+  if (u.champ!.kit === 'aurelle') {
+    // A floating battle mage: flowing robe with no legs, white-and-gold armour, gold hair, glowing
+    // violet eyes, and her rune spear hovering at her side (named so the view can hide it when thrown).
+    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0xf1ece0, flatShading: true }));
+    robe.position.y = 0.75;
+    const sash = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 6, 16), teamMat);
+    sash.rotation.x = Math.PI / 2;
+    sash.position.y = 1.05;
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.33, 0.45, 10), new THREE.MeshStandardMaterial({ color: 0xd8b25a, metalness: 0.6, roughness: 0.35 }));
+    chest.position.y = 1.4;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 10), new THREE.MeshStandardMaterial({ color: 0xf0d2b8 }));
+    head.position.y = 1.85;
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), new THREE.MeshStandardMaterial({ color: 0xf2d77a }));
+    hair.position.set(-0.04, 1.88, 0);
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0xf2d77a }));
+    tail.position.set(-0.22, 1.55, 0);
+    tail.rotation.z = -0.4;
+    g.add(robe, sash, chest, head, hair, tail);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), glow);
+      eye.position.set(0.21, 1.88, side * 0.08);
+      g.add(eye);
+    }
+    const spear = new THREE.Group();
+    spear.name = 'heldSpear';
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0xe9e4ea, metalness: 0.7, roughness: 0.3 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.35, 6), glow);
+    tip.position.y = 1.05;
+    spear.add(shaft, tip);
+    spear.position.set(0.35, 1.35, 0.55);
+    spear.rotation.z = -0.25;
+    g.add(spear);
+  } else if (u.champ!.kit === 'mabel') {
     // A small mouse beekeeper: round body, big ears, a tail, a veiled hat, one paw pointing with a bee at its tip.
     const fur = new THREE.MeshStandardMaterial({ color: 0x9b8576, flatShading: true });
     const pink = new THREE.MeshStandardMaterial({ color: 0xf0a7b4 });

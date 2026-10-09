@@ -175,6 +175,31 @@ export class EffectsView {
         }
       }
       g.add(floor, rim, hand);
+    } else if (z.kind === 'glyph') {
+      // Aurelle's Glyph Step: a violet rune circle with a six-point star, about to detonate.
+      const ring = ringShape(z.radius, 0.12, mat(0xa98bff, 0.9));
+      ring.position.y = 0.04;
+      const floor = ringShape(z.radius, z.radius, mat(0xa98bff, 0.15));
+      floor.position.y = 0.03;
+      const hand = new THREE.Group();
+      hand.name = 'hand';
+      hand.position.y = 0.05;
+      for (const off of [0, Math.PI / 3]) {
+        const tri = flat(new THREE.Mesh(new THREE.RingGeometry(z.radius * 0.7, z.radius * 0.78, 3, 1, off), mat(0xd9ccff, 0.8)));
+        hand.add(tri);
+      }
+      g.add(floor, ring, hand);
+    } else if (z.kind === 'spear') {
+      // Aurelle's spear stuck point-down in the lane, with a soft glow ring so it's easy to spot.
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0xe9e4ea, metalness: 0.7, roughness: 0.3 }));
+      shaft.position.y = 0.75;
+      shaft.rotation.z = 0.25;
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.35, 6), basic(0xa98bff, 1));
+      tip.position.set(0.05, -0.1, 0);
+      tip.rotation.x = Math.PI;
+      const glowRing = ringShape(0.6, 0.08, mat(0xa98bff, 0.7));
+      glowRing.position.y = 0.04;
+      g.add(shaft, tip, glowRing);
     } else if (z.kind === 'honey') {
       // A glossy amber puddle with a few darker drips.
       const puddle = ringShape(z.radius, z.radius, mat(0xf2a516, 0.55));

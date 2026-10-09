@@ -126,6 +126,7 @@ export class AbilityBar {
       el.root.classList.toggle('nomana', st.rank > 0 && !recast && c.mana < def.cost(st.rank));
       el.root.classList.toggle('recast', recast);
       el.root.classList.toggle('casting', c.casting?.slot === s);
+      el.root.classList.toggle('unavailable', !recast && world.castBlocker(me, s) === 'unavailable'); // Aurelle's spear is away
       el.plus.style.visibility = world.canLevel(me, s) ? 'visible' : 'hidden';
       const pips = `${'●'.repeat(st.rank)}${'○'.repeat(def.maxRank - st.rank)}`;
       if (el.pips.textContent !== pips) el.pips.textContent = pips;
