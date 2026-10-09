@@ -180,6 +180,37 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
 }
 
 /** The green "move here" marker that shrinks away after a right click. */
+/** A pulsing red ring under the enemy a right-click would attack, so you see the target before clicking. */
+export class TargetRing {
+  readonly mesh: THREE.Mesh;
+  private t = 0;
+
+  constructor(scene: THREE.Scene) {
+    this.mesh = new THREE.Mesh(
+      new THREE.RingGeometry(0.85, 1, 32),
+      new THREE.MeshBasicMaterial({ color: 0xff4a3d, transparent: true, opacity: 0.85, depthWrite: false }),
+    );
+    this.mesh.rotation.x = -Math.PI / 2;
+    this.mesh.visible = false;
+    scene.add(this.mesh);
+  }
+
+  /** Ring the unit at `at` (its feet) sized to `radius`, or hide with null. */
+  update(dt: number, at: THREE.Vector3 | null, radius = 0.6) {
+    this.t += dt;
+    this.mesh.visible = !!at;
+    if (!at) return;
+    this.mesh.position.set(at.x, 0.05, at.z);
+    this.mesh.scale.setScalar((radius + 0.35) * (1 + Math.sin(this.t * 8) * 0.05));
+  }
+
+  dispose() {
+    this.mesh.removeFromParent();
+    this.mesh.geometry.dispose();
+    (this.mesh.material as THREE.Material).dispose();
+  }
+}
+
 export class ClickMarker {
   readonly mesh: THREE.Mesh;
   private age = 1;

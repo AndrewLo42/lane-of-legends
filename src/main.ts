@@ -3,6 +3,7 @@ import { Input } from './core/input';
 import { Duel, type Shell } from './duel';
 import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
+import { installCursors } from './ui/cursors';
 import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
@@ -18,6 +19,7 @@ import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
 import { augmentPick, floorIntro, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
+installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);

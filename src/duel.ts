@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import type { Input } from './core/input';
 import type { MobaCamera } from './render/camera';
 import { EffectsView, type AimIndicator } from './render/effects';
-import { toV3, type ClickMarker } from './render/scene';
+import { TargetRing, toV3, type ClickMarker } from './render/scene';
 import { WorldView } from './render/views';
 import { BotController } from './sim/bot';
 import { kitOf } from './sim/kits';
@@ -12,6 +12,7 @@ import type { AugmentId, Command, Controller, KitId, Slot, SummonerId, SummonerS
 import { DT, TICK_HZ, World } from './sim/world';
 import { AbilityBar } from './ui/abilityBar';
 import { HealthBars } from './ui/bars';
+import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 
@@ -86,6 +87,7 @@ export class Duel {
   private hud: Hud;
   private abilityBar: AbilityBar;
   private minimap: Minimap;
+  private targetRing: TargetRing;
   /** The ability whose key is held down: its indicator shows, and it casts on release. */
   private aiming: Slot | null = null;
   /** The summoner spell whose key (D/F) is held; same hold-to-aim, release-to-cast as abilities. */
@@ -109,6 +111,7 @@ export class Duel {
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
     this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
+    this.targetRing = new TargetRing(shell.scene);
     this.minimap = new Minimap(world, this.me, shell.cam, shell.input, shell.marker, (c) => this.player.queue.push(c));
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
@@ -120,7 +123,7 @@ export class Duel {
     const { input, cam, marker, renderer } = shell;
 
     const hover = me.dead || world.winner ? undefined : this.enemyUnderCursor();
-    renderer.domElement.style.cursor = hover ? 'crosshair' : 'default';
+    renderer.domElement.style.cursor = hover ? CURSOR.attack : this.aiming != null || this.aimingSpell != null ? CURSOR.aim : CURSOR.normal;
 
     if (!world.winner) {
       this.handleAbilities();
@@ -158,6 +161,7 @@ export class Duel {
     this.view.update(this.acc / DT, dt);
     this.effects.update(dt);
     marker.update(dt);
+    this.targetRing.update(dt, hover ? this.view.positionOf(hover.id) ?? null : null, hover?.radius);
     cam.update(dt, input, this.view.positionOf(me.id) ?? toV3(me.pos));
     renderer.render(shell.scene, cam.camera);
     this.bars.update(cam.camera);
@@ -174,7 +178,8 @@ export class Duel {
     this.abilityBar.dispose();
     this.minimap.dispose();
     this.shell.indicator.hide();
-    this.shell.renderer.domElement.style.cursor = 'default';
+    this.shell.renderer.domElement.style.cursor = '';
+    this.targetRing.dispose();
   }
 
   /**
@@ -193,7 +198,7 @@ export class Duel {
     for (const u of world.units) {
       if (!world.canAttack(me, u)) continue;
       const d = Math.hypot(u.pos.x - g.x, u.pos.y - g.z) - u.radius;
-      if (d < 0.7 && d < bestD) { best = u; bestD = d; }
+      if (d < 1 && d < bestD) { best = u; bestD = d; }
     }
     return best;
   }
