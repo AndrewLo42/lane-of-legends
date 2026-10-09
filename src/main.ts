@@ -14,10 +14,10 @@ import {
 } from './run/run';
 import { spawnPoint } from './sim/lane';
 import { KITS, KIT_IDS } from './sim/kits';
-import { SANDBOX_RULES } from './sim/rules';
+import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
-import { augmentPick, floorIntro, pickChampion, runEnd, shop, starterItem } from './ui/screens';
+import { augmentPick, floorIntro, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
 installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -86,6 +86,20 @@ if (freePlayKit) {
   void runLoop();
 }
 
+/** Bot vs bot, just for fun: pick two champions, watch them duel under the run's duel rules, then back home. */
+async function watchBots() {
+  const pick = await pickBots();
+  if (!pick) return;
+  duel = new Duel(shell, {
+    seed: Date.now() % 1e9, rules: { ...DUEL_RULES }, kit: pick.blue, augments: [], summoners: SIGNATURE_SUMMONERS[pick.blue],
+    enemyKit: pick.red, enemyAugments: [], enemySummoners: SIGNATURE_SUMMONERS[pick.red], enemyStatMult: 1, enemyAccuracy: 0.9,
+    label: `${KITS[pick.blue].name} vs ${KITS[pick.red].name}`, spectate: true,
+  });
+  await duel.finished;
+  duel.dispose();
+  duel = null;
+}
+
 /** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */
 async function runLoop() {
   let run: RunState | null = loadRun();
@@ -93,10 +107,14 @@ async function runLoop() {
     if (!run) {
       const s = stage!;
       s.active = true;
-      const { kit, summoners } = await pickChampion(loadMeta(), (k) => s.focus(k));
+      const choice = await pickChampion(loadMeta(), (k) => s.focus(k));
       s.active = false;
       s.focus(null);
-      run = newRun(kit, Date.now() % 1e9, summoners);
+      if (choice.mode === 'watch') {
+        await watchBots();
+        continue;
+      }
+      run = newRun(choice.kit, Date.now() % 1e9, choice.summoners);
       saveRun(run);
     }
     // A free augment and a free item to start the run.

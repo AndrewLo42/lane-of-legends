@@ -107,6 +107,17 @@
       /* Shrinks on narrow screens so it never runs under the ability bar. */
       #minimap { position: fixed; right: 12px; bottom: 14px; width: clamp(150px, calc(50vw - 270px), 300px); height: auto; border: 2px solid #ffffff30; border-radius: 6px; background: #0c0f14;
         box-shadow: 0 2px 10px #0008; cursor: pointer; }
+      /* Bot vs bot: speed and leave controls under the top bar; no level-up buttons on the watched bar. */
+      #spectate { position: fixed; top: 46px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; align-items: center;
+        padding: 5px 10px; background: #0c0f14cc; border: 1px solid #ffffff22; border-radius: 8px; font-size: 13px; z-index: 5; }
+      #spectate button { font: inherit; color: #e8e6df; background: #ffffff10; border: 1px solid #ffffff2a; border-radius: 5px; padding: 2px 9px; cursor: pointer; }
+      #spectate button.on { border-color: #ffd76a; color: #ffd76a; }
+      #abilities.spectating .plus { display: none !important; }
+      #screen .selecthead .watch { margin-top: 6px; opacity: 0.75; font-size: 13px; }
+      #screen .botrow { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      #screen .botrow > small { opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+      #screen .botrow.blue > small { color: #7fb3ff; }
+      #screen .botrow.red > small { color: #ff8a80; }
       #tip { position: fixed; display: none; bottom: 150px; left: 50%; transform: translateX(-50%); width: 320px; background: #12141bf2;
         border: 1px solid #ffffff30; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; }
       #tip b { font-size: 14px; }

@@ -120,9 +120,10 @@ const LAST_SPELLS = 'lane-rogue.lastSpells';
  * and their full kit in the panel beside it. Click a portrait to look, double-click it or press
  * Start (or Enter) to begin; the arrow keys step through the roster.
  */
-export async function pickChampion(
-  meta: Meta, onFocus: (kit: KitId | null) => void = () => {},
-): Promise<{ kit: KitId; summoners: SpellPair }> {
+/** What the home screen chose: start a run, or watch two bots duel. */
+export type HomeChoice = { mode: 'run'; kit: KitId; summoners: SpellPair } | { mode: 'watch' };
+
+export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<HomeChoice> {
   let current: KitId = KIT_IDS[0];
   let spells: SpellPair = [...DEFAULT_SUMMONERS];
   try {
@@ -136,7 +137,8 @@ export async function pickChampion(
 
   const el = show(`
     <div class="selecthead"><h1>Lane Rogue</h1>
-      <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p></div>
+      <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
+      <button class="link watch" data-watch>🤖 Watch bots duel</button></div>
     <div class="roster">
       ${KIT_IDS.map((id) => `
         <button class="pick" data-kit="${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
@@ -172,12 +174,13 @@ export async function pickChampion(
     spellPicker(info.querySelector('.spellpick')!, spells, sample, (p) => (spells = p));
   };
 
-  const kit = await new Promise<KitId>((resolve) => {
+  const kit = await new Promise<KitId | 'watch'>((resolve) => {
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       const pick = t.closest<HTMLElement>('[data-kit]');
       if (pick) select(pick.dataset.kit as KitId);
       if (t.closest('[data-start]')) done();
+      if (t.closest('[data-watch]')) finish('watch');
     };
     const onDouble = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest('[data-kit]')) done();
@@ -194,26 +197,68 @@ export async function pickChampion(
       } else return;
       e.preventDefault();
     };
-    const done = () => {
+    const finish = (choice: KitId | 'watch') => {
       el.removeEventListener('click', onClick);
       el.removeEventListener('dblclick', onDouble);
       removeEventListener('keydown', onKey);
-      resolve(current);
+      resolve(choice);
     };
+    const done = () => finish(current);
     el.addEventListener('click', onClick);
     el.addEventListener('dblclick', onDouble);
     addEventListener('keydown', onKey);
     select(current);
   });
+  el.classList.remove('select');
+  hide();
+  if (kit === 'watch') return { mode: 'watch' };
   try {
     localStorage.setItem(LAST_KIT, kit);
     localStorage.setItem(LAST_SPELLS, JSON.stringify(spells));
   } catch {
     /* ignore */
   }
-  el.classList.remove('select');
-  hide();
-  return { kit, summoners: spells };
+  return { mode: 'run', kit, summoners: spells };
+}
+
+// ---------- bot vs bot ----------
+
+/** Pick the two champions to watch (Random allowed); null goes back to the home screen. */
+export async function pickBots(): Promise<{ blue: KitId; red: KitId } | null> {
+  const pick: Record<'blue' | 'red', KitId | 'random'> = { blue: 'random', red: 'random' };
+  for (;;) {
+    const row = (side: 'blue' | 'red') => `
+      <div class="botrow ${side}"><small>${side === 'blue' ? 'Blue side' : 'Red side'}</small>
+        <div class="roster">
+          ${KIT_IDS.map((id) => `
+            <button class="pick${pick[side] === id ? ' on' : ''}" data-action="${side}:${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
+              <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
+            </button>`).join('')}
+          <button class="pick${pick[side] === 'random' ? ' on' : ''}" data-action="${side}:random" style="--accent:#e8e6df" title="Random">
+            <span class="mini-portrait"><b>?</b></span><span class="pname">Random</span>
+          </button>
+        </div>
+      </div>`;
+    const el = show(`
+      <div class="floorhead"><small>Just for fun</small><h1>Bot vs bot</h1></div>
+      ${row('blue')}
+      <div class="vs">VS</div>
+      ${row('red')}
+      <p class="hint">Both sides play at Legend-level aim with their signature summoner spells. Speed it up to 2× or 4× while watching.</p>
+      <div class="actions"><button class="go" data-action="go">Watch</button><button class="link" data-action="back">Back</button></div>`);
+    const action = await waitFor(el);
+    if (action === 'back') {
+      hide();
+      return null;
+    }
+    if (action === 'go') {
+      hide();
+      const roll = (k: KitId | 'random') => (k === 'random' ? KIT_IDS[Math.floor(Math.random() * KIT_IDS.length)] : k);
+      return { blue: roll(pick.blue), red: roll(pick.red) };
+    }
+    const [side, id] = action.split(':') as ['blue' | 'red', KitId | 'random'];
+    pick[side] = id;
+  }
 }
 
 // ---------- before each duel ----------

@@ -17,7 +17,11 @@ export class Hud {
   private banner = document.getElementById('banner')!;
   private topbar = document.getElementById('topbar')!;
 
-  constructor(private world: World, private me: Unit, private foe: Unit, label: string, private sandbox: boolean) {
+  constructor(
+    private world: World, private me: Unit, private foe: Unit, label: string, private sandbox: boolean,
+    /** Bot vs bot: name the winner instead of VICTORY/DEFEAT, and no respawn timer. */
+    private spectate = false,
+  ) {
     this.floor.textContent = label;
     const k = KITS[foe.champ!.kit];
     this.foeStrip.innerHTML = `<span class="mini-portrait" style="--accent:${k.color}">${portraitHtml(foe.champ!.kit)}</span><b style="color:${k.color}">${k.name}</b> ${augmentChips([...foe.champ!.augments, ...foe.champ!.items], false)}`;
@@ -40,7 +44,8 @@ export class Hud {
       return parts.join(' · ');
     };
     if (Number.isFinite(r.killsToWin) || Number.isFinite(r.csToWin)) {
-      goals.push(`<span class="you">You ${side(me)}</span>`, `<span class="them">Foe ${side(foe)}</span>`);
+      const names = this.spectate ? [KITS[me.champ!.kit].name, KITS[foe.champ!.kit].name] : ['You', 'Foe'];
+      goals.push(`<span class="you">${names[0]} ${side(me)}</span>`, `<span class="them">${names[1]} ${side(foe)}</span>`);
     }
     if (r.firstTowerWins) goals.push('<span class="note" title="Destroying a tower wins">🏰</span>');
     const html = goals.join('');
@@ -49,11 +54,18 @@ export class Hud {
     const b = this.banner;
     if (world.winner) {
       const won = world.winner === me.team;
-      b.textContent = won ? 'VICTORY' : 'DEFEAT';
-      b.dataset.result = won ? 'win' : 'loss';
-      b.dataset.sub = `${world.winReason ? `${won ? 'You' : 'They'} reached ${REASON[world.winReason]}` : ''}${this.sandbox ? ' · press R to play again' : ''}`;
+      if (this.spectate) {
+        const winner = KITS[(won ? me : foe).champ!.kit].name;
+        b.textContent = `${winner.toUpperCase()} WINS`;
+        b.dataset.result = 'win';
+        b.dataset.sub = world.winReason ? `${winner} reached ${REASON[world.winReason]}` : '';
+      } else {
+        b.textContent = won ? 'VICTORY' : 'DEFEAT';
+        b.dataset.result = won ? 'win' : 'loss';
+        b.dataset.sub = `${world.winReason ? `${won ? 'You' : 'They'} reached ${REASON[world.winReason]}` : ''}${this.sandbox ? ' · press R to play again' : ''}`;
+      }
       b.style.opacity = '1';
-    } else if (me.dead) {
+    } else if (me.dead && !this.spectate) {
       b.textContent = `Respawning in ${Math.ceil((me.respawnTick - world.tick) / TICK_HZ)}`;
       b.dataset.result = '';
       b.dataset.sub = '';

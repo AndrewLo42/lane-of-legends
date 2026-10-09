@@ -47,6 +47,8 @@ export interface DuelSetup {
   label: string;
   /** Free play: the duel never "finishes"; R reloads after a win. */
   sandbox?: boolean;
+  /** Bot vs bot: the blue side is a bot too (at `enemyAccuracy`); the player only watches. */
+  spectate?: boolean;
 }
 
 export interface DuelOutcome {
@@ -96,11 +98,14 @@ export class Duel {
   private reissue = 0;
   /** Wall-clock time the duel was decided (so a throttled background tab still moves on). */
   private decidedAt: number | null = null;
+  /** Bot vs bot: simulation speed and the speed/leave panel. */
+  private speed = 1;
+  private spectatorPanel?: HTMLDivElement;
 
   constructor(private shell: Shell, private setup: DuelSetup) {
     this.finished = new Promise((r) => (this.resolve = r));
     const world = (this.world = new World(setup.seed, setup.rules));
-    this.me = world.spawnChampion('blue', setup.kit, this.player, {
+    this.me = world.spawnChampion('blue', setup.kit, setup.spectate ? new BotController(setup.enemyAccuracy) : this.player, {
       augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels, summoners: setup.summoners,
     });
     this.foe = world.spawnChampion('red', setup.enemyKit, new BotController(setup.enemyAccuracy), {
@@ -109,10 +114,11 @@ export class Duel {
     this.view = new WorldView(shell.scene, world);
     this.effects = new EffectsView(shell.scene, world, this.me.team);
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
-    this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox);
+    this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox, !!setup.spectate);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
     this.targetRing = new TargetRing(shell.scene);
     this.minimap = new Minimap(world, this.me, shell.cam, shell.input, shell.marker, (c) => this.player.queue.push(c));
+    if (setup.spectate) this.buildSpectatorPanel();
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
     if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam });
@@ -122,10 +128,13 @@ export class Duel {
     const { world, me, player, shell } = this;
     const { input, cam, marker, renderer } = shell;
 
-    const hover = me.dead || world.winner ? undefined : this.enemyUnderCursor();
+    const spectating = !!this.setup.spectate;
+    const hover = me.dead || world.winner || spectating ? undefined : this.enemyUnderCursor();
     renderer.domElement.style.cursor = hover ? CURSOR.attack : this.aiming != null || this.aimingSpell != null ? CURSOR.aim : CURSOR.normal;
 
-    if (!world.winner) {
+    if (spectating && !world.winner) {
+      if (input.wasPressed('Escape')) this.leave();
+    } else if (!world.winner) {
       this.handleAbilities();
       // Right-click an enemy to attack it, the ground to move; holding keeps re-issuing, like League.
       this.reissue -= dt;
@@ -151,18 +160,20 @@ export class Duel {
       }
     }
 
-    this.acc += dt;
+    // Spectators can fast-forward; the sim and the animations speed up together.
+    const simDt = dt * (spectating ? this.speed : 1);
+    this.acc += simDt;
     while (this.acc >= DT) {
       this.view.snapshot();
       world.step();
       this.acc -= DT;
     }
 
-    this.view.update(this.acc / DT, dt);
-    this.effects.update(dt);
+    this.view.update(this.acc / DT, simDt);
+    this.effects.update(simDt);
     marker.update(dt);
     this.targetRing.update(dt, hover ? this.view.positionOf(hover.id) ?? null : null, hover?.radius);
-    cam.update(dt, input, this.view.positionOf(me.id) ?? toV3(me.pos));
+    cam.update(dt, input, spectating ? this.watchPoint() : this.view.positionOf(me.id) ?? toV3(me.pos));
     renderer.render(shell.scene, cam.camera);
     this.bars.update(cam.camera);
     this.hud.update();
@@ -171,6 +182,8 @@ export class Duel {
   }
 
   dispose() {
+    this.spectatorPanel?.remove();
+    document.getElementById('abilities')?.classList.remove('spectating');
     this.view.dispose();
     this.effects.dispose();
     this.bars.dispose();
@@ -180,6 +193,42 @@ export class Duel {
     this.shell.indicator.hide();
     this.shell.renderer.domElement.style.cursor = '';
     this.targetRing.dispose();
+  }
+
+  /** Bot vs bot: stop watching now (resolves `finished` as if the match ended). */
+  leave() {
+    const { world, me } = this;
+    this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold });
+  }
+
+  /**
+   * Where the spectator camera looks: between the champions once they're close enough to fight,
+   * otherwise on blue (or whoever is alive), so it never stares at an empty stretch of lane.
+   */
+  private watchPoint(): THREE.Vector3 {
+    const alive = [this.me, this.foe].filter((c) => !c.dead).map((c) => this.view.positionOf(c.id) ?? toV3(c.pos));
+    if (!alive.length) return toV3(this.me.pos);
+    if (alive.length === 1 || alive[0].distanceTo(alive[1]) > 22) return alive[0];
+    return alive[0].clone().add(alive[1]).multiplyScalar(0.5);
+  }
+
+  private buildSpectatorPanel() {
+    const el = document.createElement('div');
+    el.id = 'spectate';
+    const render = () => {
+      el.innerHTML = `<span>🤖 Bot vs bot</span>${[1, 2, 4].map((s) => `<button data-speed="${s}" class="${s === this.speed ? 'on' : ''}">${s}×</button>`).join('')}<button data-leave>Leave</button>`;
+    };
+    el.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+      if (!t) return;
+      if (t.dataset.leave != null) return this.leave();
+      this.speed = Number(t.dataset.speed);
+      render();
+    });
+    render();
+    document.body.appendChild(el);
+    this.spectatorPanel = el;
+    document.getElementById('abilities')?.classList.add('spectating');
   }
 
   /**
