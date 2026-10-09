@@ -118,7 +118,7 @@ describe('Arlo', () => {
     expect(w.status(t, 'bearing', me.id)?.value).toBe(2);
     expect(lost(t)).toBeCloseTo(20, 0);
     w.dealDamage(me, t, 10, { attack: true });
-    const bonus = 15 + 3 * me.champ!.level + 0.1 * me.damage;
+    const bonus = 25 + 4 * me.champ!.level + 0.2 * me.damage;
     expect(lost(t)).toBeCloseTo(30 + bonus, 0);
     expect(w.status(t, 'bearing', me.id)).toBeUndefined(); // spent
     expect(w.attackTicks(me)).toBeLessThan(slow);

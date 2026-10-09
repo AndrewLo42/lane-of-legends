@@ -7,11 +7,11 @@ import type { Kit } from './types';
 const Q = { base: [20, 45, 70, 95, 120], ad: 1.2, cost: [28, 31, 34, 37, 40], cd: [5.5, 5.25, 5, 4.75, 4.5], refund: 1.5 };
 const W = { base: [80, 135, 190, 245, 300], ad: 0.6, cost: [50, 50, 50, 50, 50], cd: [12, 12, 12, 12, 12], manaBack: 60 };
 const E = { base: [80, 130, 180, 230, 280], ad: 0.5, cost: [90, 90, 90, 90, 90], cd: [22, 20, 18, 16, 14], blink: 4.5, seek: 7.5 };
-const R = { base: [320, 500], ad: 1.0, cost: [100, 100], cd: [90, 75], minionFactor: 0.5 };
+const R = { base: [320, 500], ad: 1.0, cost: [100, 100], cd: [90, 75], minionFactor: 0.5, width: 4, windup: 0.75 };
 const RANGE = 11;
 
 /** Passive: three hits on the same enemy within `window` seconds triangulate it. */
-const TRI = { window: 4, base: 15, perLevel: 3, ad: 0.1, attackSpeed: 0.15, seconds: 2 };
+const TRI = { window: 4, base: 25, perLevel: 4, ad: 0.2, attackSpeed: 0.15, seconds: 2 };
 
 /** Triangulate's bonus damage right now. */
 const triDamage = (self: Unit) => TRI.base + TRI.perLevel * self.champ!.level + TRI.ad * self.damage;
@@ -140,18 +140,18 @@ export const ARLO: Kit = {
       maxRank: 2,
       cost: (r) => at(R.cost, r),
       cooldown: (r) => at(R.cd, r),
-      castTime: 1,
-      aim: { shape: 'line', length: 130, width: 2.4 },
+      castTime: R.windup,
+      aim: { shape: 'line', length: 130, width: R.width },
       damage: (r, self) => at(R.base, r) + R.ad * self.damage,
       describe: (r, self) =>
-        `After 1s, unleash a wave that crosses the whole lane, hitting everything in its path for ` +
+        `After ${R.windup}s, unleash a wave that crosses the whole lane, hitting everything in its path for ` +
         `${Math.round(ARLO.abilities[3].damage!(r, self))} damage (minions take ${R.minionFactor * 100}%).`,
       onWindup: ({ world, self, at: aim }) => {
-        world.telegraph({ team: self.team, shape: 'line', pos: self.pos, dir: Math.atan2(aim.y - self.pos.y, aim.x - self.pos.x), length: 130, width: 2.4 }, 1);
+        world.telegraph({ team: self.team, shape: 'line', pos: self.pos, dir: Math.atan2(aim.y - self.pos.y, aim.x - self.pos.x), length: 130, width: R.width }, R.windup);
       },
       cast: ({ world, self, at: aim, rank }) => {
         world.fireLine(self, {
-          style: 'wave', dir: dirTo(self.pos, aim), speed: 28, range: 130, width: 2.4, pierce: true, canHit: champsAndMinions,
+          style: 'wave', dir: dirTo(self.pos, aim), speed: 28, range: 130, width: R.width, pierce: true, canHit: champsAndMinions,
           onHit: (t) => {
             const dmg = ARLO.abilities[3].damage!(rank, self);
             world.dealDamage(self, t, t.kind === 'minion' ? dmg * R.minionFactor : dmg, { slot: 3 });
@@ -170,4 +170,4 @@ export const ARLO: Kit = {
   },
 };
 
-export const ARLO_TUNING = { TRI };
+export const ARLO_TUNING = { TRI, R };
