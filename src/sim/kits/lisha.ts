@@ -171,3 +171,5 @@ export const LISHA: Kit = {
   ],
 };
 
+
+export const LISHA_TUNING = { Q, W, E, R, HARVEST };

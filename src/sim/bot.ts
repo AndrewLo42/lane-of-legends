@@ -4,7 +4,7 @@ import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
 import type { Command, Controller, Slot, SummonerId, SummonerSlot, Unit, Vec2 } from './types';
-import { dirTo, dist, inCone, toward } from './util';
+import { TICK_HZ, dirTo, dist, inCone, toward } from './util';
 import { enemyOf, gap, type World } from './world';
 
 /** Shared view of the lane for one decision. */
@@ -394,18 +394,34 @@ export class BotController implements Controller {
     const { world, self, foe, near, unsafe, ready, dmg, aim } = ctx;
     const marked = (u: Unit) => !!world.status(u, 'mark', self.id);
     const qReach = (u: Unit) => gap(self, u) <= 6;
+    const healthy = self.hp > self.maxHp * 0.5;
     if (foe) {
-      const healthy = self.hp > self.maxHp * 0.5;
       // Brace when trading at close range and getting hurt.
       if (ready(1) && near(3) && self.hp < self.maxHp * 0.7) return cast(1, self.pos);
       if (ready(3) && near(7) && (foe.hp < foe.maxHp * 0.55 || healthy) && !unsafe(foe.pos)) return cast(3, aim(foe, 24));
       if (ready(0) && qReach(foe) && (marked(foe) || foe.hp < dmg(0)) && !unsafe(foe.pos)) return cast(0, foe.pos);
-      if (ready(2) && near(7)) {
-        // Mark first; the dash follows once it lands. The pincer closes on its point a moment after
-        // the cast, so lead by that, and aim a little past them so they sit inside the V, not at its tip.
+      // Twin Petals' point reaches 8 at most, so only throw it when they're close enough to sit inside the V.
+      if (ready(2) && dist(self.pos, foe.pos) <= 6.5 && !unsafe(foe.pos)) {
+        // Mark the champion first; the dash follows once it lands. The pincer closes on its point a
+        // moment after the cast, so lead by that, and aim well past them: the V is widest at its open
+        // end, so a target deep inside it is much harder to slip out of.
         const p = ctx.aimAfter(foe, 0.15 + dist(self.pos, foe.pos) / 24);
         const d = dirTo(self.pos, p);
-        return cast(2, { x: p.x + d.x * 1.2, y: p.y + d.y * 1.2 });
+        return cast(2, { x: p.x + d.x * 2.5, y: p.y + d.y * 2.5 });
+      }
+      // Commit when the fight is good, mark or not: she's a duelist. But if Twin Petals is about to
+      // come back, wait for it: a marked Petal Step refunds itself and heals her, an unmarked one doesn't.
+      const winning = foe.hp < foe.maxHp * 0.6 || self.hp > foe.hp * 1.2;
+      const eSoon = self.champ!.abilities[2].rank > 0 && (self.champ!.abilities[2].readyAt - world.tick) / TICK_HZ < 2;
+      if (ready(0) && qReach(foe) && healthy && winning && !eSoon && !near(1) && !unsafe(foe.pos)) return cast(0, foe.pos);
+      // Engage through the wave: dash onto a marked or killable minion next to them (the reset brings
+      // Petal Step straight back), then onto them.
+      if (ready(0) && healthy && !qReach(foe) && gap(self, foe) < 12 && !unsafe(foe.pos)) {
+        const stone = world.units.find(
+          (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && qReach(u) && (marked(u) || u.hp < dmg(0)) &&
+            dist(u.pos, foe.pos) < dist(self.pos, foe.pos) - 2 && gap(u, foe) <= 5 && !unsafe(u.pos),
+        );
+        if (stone) return cast(0, stone.pos);
       }
     }
     // Chain Petal Step through marked or killable minions (each one resets it).
@@ -415,14 +431,23 @@ export class BotController implements Controller {
       );
       if (hop) return cast(0, hop.pos);
     }
-    if (ready(2) && self.champ!.mana > self.champ!.maxMana * 0.6) {
+    // Twin Petals on the wave only when the champion is nowhere near (keep it for them).
+    if (ready(2) && self.champ!.mana > self.champ!.maxMana * 0.6 && !(foe && near(12))) {
       const minions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < 7 && !unsafe(u.pos));
       if (minions.length >= 3) return cast(2, minions[0].pos);
     }
     return null;
   }
 
-  private lishaEscape({ self, near, ready }: Ctx): Command | null {
+  private lishaEscape({ world, self, foe, near, ready, dmg, unsafe }: Ctx): Command | null {
+    // Hop out through a marked or killable minion further from them (the reset keeps Petal Step up).
+    if (foe && ready(0) && near(5)) {
+      const out = world.units.find(
+        (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && gap(self, u) <= 6 &&
+          (!!world.status(u, 'mark', self.id) || u.hp < dmg(0)) && dist(u.pos, foe.pos) > dist(self.pos, foe.pos) + 2 && !unsafe(u.pos),
+      );
+      if (out) return cast(0, out.pos);
+    }
     return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
   }
 
