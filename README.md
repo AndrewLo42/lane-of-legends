@@ -20,7 +20,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Currently: Gormund and Sable.
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Currently: Gormund.
 
 | | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
 |---|---|---|---|

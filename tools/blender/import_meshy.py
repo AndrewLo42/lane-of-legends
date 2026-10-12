@@ -14,7 +14,9 @@ The JSON config (see assets-src/meshy/<name>/import.json) lists:
             2H_Melee_Attack_Slice, ...); src matches a Meshy action name.
   textures  max size per texture role (baseColor / normal / metallicRoughness)
   props     weapon meshes borrowed from another GLB, parented to hand bones, scaled to `length`
-            metres; optional per-item `rot` (deg, bone space) and `offset` (m, bone space)
+            metres; optional per-item `rot` (deg, bone space) and `offset` (m, bone space), and
+            `at: "fist"` to offset from the hand's curled-fist grip centre instead of the bone origin
+  fists     per hand bone {palm, knuckle, radius, wrap?}: curl the fingers around a grip (see below)
 Everything is exported with one animation per canonical clip; non-canonical actions are dropped.
 """
 import bpy, sys, json, math, os, re
@@ -55,7 +57,8 @@ before = {o.name for o in bpy.data.objects}
 bpy.ops.import_scene.gltf(filepath=cfg['rigged'])
 char_objs = new_objects(before)
 arm = next(o for o in char_objs if o.type == 'ARMATURE')
-mesh = next(o for o in char_objs if o.type == 'MESH')
+# The skinned body (the glTF importer can also create helper meshes, e.g. an icosphere bone shape).
+mesh = max((o for o in char_objs if o.type == 'MESH'), key=lambda o: (any(m.type == 'ARMATURE' for m in o.modifiers), len(o.data.vertices)))
 if not arm.animation_data:
     arm.animation_data_create()
 for a in list(bpy.data.actions):  # the rig's bind-pose clip
@@ -338,8 +341,11 @@ if cfg.get('props'):
             o.matrix_world = H @ Matrix.Translation(fists[spec['hand']]) @ stand @ twist @ Rb @ Matrix.Translation(-hc)
             print(f'  grip {pname}: handle at {tuple(round(x, 3) for x in hc)} axis {"X" if along_x else "Z"}, back side {"+" if back_sign > 0 else "-"}Y')
         else:
+            # "at": "fist" puts the prop's origin at the curled fist's grip centre (see `fists`), for
+            # props exported already in the hand's bone frame with their grip at the origin (Sable's scythe).
+            base = fists[spec['hand']] if spec.get('at') == 'fist' else Vector()
             o.matrix_world = (H
-                              @ Matrix.Translation(Vector(spec.get('offset', (0, 0.08, 0))))
+                              @ Matrix.Translation(base + Vector(spec.get('offset', (0, 0.08, 0))))
                               @ Euler([math.radians(x) for x in spec.get('rot', (0, 0, 0))]).to_matrix().to_4x4())
         world = o.matrix_world.copy()
         o.parent = arm

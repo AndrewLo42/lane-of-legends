@@ -82,7 +82,6 @@ export const SABLE: Kit = {
     'Melee catcher with a chained scythe. Hook an enemy to her, weave in a swing, then pick one follow-up: Reap them with an empowered swing, ' +
     'Bind them in place, or Vault over them to cut off their escape.',
   color: '#c9b26b',
-  experimental: true,
   stats: {
     hp: 700, hpPerLevel: 100, mana: 360, manaPerLevel: 45, manaRegen: 2.2, damage: 66, damagePerLevel: 4,
     attackInterval: 0.85, attackSpeedPerLevel: 0.02, windup: 0.22, range: 2.0, projectileSpeed: 0, speed: 6.6, radius: 0.6,

@@ -69,6 +69,7 @@ requestAnimationFrame(frame);
 await loadModels(); // missing models fall back to placeholders
 bakePortraits();
 stage = new SelectStage();
+if (import.meta.env.DEV) Object.assign(window, { stage });
 
 const params = new URLSearchParams(location.search);
 const asKit = (v: string | null) => (KIT_IDS.includes(v as KitId) ? (v as KitId) : null);

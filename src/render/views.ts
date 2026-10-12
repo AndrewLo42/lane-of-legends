@@ -18,7 +18,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, sable: 2.7, mabel: 2.0 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];

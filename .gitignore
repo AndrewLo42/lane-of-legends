@@ -11,3 +11,5 @@ release
 # `npm run meshy` using the task ids in assets-src/meshy/*/manifest.json; the game only needs the
 # processed output in public/assets/meshy/ (built by tools/blender/import_meshy.py).
 assets-src/**/*.glb
+assets-src/**/*.blend
+assets-src/**/*.blend1

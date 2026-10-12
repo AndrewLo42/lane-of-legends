@@ -1,0 +1,92 @@
+{
+  "out": "public/assets/meshy/Sable.glb",
+  "rigged": "assets-src/blenderkit/sable/rigged_sable.glb",
+  "anims": [
+    "assets-src/blenderkit/sable/anims_sable.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": {
+      "src": "S_Idle"
+    },
+    "Run": {
+      "src": "S_Run"
+    },
+    "Attack": {
+      "src": "S_Attack",
+      "start": 0.6,
+      "end": 1.5
+    },
+    "Attack2": {
+      "src": "S_Attack2",
+      "start": 0.3,
+      "end": 1.2
+    },
+    "CastQ": {
+      "src": "S_Throw",
+      "start": 3.0,
+      "end": 4.4
+    },
+    "CastW": {
+      "src": "S_Reap",
+      "start": 3.8,
+      "end": 4.7
+    },
+    "CastE": {
+      "src": "S_Roll",
+      "start": 0.6,
+      "end": 1.6
+    },
+    "CastR": {
+      "src": "S_Slam",
+      "start": 0.6,
+      "end": 2.2
+    },
+    "Death": {
+      "src": "S_Dead",
+      "start": 0.9,
+      "end": 2.8
+    },
+    "Hit": {
+      "src": "S_Hit",
+      "start": 0.0,
+      "end": 1.0
+    }
+  },
+  "props": {
+    "items": {
+      "Scythe": {
+        "file": "assets-src/blenderkit/sable/scythe_hand.glb",
+        "hand": "RightHand",
+        "length": 2.3714,
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "rot": [
+          0,
+          0,
+          0
+        ],
+        "at": "fist"
+      }
+    }
+  },
+  "fists": {
+    "RightHand": {
+      "palm": [
+        -1,
+        0,
+        0
+      ],
+      "knuckle": 0.1,
+      "radius": 0.03,
+      "wrap": 230
+    }
+  }
+}

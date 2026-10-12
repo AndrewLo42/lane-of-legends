@@ -246,7 +246,12 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
   if (!gltf) return null;
   const model = cloneSkinned(gltf.scene);
   model.updateMatrixWorld(true); // Meshy armatures carry a 0.01 (centimetre) scale; measure with it applied
-  const box = new THREE.Box3().setFromObject(model);
+  // Size by the body: weapons baked onto a hand (Sable's scythe) would otherwise shrink the model.
+  const box = new THREE.Box3();
+  model.traverse((o) => {
+    if ((o as THREE.SkinnedMesh).isSkinnedMesh) box.expandByObject(o);
+  });
+  if (box.isEmpty()) box.setFromObject(model);
   const k = height / Math.max(0.01, box.max.y - box.min.y);
   model.scale.setScalar(k);
   // Stand it on the ground and centre it: not every Meshy export has its origin at the feet.
@@ -260,10 +265,13 @@ export function instantiate(name: ModelName, height: number, team: THREE.Color |
     m.castShadow = true;
     m.frustumCulled = false; // skinned bounds don't follow animation
     const mat = (m.material as THREE.MeshStandardMaterial).clone();
-    // Lift the painted albedo a little so small units read from the MOBA camera.
-    mat.emissive.set(0xffffff);
-    mat.emissiveMap = mat.map;
-    mat.emissiveIntensity = 0.3;
+    // Lift the painted albedo a little so small units read from the MOBA camera (textured materials
+    // only: on a flat colour, like a baked-in weapon's, it would just wash it out).
+    if (mat.map) {
+      mat.emissive.set(0xffffff);
+      mat.emissiveMap = mat.map;
+      mat.emissiveIntensity = 0.3;
+    }
     if (team) teamTint(mat, team);
     m.material = mat;
     materials.push(mat);
