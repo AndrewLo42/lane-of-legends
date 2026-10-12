@@ -96,6 +96,8 @@ export interface Kit {
   resource?: 'mana' | 'bees' | 'health';
   /** Abilities cost nothing right now (Gormund's Labyrinth Rage). */
   freeCasts?: (world: World, self: Unit) => boolean;
+  /** Extra auto-attack reach against `target` (Sable reaches further against enemies she's Gleaned). */
+  attackRangeBonus?: (world: World, self: Unit, target: Unit) => number;
   /** Multiplier on all damage we deal right now (Gormund's Fury). */
   damageMult?: (world: World, self: Unit, target: Unit) => number;
   /** Missile look for ranged auto-attacks (default 'auto'). */

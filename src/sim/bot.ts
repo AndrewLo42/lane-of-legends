@@ -2,6 +2,7 @@ import { lead, leadTime, minionInTheWay } from './aim';
 import { kitOf } from './kits';
 import { holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
+import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -107,6 +108,7 @@ export class BotController implements Controller {
       mabel: { play: this.mabel, escape: this.mabelEscape },
       aurelle: { play: this.aurelle, escape: this.aurelleEscape },
       gormund: { play: this.gormund, escape: this.gormundEscape },
+      sable: { play: this.sable, escape: this.sableEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -556,6 +558,82 @@ export class BotController implements Controller {
   private gormundEscape({ self, near, ready }: Ctx): Command | null {
     // Slow them and run.
     if (ready(1) && near(GORMUND_TUNING.W.radius)) return cast(1, self.pos);
+    return null;
+  }
+
+  // ---------- Sable ----------
+
+  private sable(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, recasting, aim, aimAfter } = ctx;
+    const { Q, REAP, W, R } = SABLE_TUNING;
+    if (foe) {
+      const hp = self.hp / self.maxHp;
+      const foeHp = foe.hp / foe.maxHp;
+      const winning = foeHp < 0.6 || hp > foeHp + 0.1;
+      // Hitting them turns their nearby minions on her: don't start fights next to their wave.
+      const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 6).length;
+      const safe = !unsafe(foe.pos) && (wave < 3 || foeHp < 0.3);
+      // A hook landed on them: weave in an auto while the window is young, then spend the one follow-up.
+      if (windowOpen(world, self) && reaping(world, self).includes(foe)) {
+        const r = Math.max(1, self.champ!.abilities[0].rank);
+        const reap = (REAP.base[r - 1] + REAP.ad * self.damage) * (1 + REAP.missing * (1 - foeHp));
+        const st = world.status(foe, 'reaping', self.id)!;
+        const left = (st.until - world.tick) / TICK_HZ;
+        const swinging = self.windup > 0 && self.attackTarget === foe.id;
+        const canSwing = self.attackCd === 0 && gap(self, foe) <= world.attackRange(self, foe);
+        if (left > 0.8 && (swinging || canSwing)) return { type: 'attack', target: foe.id };
+        if (recasting(0) && foe.hp < reap) return cast(0, foe.pos); // Reap finishes them
+        // Low and about to run: vault over them, onto their escape route (never under their tower).
+        const d = dirTo(self.pos, foe.pos);
+        const landing = { x: foe.pos.x + d.x * 2, y: foe.pos.y + d.y * 2 };
+        if (recasting(2) && foeHp < 0.45 && !unsafe(landing)) return cast(2, foe.pos);
+        if (recasting(1)) return cast(1, self.pos); // Bind, then the swings land
+        if (recasting(0)) return cast(0, foe.pos);
+        return { type: 'attack', target: foe.id };
+      }
+      if (ready(3) && near(R.radius - 1.5) && (winning || foeHp < 0.5) && safe) return cast(3, aimAfter(foe, R.windup));
+      if (ready(0) && near(Q.range - 0.5) && hp > 0.4 && hp > foeHp - 0.15 && safe) {
+        const p = aim(foe, Q.speed);
+        if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+      }
+      if (ready(1) && near(W.radius - 0.3)) return cast(1, self.pos);
+      // Gleaned: her reach is longer against them, so keep swinging while it lasts.
+      if (world.status(foe, 'gleaned', self.id) && winning && safe && gap(self, foe) <= world.attackRange(self, foe) + 1) {
+        return { type: 'attack', target: foe.id };
+      }
+      // In her face and hitting her: swing back if the trade is even, otherwise slow them and drift off.
+      if (foe.attackTarget === self.id && gap(self, foe) <= world.attackRange(self, foe) + 0.5) {
+        // Drift's damage reduction makes the trade: glide in beside them and keep swinging.
+        if (ready(2) && safe && (hp > foeHp - 0.15 || hp > 0.5)) return cast(2, foe.pos);
+        if (hp > foeHp - 0.15 || hp > 0.5) return { type: 'attack', target: foe.id };
+        if (ready(1)) return cast(1, self.pos);
+        if (ready(2)) return cast(2, spawnPoint(self.team));
+      }
+      // Poked from out of reach: hook them out of their wave (that's what the hook is for), walk at them
+      // if they're alone, and only back off when she can do neither.
+      if (foe.attackTarget === self.id && gap(self, foe) > self.range + 0.5) {
+        if (ready(0) && near(Q.range - 0.5) && hp > 0.3 && !unsafe(foe.pos)) {
+          const p = aim(foe, Q.speed);
+          if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+        }
+        if (safe && hp > 0.5) return { type: 'attack', target: foe.id };
+        const back = self.team === 'blue' ? -1 : 1;
+        const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2), y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+    }
+    // Farm with Wide Swath: when it would finish a minion, or catches three.
+    if (ready(1) && self.champ!.mana > self.champ!.maxMana * 0.25) {
+      const swath = ctx.dmg(1) * W.minion;
+      const close = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < W.radius + u.radius && !unsafe(u.pos));
+      if (close.length >= 3 || close.some((m) => m.hp < swath)) return cast(1, self.pos);
+    }
+    return null;
+  }
+
+  private sableEscape({ self, near, ready }: Ctx): Command | null {
+    if (ready(2) && near(4)) return cast(2, spawnPoint(self.team)); // Drift away
+    if (ready(1) && near(2.5)) return cast(1, self.pos); // slow the chaser
     return null;
   }
 

@@ -434,6 +434,11 @@ export class World {
     if (def.cast(this, u, at, st)) st.readyAt = Math.max(st.readyAt, this.tick + ticks(def.cooldown));
   }
 
+  /** Auto-attack reach against `target` (Sable reaches further against Gleaned enemies). */
+  attackRange(u: Unit, target: Unit) {
+    return u.range + (u.champ ? kitOf(u).attackRangeBonus?.(this, u, target) ?? 0 : 0);
+  }
+
   /** Ticks between attacks, after level, momentum, Rage and frenzy attack speed. */
   attackTicks(u: Unit) {
     let bonus = 0;
@@ -610,7 +615,7 @@ export class World {
       if (--u.windup === 0) this.fire(u, target);
       return;
     }
-    if (gap(u, target) > u.range) {
+    if (gap(u, target) > this.attackRange(u, target)) {
       if (u.speed > 0) u.moveTarget = { ...target.pos }; // chase
       return;
     }

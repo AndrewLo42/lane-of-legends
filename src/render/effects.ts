@@ -380,6 +380,16 @@ export class EffectsView {
         }
         break;
       }
+      case 'bind': {
+        // Sable's Bind: a gold chain ring that cinches in around the target.
+        const r = ringShape((fx.radius ?? 1) + 0.6, 0.12, basic(0xe6c86b, 0.95));
+        r.position.y = 0.8;
+        add(r, 0.4, (k) => {
+          fade(r, 0.95)(k);
+          r.scale.setScalar(1.6 - k * 0.7);
+        });
+        break;
+      }
       case 'slam': {
         // Bull Rush's impact: a dust ring and a low brown dome.
         const r = ringShape(fx.radius ?? 1.4, 0.35, basic(0xb89a72, 0.9));

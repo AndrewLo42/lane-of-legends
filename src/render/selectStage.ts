@@ -53,7 +53,7 @@ export class SelectStage {
       if (!built) {
         // No Meshy model yet: stand the placeholder figure on the podium instead.
         const stand = placeholderFor(new World(1).spawnChampion('blue', kit, { think: () => [] }));
-        stand.scale.setScalar(0.95);
+        stand.scale.setScalar(kit === 'sable' ? 0.75 : 0.95); // Sable's scythe towers over her
         this.place(stand);
         this.champs.set(kit, { root: stand });
         return;

@@ -5,10 +5,11 @@ import { GORMUND } from './gormund';
 import { LISHA } from './lisha';
 import { MABEL } from './mabel';
 import { MAREN } from './maren';
+import { SABLE } from './sable';
 import { TOCK } from './tock';
 import type { Kit } from './types';
 
-export const KITS: Record<KitId, Kit> = { arlo: ARLO, tock: TOCK, maren: MAREN, lisha: LISHA, mabel: MABEL, aurelle: AURELLE, gormund: GORMUND };
+export const KITS: Record<KitId, Kit> = { arlo: ARLO, tock: TOCK, maren: MAREN, lisha: LISHA, mabel: MABEL, aurelle: AURELLE, gormund: GORMUND, sable: SABLE };
 export const KIT_IDS = Object.keys(KITS) as KitId[];
 /** Champions bots may play: everyone but the experimental ones (no model yet). */
 export const BOT_KIT_IDS = KIT_IDS.filter((k) => !KITS[k].experimental);

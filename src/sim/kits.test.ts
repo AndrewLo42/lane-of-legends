@@ -5,6 +5,7 @@ import { SIGNATURE_SUMMONERS } from './summoners';
 import { MABEL_TUNING } from './kits/mabel';
 import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, fury } from './kits/gormund';
+import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -832,6 +833,119 @@ describe('Gormund', () => {
   });
 });
 
+describe('Sable', () => {
+  const { GLEAN, WINDOW, REAP, BIND, VAULT, R } = SABLE_TUNING;
+  /** Hook a dummy standing at `x` and let the pull finish. */
+  function hook(x = 6) {
+    const s = setup('sable');
+    const t = dummy(s.w, x);
+    s.cast(0, x);
+    run(s.w, 0.8);
+    return { ...s, t };
+  }
+
+  it('Reaping Hook yanks the first enemy to her, Gleans it and opens the window', () => {
+    const { w, me, t } = hook();
+    expect(t.pos.x).toBeLessThan(2);
+    near(lost(t), KITS.sable.abilities[0].damage!(1, me));
+    expect(w.status(t, 'gleaned', me.id)).toBeTruthy();
+    expect(windowOpen(w, me)).toBe(true);
+    expect(w.castBlocker(me, 1)).toBe(null); // W is now Bind, E is now Vault
+    run(w, WINDOW);
+    expect(windowOpen(w, me)).toBe(false);
+    expect(reaping(w, me)).toEqual([]);
+  });
+
+  it('Bind roots everything she is reaping and closes the window (one follow-up only)', () => {
+    const { w, me, t, cast } = hook();
+    const before = lost(t);
+    cast(1, 0);
+    expect(w.isRooted(t)).toBe(true);
+    near(lost(t) - before, BIND.base[0] + BIND.ad * me.damage);
+    expect(windowOpen(w, me)).toBe(false);
+    expect(w.castBlocker(me, 2)).toBe(null); // plain Drift is still there...
+    const from = { ...me.pos };
+    cast(2, -10);
+    run(w, 0.5);
+    expect(me.pos.x).toBeLessThan(from.x - 3); // ...and it's Drift, not Vault
+    run(w, BIND.root);
+    expect(w.isRooted(t)).toBe(false);
+  });
+
+  it('Drift dashes and cuts the damage she takes for a moment', () => {
+    const { w, me, cast } = setup('sable');
+    cast(2, 10);
+    const hp = me.hp;
+    w.dealDamage(null, me, 100);
+    expect(hp - me.hp).toBeCloseTo(100 * (1 - SABLE_TUNING.E.guard), 3);
+    run(w, SABLE_TUNING.E.guardFor + 0.1);
+    expect(me.pos.x).toBeGreaterThan(SABLE_TUNING.E.range - 0.3);
+    const hp2 = me.hp;
+    w.dealDamage(null, me, 100);
+    expect(hp2 - me.hp).toBeCloseTo(100, 3);
+  });
+
+  it('Vault leaps over the target to its far side and slows it', () => {
+    const { w, me, t, cast } = hook();
+    const before = lost(t);
+    cast(2, 0);
+    run(w, 0.6);
+    expect(me.pos.x).toBeGreaterThan(t.pos.x);
+    expect(w.status(t, 'slow', me.id)).toBeTruthy();
+    near(lost(t) - before, VAULT.base[0] + VAULT.ad * me.damage);
+    expect(windowOpen(w, me)).toBe(false);
+  });
+
+  it('autos in the window are plain swings; Q again Reaps, harder the lower they are', () => {
+    const { w, me, t, cast } = hook();
+    me.range = 2;
+    me.attackCd = 0;
+    me.attackTarget = t.id;
+    t.hp = t.maxHp * 0.5;
+    let before = t.hp;
+    run(w, 0.5); // one woven auto
+    expect(before - t.hp).toBeGreaterThan(me.damage * 0.9);
+    expect(before - t.hp).toBeLessThan(me.damage * 1.4);
+    expect(windowOpen(w, me)).toBe(true); // the auto didn't spend the window
+    me.range = 0;
+    me.attackTarget = null;
+    before = t.hp;
+    const missing = 1 - t.hp / t.maxHp;
+    cast(0, t.pos.x);
+    run(w, 0.2);
+    near(before - t.hp, (REAP.base[0] + REAP.ad * me.damage) * (1 + REAP.missing * missing), 12);
+    expect(windowOpen(w, me)).toBe(false);
+    expect(w.castBlocker(me, 1)).toBe(null); // plain Wide Swath again, not Bind
+    expect(me.champ!.abilities[1].recastUntil).toBe(0);
+  });
+
+  it('Gleaned enemies are in reach from further away, and hurting them heals her', () => {
+    const { w, me, t } = hook();
+    run(w, WINDOW); // let the window close so autos don't Reap
+    me.range = 2;
+    t.pos = { x: me.pos.x + me.radius + t.radius + 2 + GLEAN.reach - 0.2, y: 0 };
+    expect(w.attackRange(me, t)).toBeCloseTo(2 + GLEAN.reach, 5);
+    me.hp = me.maxHp * 0.5;
+    const hp = me.hp;
+    w.dealDamage(me, t, 100);
+    expect(me.hp - hp).toBeCloseTo(100 * GLEAN.heal, 0);
+  });
+
+  it('Last Harvest drags everything in the crescent to her and opens the window on all of them', () => {
+    const { w, me, cast } = setup('sable', 1);
+    const a = dummy(w, 5, 1.5);
+    const m = w.spawnMinion('red', 'melee', { x: 6, y: -1.5 });
+    m.speed = 4.6;
+    cast(3, 6);
+    run(w, R.windup + 0.6);
+    expect(a.pos.x).toBeLessThan(2.5);
+    expect(m.pos.x).toBeLessThan(2.5);
+    expect(reaping(w, me).map((u) => u.id).sort()).toEqual([a.id, m.id].sort());
+    cast(1, 0);
+    expect(w.isRooted(a) && w.isRooted(m)).toBe(true);
+  });
+});
+
 describe('experimental champions', () => {
   it('are exactly the ones without a Meshy model', () => {
     const models = Object.keys(import.meta.glob('../../public/assets/meshy/*.glb'));
@@ -844,7 +958,7 @@ describe('experimental champions', () => {
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });

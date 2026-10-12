@@ -112,7 +112,38 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'gormund') {
+  if (u.champ!.kit === 'sable') {
+    // A tall, quiet harvester: a tattered field cloak, a dark crow-feather mantle, a deep hood with two
+    // pale eyes, and a long scythe with a small lantern hanging from the blade.
+    const cloak = new THREE.MeshStandardMaterial({ color: 0x5a5245, flatShading: true });
+    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.9, 9), cloak);
+    robe.position.y = 0.95;
+    const sash = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 6, 16), teamMat);
+    sash.rotation.x = Math.PI / 2;
+    sash.position.y = 1.15;
+    const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.55, 10), new THREE.MeshStandardMaterial({ color: 0x1d1b22, flatShading: true }));
+    mantle.position.y = 1.75;
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), cloak);
+    hood.position.y = 2.15;
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: 0x0c0b10 }));
+    face.position.set(0.14, 2.12, 0);
+    g.add(robe, sash, mantle, hood, face);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), glow);
+      eye.position.set(0.31, 2.15, side * 0.07);
+      g.add(eye);
+    }
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a32 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.8, 6), wood);
+    shaft.position.set(0.35, 1.45, 0.55);
+    shaft.rotation.z = -0.15;
+    const blade = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.05, 4, 18, Math.PI * 0.85), metal);
+    blade.position.set(0.55, 2.75, 0.55);
+    blade.rotation.z = Math.PI * 0.95;
+    const lantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.11), new THREE.MeshStandardMaterial({ color: 0xffe6a0, emissive: 0xffd36b, emissiveIntensity: 1.5 }));
+    lantern.position.set(-0.05, 2.35, 0.55);
+    g.add(shaft, blade, lantern);
+  } else if (u.champ!.kit === 'gormund') {
     // A hulking, hunched minotaur: broad chest, bull head with horns and a brass nose ring, chain-wrapped
     // fists, no weapon.
     const hide = new THREE.MeshStandardMaterial({ color: 0x6b4630, flatShading: true });

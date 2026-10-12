@@ -18,7 +18,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, sable: 2.7, mabel: 2.0 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -52,6 +52,8 @@ interface UnitView {
   lances?: THREE.Group;
   /** Aurelle's spear stuck in this unit. */
   impaled?: THREE.Mesh;
+  /** Sable's Reaping window on this unit: a gold crescent overhead and a chain ring at the feet. */
+  reaping?: THREE.Group;
   /** Mark indicator: a ring at the feet and a petal overhead, in the marker's colour. */
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
@@ -110,6 +112,8 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     // Tether: a glowing hook, open end forward.
     // Gormund's Hurl Stone: a tumbling chunk of labyrinth floor.
     stone: () => ({ geo: new THREE.DodecahedronGeometry(0.42), color: 0x8f877b, height: 1.3 }),
+    // Sable's Reaping Hook: the scythe's crescent blade, flying point-first on its chain.
+    hook: () => ({ geo: new THREE.TorusGeometry(0.42, 0.06, 6, 18, Math.PI * 1.1).rotateZ(-Math.PI * 0.55).rotateX(Math.PI / 2), color: 0xe6dcb0, height: 1.2 }),
     tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
   };
   const look = looks[m.style]();
@@ -434,6 +438,28 @@ export class WorldView {
     if (v.impaled) v.impaled.visible = on;
   }
 
+  /** Sable's Reaping window: a crescent over the head and a ring at the feet, so both sides see the follow-up coming. */
+  private reapingVisual(u: Unit, v: UnitView) {
+    const on = u.statuses.some((s) => s.kind === 'reaping' && s.until > this.world.tick);
+    if (on && !v.reaping) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xe6c86b, transparent: true, opacity: 0.9, depthWrite: false });
+      v.reaping = new THREE.Group();
+      const moon = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.07, 6, 18, Math.PI * 1.2), mat);
+      moon.position.y = BAR_HEIGHT[u.kind] + 0.9;
+      moon.rotation.z = Math.PI * 0.9;
+      moon.name = 'moon';
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(u.radius + 0.3, 0.05, 6, 28), mat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.1;
+      v.reaping.add(moon, ring);
+      v.obj.add(v.reaping);
+    }
+    if (!v.reaping) return;
+    v.reaping.visible = on;
+    const moon = v.reaping.getObjectByName('moon');
+    if (moon) moon.position.y = BAR_HEIGHT[u.kind] + 0.9 + Math.sin(performance.now() / 250) * 0.08;
+  }
+
   /** Rage/Ghost aura, Ignite's flame, and the Tether line. */
   private summonerVisuals(u: Unit, v: UnitView) {
     const now = performance.now() / 1000;
@@ -509,6 +535,7 @@ export class WorldView {
     this.summonerVisuals(u, v);
     this.beeVisuals(u, v);
     this.impaleVisual(u, v);
+    this.reapingVisual(u, v);
     if (v.bubble) v.bubble.visible = shielded;
     if (v.root) v.root.visible = rooted;
     if (v.stun) {

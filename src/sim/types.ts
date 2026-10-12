@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,7 +47,7 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal' | 'unstoppable';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal' | 'unstoppable' | 'gleaned' | 'reaping';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
@@ -57,7 +57,8 @@ export interface Status {
    * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder;
    * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction;
    * impale: Aurelle's spear is stuck in this unit (she can recall it through them); arsenal: Aurelle's
-   * ultimate is up (spectral lances ring her); unstoppable: ignores slows, roots, stuns and displacement.
+   * ultimate is up (spectral lances ring her); unstoppable: ignores slows, roots, stuns and displacement;
+   * gleaned: hooked by Sable (her reach and healing); reaping: Sable's follow-up window is open on this unit.
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -166,7 +167,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook';
 
 export interface Missile {
   id: number;
@@ -224,7 +225,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind';
   pos: Vec2;
   dir?: number;
   radius?: number;

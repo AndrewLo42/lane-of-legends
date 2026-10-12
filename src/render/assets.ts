@@ -21,6 +21,7 @@ export const MODELS = {
   champ_mabel: 'Mabel.glb',
   champ_aurelle: 'Aurelle.glb',
   champ_gormund: 'Gormund.glb',
+  champ_sable: 'Sable.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 
