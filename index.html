@@ -194,7 +194,8 @@
       #screen h4 { margin: 4px 0 -2px; font-size: 13px; font-weight: 600; }
       #screen h4 small { font-weight: 400; opacity: 0.55; font-size: 11px; margin-left: 4px; }
       /* Summoner spell picker: D/F slots over a grid of every spell. */
-      #screen .spellpick { display: flex; flex-direction: column; gap: 8px; }
+      /* A fixed width: sized by its text, the picker re-centred under the cursor as descriptions changed. */
+      #screen .spellpick { display: flex; flex-direction: column; gap: 8px; width: min(440px, 100%); }
       #screen .spellslots { display: flex; gap: 8px; }
       #screen .sslot { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #ffffff0a;
         border: 1px solid #ffffff22; cursor: pointer; font-size: 13px; text-align: left; }

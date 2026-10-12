@@ -68,6 +68,24 @@ const SPELL_KEYS = ['D', 'F'];
 function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange: (p: SpellPair) => void) {
   let active = 0;
   let shown: SummonerId = pair[0];
+  const describe = (id: SummonerId) => `<b>${SUMMONERS[id].name}</b> <small>${SUMMONERS[id].cooldown}s cooldown</small><br>${SUMMONERS[id].describe(sample)}`;
+  /**
+   * Reserve room for the longest description, so hovering spells never resizes the picker: a box that
+   * grows and shrinks moves the buttons under the cursor, which then hovers a different spell.
+   */
+  const fitDescription = () => {
+    const p = host.querySelector<HTMLElement>('.spelldesc');
+    if (!p) return;
+    const keep = p.innerHTML;
+    p.style.minHeight = '';
+    let tallest = 0;
+    for (const id of SUMMONER_IDS) {
+      p.innerHTML = describe(id);
+      tallest = Math.max(tallest, p.offsetHeight);
+    }
+    p.innerHTML = keep;
+    p.style.minHeight = `${tallest}px`;
+  };
   const render = () => {
     const d = SUMMONERS[shown];
     host.innerHTML = `
@@ -79,7 +97,8 @@ function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange:
         return `<button class="spell${at >= 0 ? ' in' : ''}${id === shown ? ' shown' : ''}" data-spell="${id}" title="${SUMMONERS[id].name}">
           <i>${SUMMONERS[id].icon}</i>${at >= 0 ? `<kbd>${SPELL_KEYS[at]}</kbd>` : ''}</button>`;
       }).join('')}</div>
-      <p class="spelldesc"><b>${d.name}</b> <small>${d.cooldown}s cooldown</small><br>${d.describe(sample)}</p>`;
+      <p class="spelldesc">${describe(d.id)}</p>`;
+    fitDescription();
   };
   host.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
@@ -104,7 +123,7 @@ function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange:
     const spell = (e.target as HTMLElement).closest<HTMLElement>('[data-spell]');
     if (spell && spell.dataset.spell !== shown) {
       shown = spell.dataset.spell as SummonerId;
-      host.querySelector('.spelldesc')!.innerHTML = `<b>${SUMMONERS[shown].name}</b> <small>${SUMMONERS[shown].cooldown}s cooldown</small><br>${SUMMONERS[shown].describe(sample)}`;
+      host.querySelector('.spelldesc')!.innerHTML = describe(shown);
     }
   });
   render();
