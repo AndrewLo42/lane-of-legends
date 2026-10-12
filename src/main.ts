@@ -13,7 +13,7 @@ import {
   type DuelResult, type RunState,
 } from './run/run';
 import { spawnPoint } from './sim/lane';
-import { KITS, KIT_IDS } from './sim/kits';
+import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
@@ -77,7 +77,9 @@ const freePlayKit = asKit(params.get('champ'));
 if (freePlayKit) {
   // Free play: the old sandbox, no goals, nexus to win.
   const spells = params.get('spells')?.split(',');
-  const enemyKit = asKit(params.get('enemy')) ?? KIT_IDS.find((k) => k !== freePlayKit) ?? freePlayKit;
+  // Bots never play experimental champions.
+  const asked = asKit(params.get('enemy'));
+  const enemyKit = (asked && BOT_KIT_IDS.includes(asked) ? asked : null) ?? BOT_KIT_IDS.find((k) => k !== freePlayKit) ?? BOT_KIT_IDS[0];
   duel = new Duel(shell, {
     seed: Number(params.get('seed') ?? Date.now() % 1e9), rules: SANDBOX_RULES, kit: freePlayKit, augments: [],
     summoners: validSummoners(spells) ? spells : undefined, enemyKit, enemySummoners: SIGNATURE_SUMMONERS[enemyKit], enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 0.8, label: 'Free play', sandbox: true,

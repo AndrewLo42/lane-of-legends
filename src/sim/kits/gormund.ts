@@ -41,6 +41,7 @@ export const GORMUND: Kit = {
     'Melee juggernaut with no mana: his abilities cost health, he regenerates fast out of combat, and he hits harder the lower he gets. ' +
     'Slow him, poke him, and never let him catch his breath.',
   color: '#c0703a',
+  experimental: true,
   resource: 'health',
   stats: {
     hp: 820, hpPerLevel: 115, mana: 0, manaPerLevel: 0, manaRegen: 0, damage: 66, damagePerLevel: 4,

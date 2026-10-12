@@ -20,6 +20,8 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Currently: Gormund.
+
 | | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
 |---|---|---|---|
 | Passive | **Triangulate**: every attack or ability hit takes a bearing; the 3rd on the same enemy within 4s deals bonus damage and gives +15% attack speed for 2s | **Second Hand**: every 3rd attack echoes 0.4s later for 60% | **Undertow**: abilities Soak champions; the 3rd stack roots for 1s |

@@ -4,6 +4,7 @@ import { DUEL_RULES } from '../sim/rules';
 import { ITEMS, MAX_ITEMS } from '../sim/items';
 import { FLOORS, WIN_BONUS, advance, augmentOffers, buy, cantBuy, floorPlan, loadout, newRun, reroll, shopStock, starterAugments, starterItems, takeStarter, runSummoners, setSummoners } from './run';
 import { SIGNATURE_SUMMONERS } from '../sim/summoners';
+import { KITS } from '../sim/kits';
 
 describe('run', () => {
   it('floor plans are deterministic per seed', () => {
@@ -14,6 +15,16 @@ describe('run', () => {
       const pa = floorPlan(a);
       const pb = floorPlan(b);
       expect({ ...pa, modifier: pa.modifier?.id }).toEqual({ ...pb, modifier: pb.modifier?.id });
+    }
+  });
+
+  it('opponents are never experimental champions', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const run = newRun('gormund', seed);
+      for (let f = 0; f < FLOORS.length; f++) {
+        run.floor = f;
+        expect(KITS[floorPlan(run).opponent].experimental).toBeFalsy();
+      }
     }
   });
 

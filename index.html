@@ -156,6 +156,14 @@
       #screen .pick .mini-portrait { width: 58px; height: 58px; border-width: 2px; font-size: 26px; }
       #screen .pick.on .mini-portrait { box-shadow: 0 0 0 2px #0b0d12, 0 0 0 4px var(--accent), 0 0 18px var(--accent); }
       #screen .pick .pname { font-size: 12px; font-weight: 600; color: var(--accent); }
+      /* Experimental champions (no model yet): hidden unless the toggle is on, and tagged with a flask. */
+      #screen.select .pick.experimental { display: none; position: relative; }
+      #screen.select.show-experimental .pick.experimental { display: flex; }
+      #screen .pick.experimental::after { content: '🧪'; position: absolute; top: 2px; right: 6px; font-size: 14px; }
+      #screen .homelinks { display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 6px; }
+      #screen .homelinks .watch { margin-top: 0; }
+      #screen .exptoggle { display: flex; align-items: center; gap: 5px; font-size: 13px; opacity: 0.75; cursor: pointer; user-select: none; }
+      #screen .exptoggle input { margin: 0; accent-color: #c9a5ff; }
       #screen .selectmain { box-sizing: border-box; flex: 1; width: 100%; max-width: 1200px; display: flex; align-items: center; gap: 24px; padding: 0 24px; min-height: 0; }
       #screen .selectmain .stagegap { flex: 1; min-height: 40vh; }
       #screen .champinfo { box-sizing: border-box; width: min(420px, 100%); background: #151922e6; border: 1px solid #ffffff1f; border-radius: 12px; padding: 16px 18px;

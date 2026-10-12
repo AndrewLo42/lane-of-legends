@@ -1,7 +1,7 @@
 import { Rng } from '../core/rng';
 import { AUGMENTS, AUGMENT_IDS, type AugmentTier } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS, PERMANENT_ITEMS, STARTER_ITEMS } from '../sim/items';
-import { KIT_IDS } from '../sim/kits';
+import { BOT_KIT_IDS, KIT_IDS } from '../sim/kits';
 import { DUEL_RULES, type DuelRules, type WinReason } from '../sim/rules';
 import { DEFAULT_SUMMONERS, SIGNATURE_SUMMONERS, SUMMONERS } from '../sim/summoners';
 import type { AugmentId, KitId, SummonerId } from '../sim/types';
@@ -131,7 +131,7 @@ export function newRun(kit: KitId, seed: number, summoners: [SummonerId, Summone
 export function floorPlan(run: RunState): FloorPlan {
   const def = FLOORS[run.floor];
   const rng = new Rng(run.seed * 7919 + run.floor * 104729 + 17);
-  const opponent = KIT_IDS[rng.int(0, KIT_IDS.length - 1)];
+  const opponent = BOT_KIT_IDS[rng.int(0, BOT_KIT_IDS.length - 1)];
   const opponentAugments: AugmentId[] = [];
   for (const tier of def.enemyAugments) {
     const pool = ofTier(tier).filter((id) => !opponentAugments.includes(id));

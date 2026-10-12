@@ -2,7 +2,7 @@ import { portraitHtml } from '../render/portraits';
 import { FLOORS, cantBuy, runSummoners, shopStock, validSummoners, type FloorPlan, type Meta, type RunState } from '../run/run';
 import { AUGMENTS } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
-import { KITS, KIT_IDS } from '../sim/kits';
+import { BOT_KIT_IDS, KITS, KIT_IDS } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
 import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
 import type { AugmentId, KitId, SummonerId, Unit } from '../sim/types';
@@ -114,6 +114,7 @@ function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange:
 
 const LAST_KIT = 'lane-rogue.lastKit';
 const LAST_SPELLS = 'lane-rogue.lastSpells';
+const EXPERIMENTAL = 'lane-rogue.experimental';
 
 /**
  * Champion select: portraits along the top, the chosen champion on the 3D stage (via `onFocus`),
@@ -126,9 +127,12 @@ export type HomeChoice = { mode: 'run'; kit: KitId; summoners: SpellPair } | { m
 export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<HomeChoice> {
   let current: KitId = KIT_IDS[0];
   let spells: SpellPair = [...DEFAULT_SUMMONERS];
+  /** Show champions without a model yet (placeholders) for testing. */
+  let experimental = false;
   try {
+    experimental = localStorage.getItem(EXPERIMENTAL) === '1';
     const last = localStorage.getItem(LAST_KIT) as KitId | null;
-    if (last && KIT_IDS.includes(last)) current = last;
+    if (last && KIT_IDS.includes(last) && (experimental || !KITS[last].experimental)) current = last;
     const lastSpells = JSON.parse(localStorage.getItem(LAST_SPELLS) ?? 'null');
     if (validSummoners(lastSpells)) spells = lastSpells;
   } catch {
@@ -138,10 +142,12 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   const el = show(`
     <div class="selecthead"><h1>Lane Rogue</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-      <button class="link watch" data-watch>🤖 Watch bots duel</button></div>
+      <div class="homelinks"><button class="link watch" data-watch>🤖 Watch bots duel</button>
+        <label class="exptoggle" title="Champions without a model yet, as placeholders. Bots never play them."><input type="checkbox" data-experimental${experimental ? ' checked' : ''}> 🧪 Experimental champions</label></div></div>
     <div class="roster">
       ${KIT_IDS.map((id) => `
-        <button class="pick" data-kit="${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
+        <button class="pick${KITS[id].experimental ? ' experimental' : ''}" data-kit="${id}" style="--accent:${KITS[id].color}"
+          title="${KITS[id].name}${KITS[id].experimental ? ' (experimental: no model yet, bots never pick them)' : ''}">
           <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
         </button>`).join('')}
     </div>
@@ -149,7 +155,9 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}←/→ to browse · Enter to start ·
       Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
   el.classList.add('select');
+  el.classList.toggle('show-experimental', experimental);
   const info = el.querySelector<HTMLElement>('.champinfo')!;
+  const roster = () => KIT_IDS.filter((k) => experimental || !KITS[k].experimental);
 
   const select = (kit: KitId) => {
     current = kit;
@@ -179,6 +187,17 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       const t = e.target as HTMLElement;
       const pick = t.closest<HTMLElement>('[data-kit]');
       if (pick) select(pick.dataset.kit as KitId);
+      const toggle = t.closest<HTMLInputElement>('[data-experimental]');
+      if (toggle) {
+        experimental = toggle.checked;
+        el.classList.toggle('show-experimental', experimental);
+        try {
+          localStorage.setItem(EXPERIMENTAL, experimental ? '1' : '0');
+        } catch {
+          /* ignore */
+        }
+        if (!roster().includes(current)) select(roster()[0]);
+      }
       if (t.closest('[data-start]')) done();
       if (t.closest('[data-watch]')) finish('watch');
     };
@@ -186,9 +205,11 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       if ((e.target as HTMLElement).closest('[data-kit]')) done();
     };
     const onKey = (e: KeyboardEvent) => {
-      const i = KIT_IDS.indexOf(current);
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') select(KIT_IDS[(i + 1) % KIT_IDS.length]);
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') select(KIT_IDS[(i - 1 + KIT_IDS.length) % KIT_IDS.length]);
+      if ((e.target as HTMLElement).closest?.('input')) return;
+      const ids = roster();
+      const i = ids.indexOf(current);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') select(ids[(i + 1) % ids.length]);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') select(ids[(i - 1 + ids.length) % ids.length]);
       else if (e.key === 'Enter') {
         // A focused button (the last spell clicked) would otherwise take the Enter as a click too.
         e.preventDefault();
@@ -209,7 +230,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     addEventListener('keydown', onKey);
     select(current);
   });
-  el.classList.remove('select');
+  el.classList.remove('select', 'show-experimental');
   hide();
   if (kit === 'watch') return { mode: 'watch' };
   try {
@@ -230,7 +251,7 @@ export async function pickBots(): Promise<{ blue: KitId; red: KitId } | null> {
     const row = (side: 'blue' | 'red') => `
       <div class="botrow ${side}"><small>${side === 'blue' ? 'Blue side' : 'Red side'}</small>
         <div class="roster">
-          ${KIT_IDS.map((id) => `
+          ${BOT_KIT_IDS.map((id) => `
             <button class="pick${pick[side] === id ? ' on' : ''}" data-action="${side}:${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
               <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
             </button>`).join('')}
@@ -253,7 +274,7 @@ export async function pickBots(): Promise<{ blue: KitId; red: KitId } | null> {
     }
     if (action === 'go') {
       hide();
-      const roll = (k: KitId | 'random') => (k === 'random' ? KIT_IDS[Math.floor(Math.random() * KIT_IDS.length)] : k);
+      const roll = (k: KitId | 'random') => (k === 'random' ? BOT_KIT_IDS[Math.floor(Math.random() * BOT_KIT_IDS.length)] : k);
       return { blue: roll(pick.blue), red: roll(pick.red) };
     }
     const [side, id] = action.split(':') as ['blue' | 'red', KitId | 'random'];

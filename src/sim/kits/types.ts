@@ -81,6 +81,11 @@ export interface Kit {
   blurb: string;
   /** Accent colour for UI and effects. */
   color: string;
+  /**
+   * No Meshy model yet (plays as a placeholder): only selectable with the select screen's
+   * Experimental toggle, and never a bot.
+   */
+  experimental?: boolean;
   stats: KitStats;
   passive: { name: string; icon: string; describe: (self: Unit) => string };
   /**
