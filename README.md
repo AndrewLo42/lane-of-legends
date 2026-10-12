@@ -16,7 +16,7 @@ npm run dev        # http://localhost:5173 (?seed=42 for a fixed seed)
 npm test           # sim tests
 ```
 
-**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel|aurelle|gormund|sable`, `&enemy=…` (defaults to the other one), `&seed=42`.
+**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel|aurelle|gormund|sable`, `&enemy=…` (defaults to the other one), `&seed=42`, `&augments=brute,haste&items=i.blade` (comma-separated ids) to start with upgrades. Augments and items show as icon rows left of the ability bar, growing outward.
 
 **Champions** (kits in `src/sim/kits/`):
 

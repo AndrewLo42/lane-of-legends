@@ -12,6 +12,8 @@ import {
   advance, augmentOffers, buy, runSummoners, setSummoners, validSummoners, starterAugments, starterItems, takeStarter, floorPlan, isFinalFloor, leaveShop, loadMeta, loadRun, loadout, newRun, recordRunEnd, reroll, saveRun,
   type DuelResult, type RunState,
 } from './run/run';
+import { AUGMENTS } from './sim/augments';
+import { ITEMS } from './sim/items';
 import { spawnPoint } from './sim/lane';
 import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
@@ -81,8 +83,11 @@ if (freePlayKit) {
   // Bots never play experimental champions.
   const asked = asKit(params.get('enemy'));
   const enemyKit = (asked && BOT_KIT_IDS.includes(asked) ? asked : null) ?? BOT_KIT_IDS.find((k) => k !== freePlayKit) ?? BOT_KIT_IDS[0];
+  // `&augments=…&items=…` (comma-separated ids) start with upgrades, for trying them out.
+  const ids = (key: string, known: Record<string, unknown>) => (params.get(key)?.split(',') ?? []).filter((id) => id in known);
   duel = new Duel(shell, {
-    seed: Number(params.get('seed') ?? Date.now() % 1e9), rules: SANDBOX_RULES, kit: freePlayKit, augments: [],
+    seed: Number(params.get('seed') ?? Date.now() % 1e9), rules: SANDBOX_RULES, kit: freePlayKit,
+    augments: ids('augments', AUGMENTS), items: ids('items', ITEMS),
     summoners: validSummoners(spells) ? spells : undefined, enemyKit, enemySummoners: SIGNATURE_SUMMONERS[enemyKit], enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 0.8, label: 'Free play', sandbox: true,
   });
 } else {

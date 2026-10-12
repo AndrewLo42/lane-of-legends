@@ -36,8 +36,16 @@
       .tier-prismatic { border-color: #c58bff; color: #e6c8ff; box-shadow: 0 0 8px #b36bff66; }
       .tier-item { border-color: #e0a96d; color: #f3d2a8; border-radius: 4px; }
       .none { opacity: 0.5; font-size: 12px; }
-      #abilities .augs { display: flex; flex-direction: column; gap: 3px; align-self: center; }
-      #abilities .augs .aug { padding: 1px 4px; pointer-events: auto; }
+      /* Augments (top row) and items (bottom row) sit outside the bar on its left, growing outward as
+         the run collects more, so the bar itself never grows into the game. */
+      #abilities .perks { position: absolute; right: calc(100% + 10px); bottom: 2px; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+      #abilities .perks .row { display: flex; flex-direction: row-reverse; flex-wrap: wrap-reverse; gap: 4px; min-height: 30px;
+        /* Room left of the bar (about 215px of half the bar plus margin); a full row wraps onto a new line above. */
+        width: max-content; max-width: clamp(98px, calc(50vw - 215px), 234px); }
+      #abilities .perks .none { display: none; }
+      #abilities .perks .aug { width: 30px; height: 30px; padding: 0; justify-content: center; font-size: 16px; border-radius: 7px; border-width: 2px;
+        background: #12141be6; pointer-events: auto; }
+      #abilities .perks .aug.tier-item { border-radius: 4px; }
 
       /* Health bars */
       #bars { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
