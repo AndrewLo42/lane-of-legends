@@ -82,7 +82,7 @@ export class World {
       attackInterval: k.attackInterval, windup: k.windup, projectileSpeed: k.projectileSpeed, bounty: CHAMPION_BOUNTY,
     });
     const ability = () => ({ rank: 0, readyAt: 0, recastUntil: 0 });
-    const manaFlat = KITS[kit].resource === 'bees' ? 0 : mods.manaFlat; // mana items don't grow bees
+    const manaFlat = KITS[kit].resource ? 0 : mods.manaFlat; // mana items don't grow bees (or give Gormund mana)
     const champ: ChampState = {
       kit, level: 1, xp: 0, skillPoints: 1, mana: k.mana + manaFlat, maxMana: k.mana + manaFlat,
       abilities: [ability(), ability(), ability(), ability()], casting: null, lastCast: null, queued: null, dash: null, data: {},
@@ -210,7 +210,7 @@ export class World {
     if (def.recast && this.tick < st.recastUntil) return null;
     if (def.available && !def.available(this, u)) return 'unavailable';
     if (this.tick < st.readyAt) return 'cooldown';
-    if (c.mana < def.cost(st.rank)) return 'mana';
+    if (kitOf(u).resource !== 'health' && c.mana < def.cost(st.rank)) return 'mana';
     return null;
   }
 
@@ -227,20 +227,28 @@ export class World {
     if (targeted && !(this.tick < st.recastUntil) && !targeted(this, u, at)) return; // nothing to click on
     const def = kitOf(u).abilities[slot];
     const recast = !!def.recast && this.tick < st.recastUntil;
+    let paid = 0;
     if (recast) {
       st.recastUntil = 0;
     } else {
-      c.mana -= def.cost(st.rank);
+      const kit = kitOf(u);
+      const cost = kit.freeCasts?.(this, u) ? 0 : def.cost(st.rank);
+      if (kit.resource === 'health') {
+        paid = u.hp * cost; // a share of current health, so it can never kill
+        u.hp -= paid;
+      } else {
+        c.mana -= cost;
+      }
       st.readyAt = this.tick + ticks((def.cooldown(st.rank) * 100) / (100 + c.mods.haste));
       if (def.recastWindow) st.recastUntil = this.tick + ticks(def.recastWindow);
     }
     u.windup = 0;
     u.facing = angleTo(u.pos, at);
-    const ctx: CastCtx = { world: this, self: u, at: { ...at }, rank: st.rank, recast };
+    const ctx: CastCtx = { world: this, self: u, at: { ...at }, rank: st.rank, recast, paid };
     def.onWindup?.(ctx);
     const time = recast ? def.recastTime ?? def.castTime : def.castTime;
     c.lastCast = { slot, tick: this.tick, time };
-    if (time > 0) c.casting = { slot, at: { ...at }, fireAt: this.tick + ticks(time), recast };
+    if (time > 0) c.casting = { slot, at: { ...at }, fireAt: this.tick + ticks(time), recast, paid };
     else this.resolveCast(ctx, slot);
     for (const a of perksOf(u)) a.onCast?.(this, u, slot, ctx.at, recast);
   }
@@ -261,9 +269,9 @@ export class World {
     const c = u.champ!;
     if (c.casting && this.isStunned(u)) c.casting = null; // stuns interrupt wind-ups
     if (c.casting && this.tick >= c.casting.fireAt) {
-      const { slot, at, recast } = c.casting;
+      const { slot, at, recast, paid } = c.casting;
       c.casting = null;
-      this.resolveCast({ world: this, self: u, at, rank: c.abilities[slot].rank, recast }, slot);
+      this.resolveCast({ world: this, self: u, at, rank: c.abilities[slot].rank, recast, paid }, slot);
     }
     if (c.dash) {
       const d = c.dash;
@@ -357,7 +365,13 @@ export class World {
     if (i >= 0) this.zones[i].until = this.tick; // expire through updateZones so frozen missiles drop too
   }
 
+  /** Immune to slows, roots, stuns and displacement (Gormund's Labyrinth Rage). */
+  isUnstoppable(u: Unit) {
+    return u.statuses.some((s) => s.kind === 'unstoppable' && s.until > this.tick);
+  }
+
   addStatus(u: Unit, s: Omit<Status, 'until'> & { seconds: number }) {
+    if ((s.kind === 'slow' || s.kind === 'root' || s.kind === 'stun') && this.isUnstoppable(u)) return;
     const until = this.tick + ticks(s.seconds);
     if (s.kind === 'momentum' || s.kind === 'mark' || s.kind === 'soak' || s.kind === 'bearing') {
       const cur = u.statuses.find((o) => o.kind === s.kind && o.sourceId === s.sourceId);
@@ -456,7 +470,7 @@ export class World {
 
   /** Drag `u` to `to` (pulls, knockbacks). It can't act until it arrives; wind-ups and dashes are cancelled. */
   pull(u: Unit, to: Vec2, speed: number) {
-    if (u.speed <= 0 || u.dead) return;
+    if (u.speed <= 0 || u.dead || this.isUnstoppable(u)) return;
     u.forced = { to: clampToLane(to, u.radius), speed };
     u.windup = 0;
     if (u.champ) {
@@ -467,7 +481,7 @@ export class World {
 
   /** Shift `u` up to `max` toward `to` this tick (slow drags like a whirlpool). */
   nudge(u: Unit, to: Vec2, max: number) {
-    if (u.speed <= 0 || u.dead) return;
+    if (u.speed <= 0 || u.dead || this.isUnstoppable(u)) return;
     u.pos = clampToLane(toward(u.pos, to, max), u.radius);
     this.resolveStructures(u);
   }
@@ -704,6 +718,7 @@ export class World {
     if (src?.champ) {
       amount *= 1 + src.champ.mods.dmgAmp;
       for (const a of perksOf(src)) amount *= a.damageMult?.(this, src, target) ?? 1;
+      amount *= kitOf(src).damageMult?.(this, src, target) ?? 1;
     }
     if (target.champ) {
       amount *= target.champ.mods.takenMult;
@@ -812,7 +827,7 @@ export class World {
       const atFountain = dist(u.pos, spawnPoint(u.team)) <= FOUNTAIN.radius;
       const c = u.champ!;
       this.heal(u, (CHAMPION_REGEN + (atFountain ? u.maxHp * FOUNTAIN.healPerSec : 0)) * DT);
-      const bonusRegen = kitOf(u).resource === 'bees' ? 0 : c.mods.manaRegen; // mana items don't grow bees
+      const bonusRegen = kitOf(u).resource ? 0 : c.mods.manaRegen; // mana items don't grow bees (or Gormund's mana)
       c.mana = Math.min(c.maxMana, c.mana + (kitOf(u).stats.manaRegen + bonusRegen + (atFountain ? c.maxMana * FOUNTAIN.healPerSec : 0)) * DT);
     }
     for (const u of this.champions()) {

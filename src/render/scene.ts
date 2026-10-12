@@ -112,7 +112,41 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
-  if (u.champ!.kit === 'aurelle') {
+  if (u.champ!.kit === 'gormund') {
+    // A hulking, hunched minotaur: broad chest, bull head with horns and a brass nose ring, chain-wrapped
+    // fists, no weapon.
+    const hide = new THREE.MeshStandardMaterial({ color: 0x6b4630, flatShading: true });
+    const horn = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, flatShading: true });
+    const brass = new THREE.MeshStandardMaterial({ color: 0xd8a84a, metalness: 0.7, roughness: 0.3 });
+    const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.38, 0.9, 8), teamMat);
+    legs.position.y = 0.45;
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.72, 12, 10).scale(0.9, 1, 1.1), hide);
+    chest.position.set(0.12, 1.45, 0);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.5), hide);
+    head.position.set(0.62, 1.95, 0);
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.3, 0.42), new THREE.MeshStandardMaterial({ color: 0x4a3022, flatShading: true }));
+    muzzle.position.set(0.98, 1.85, 0);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 6, 14), brass);
+    ring.position.set(1.13, 1.74, 0);
+    ring.rotation.y = Math.PI / 2;
+    g.add(legs, chest, head, muzzle, ring);
+    for (const side of [-1, 1]) {
+      const h = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.7, 8), horn);
+      h.position.set(0.6, 2.3, side * 0.42);
+      h.rotation.x = side * -0.9;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), glow);
+      eye.position.set(0.94, 2.03, side * 0.17);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.75, 4, 8), hide);
+      arm.position.set(0.3, 1.15, side * 0.8);
+      arm.rotation.z = -0.3;
+      const fist = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), hide);
+      fist.position.set(0.48, 0.72, side * 0.82);
+      const chain = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.04, 6, 12), metal);
+      chain.position.set(0.42, 0.9, side * 0.82);
+      chain.rotation.x = Math.PI / 2;
+      g.add(h, eye, arm, fist, chain);
+    }
+  } else if (u.champ!.kit === 'aurelle') {
     // A floating battle mage: flowing robe with no legs, white-and-gold armour, gold hair, glowing
     // violet eyes, and her rune spear hovering at her side (named so the view can hide it when thrown).
     const robe = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0xf1ece0, flatShading: true }));

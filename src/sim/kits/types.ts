@@ -20,12 +20,15 @@ export interface CastCtx {
   rank: number;
   /** This is the recast of an ability with a recast window. */
   recast: boolean;
+  /** Health spent on this cast (health-cost kits), so it can be refunded. */
+  paid?: number;
 }
 
 export interface AbilityDef {
   name: string;
   icon: string;
   maxRank: number;
+  /** Mana (or bees). For `resource: 'health'` kits, a fraction of current health (0.07 = 7%). */
   cost: (rank: number) => number;
   /** Seconds. */
   cooldown: (rank: number) => number;
@@ -82,9 +85,14 @@ export interface Kit {
   passive: { name: string; icon: string; describe: (self: Unit) => string };
   /**
    * What the mana bar holds. 'bees' (Mabel): a small whole-number pool; mana items and augments
-   * don't add to it, and the HUD shows it as bees.
+   * don't add to it, and the HUD shows it as bees. 'health' (Gormund): no mana at all; abilities
+   * cost a fraction of current health (never lethal) and the HUD hides the mana bar.
    */
-  resource?: 'mana' | 'bees';
+  resource?: 'mana' | 'bees' | 'health';
+  /** Abilities cost nothing right now (Gormund's Labyrinth Rage). */
+  freeCasts?: (world: World, self: Unit) => boolean;
+  /** Multiplier on all damage we deal right now (Gormund's Fury). */
+  damageMult?: (world: World, self: Unit, target: Unit) => number;
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */

@@ -11,7 +11,7 @@ export interface Vec2 {
 export type Team = 'blue' | 'red';
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -47,7 +47,7 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal' | 'unstoppable';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
@@ -57,7 +57,7 @@ export interface Status {
    * sting: a bee latched on, damage per second (like burn); honey: honeyed, bees hit harder;
    * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction;
    * impale: Aurelle's spear is stuck in this unit (she can recall it through them); arsenal: Aurelle's
-   * ultimate is up (spectral lances ring her).
+   * ultimate is up (spectral lances ring her); unstoppable: ignores slows, roots, stuns and displacement.
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -93,7 +93,7 @@ export interface ChampState {
   maxMana: number;
   abilities: [AbilityState, AbilityState, AbilityState, AbilityState];
   /** Rooted while winding up an ability; it fires at `fireAt`. */
-  casting: { slot: Slot; at: Vec2; fireAt: number; recast: boolean } | null;
+  casting: { slot: Slot; at: Vec2; fireAt: number; recast: boolean; paid: number } | null;
   /** The latest ability cast (or recast), for the renderer's cast animation. */
   lastCast: { slot: Slot; tick: number; time: number } | null;
   /** A cast pressed during a wind-up or dash; it fires as soon as the champion is free (if before `until`). */
@@ -166,7 +166,7 @@ export interface Unit {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone';
 
 export interface Missile {
   id: number;
@@ -224,7 +224,7 @@ export interface Telegraph {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam';
   pos: Vec2;
   dir?: number;
   radius?: number;

@@ -16,7 +16,7 @@ npm run dev        # http://localhost:5173 (?seed=42 for a fixed seed)
 npm test           # sim tests
 ```
 
-**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel|aurelle`, `&enemy=…` (defaults to the other one), `&seed=42`.
+**Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel|aurelle|gormund`, `&enemy=…` (defaults to the other one), `&seed=42`.
 
 **Champions** (kits in `src/sim/kits/`):
 
@@ -34,9 +34,11 @@ npm test           # sim tests
 
 **Aurelle, the Spellspear** (floating battle mage): **Bound Weapon** passive: holding her spear she attacks with 2.6-range thrusts; without it, arcane bolts (range 5, 70% damage); picking it up empowers her next thrust, and a dropped spear flies back after 6s · **Q Arcane Lance**: throw the spear through minions; if it impales a champion it stops in them and she can recast within 3s to rip it back through everything (60% damage); a miss lands at max range and can't be recalled · **W Glyph Step**: blink, leaving a glyph that detonates and slows · **E Sweep / Arcane Nova**: with the spear, a knockback sweep; without it, a bigger burst · **R Arsenal Ascendant**: for 6s, Arcane Lance throws three returning spectral lances (2s cooldown) and her attacks cleave; then they crash down around her.
 
+**Gormund, Lord of the Labyrinth** (a minotaur; melee juggernaut, bare-handed): no mana; **abilities cost a share of his current health** (never lethal). **Thick Hide** passive: after 3s without trading with the enemy champion or taking tower shots (minions don't count), he regenerates 5% max HP per second; **Fury**: up to +30% damage as his health drops, maxed at 30% health · **Q Hurl Stone** (7%): a rock skillshot that slows 35% and shatters for 60% splash; hitting the champion refunds its cost · **W Bellow** (5%): a roar that slows nearby enemies 35%, gives him 25% speed for 2s and 25% damage reduction for 3s · **E Bull Rush** (10%): a straight 6-unit charge; the first champion in the way is carried to the end and stunned for 0.75s, minions are shoved aside · **R Labyrinth Rage**: for 7s he grows huge, is unstoppable (sheds and ignores slows, roots, stuns and pulls), casts for free and heals for 20% of his damage.
+
 Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
 
-Crowd control: **root** (no walking, dashing or blinking), **stun** (nothing, and it interrupts wind-ups), **shields** (absorb damage first, shown white on health bars) and **pulls**. A cast pressed during another wind-up or dash is buffered for 0.4s, so combos like E→W don't drop keys.
+Crowd control: **root** (no walking, dashing or blinking), **stun** (nothing, and it interrupts wind-ups), **shields** (absorb damage first, shown white on health bars) and **pulls**. **Unstoppable** units ignore all of it. A cast pressed during another wind-up or dash is buffered for 0.4s, so combos like E→W don't drop keys.
 
 Levels 1–11 from XP (minions dying within 12 units, champion kills). Each level gives a skill point: basics up to rank ceil(level/2), max 5; ultimate at 6 and 11.
 

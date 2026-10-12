@@ -48,11 +48,11 @@ export class HealthBars {
       bar.shield.style.left = `${hpPct}%`;
       bar.shield.style.width = `${(100 * shield) / scale}%`;
       if (bar.cc) {
-        const cc = this.world.isStunned(u) ? 'STUNNED' : this.world.isRooted(u) ? 'ROOTED' : '';
+        const cc = this.world.isStunned(u) ? 'STUNNED' : this.world.isRooted(u) ? 'ROOTED' : this.world.isUnstoppable(u) ? 'UNSTOPPABLE' : '';
         if (bar.cc.textContent !== cc) bar.cc.textContent = cc;
       }
       if (u.champ && bar.mana && bar.lvl) {
-        bar.mana.style.width = `${(100 * u.champ.mana) / u.champ.maxMana}%`;
+        bar.mana.style.width = u.champ.maxMana > 0 ? `${(100 * u.champ.mana) / u.champ.maxMana}%` : '0%'; // Gormund has no mana
         bar.lvl.textContent = String(u.champ.level);
         bar.el.classList.toggle('marked', !!this.world.status(u, 'mark'));
       }

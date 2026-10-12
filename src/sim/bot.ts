@@ -1,6 +1,7 @@
 import { lead, leadTime, minionInTheWay } from './aim';
 import { kitOf } from './kits';
 import { holdingSpear, spearOnGround } from './kits/aurelle';
+import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -105,12 +106,21 @@ export class BotController implements Controller {
       lisha: { play: this.lisha, escape: this.lishaEscape },
       mabel: { play: this.mabel, escape: this.mabelEscape },
       aurelle: { play: this.aurelle, escape: this.aurelleEscape },
+      gormund: { play: this.gormund, escape: this.gormundEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
-    if (self.hp < self.maxHp * 0.3) this.retreating = true;
-    if (self.hp > self.maxHp * 0.9) this.retreating = false;
-    if (this.retreating) return kitPlay.escape.call(this, ctx) ?? { type: 'move', to: spawnPoint(self.team) };
+    // Gormund fights on lower (Fury) and only needs to get back to most of his health: Thick Hide
+    // regenerates it in lane.
+    const tanky = self.champ!.kit === 'gormund';
+    if (self.hp < self.maxHp * (tanky ? 0.22 : 0.3)) this.retreating = true;
+    if (self.hp > self.maxHp * (tanky ? 0.65 : 0.9)) this.retreating = false;
+    if (this.retreating) {
+      // Gormund doesn't need the fountain: once nobody is hitting him, he stands still and regenerates.
+      const chased = world.units.some((u) => !u.dead && u.team !== self.team && u.attackTarget === self.id);
+      if (tanky && !chased && !ctx.near(9) && calmFor(world, self) > TICK_HZ * 2 && !ctx.unsafe(self.pos)) return { type: 'stop' };
+      return kitPlay.escape.call(this, ctx) ?? { type: 'move', to: spawnPoint(self.team) };
+    }
     if (ctx.unsafe(self.pos)) return { type: 'move', to: { x: self.pos.x - towardFoe * 4, y: self.pos.y } };
 
     const play = kitPlay.play.call(this, ctx);
@@ -480,6 +490,72 @@ export class BotController implements Controller {
   private aurelleEscape({ self, near, ready }: Ctx): Command | null {
     // Blink home, leaving a glyph on the chaser.
     if (ready(1) && near(4)) return cast(1, spawnPoint(self.team));
+    return null;
+  }
+
+  // ---------- Gormund ----------
+
+  private gormund(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim, aimAfter } = ctx;
+    if (!foe) return this.gormundFarm(ctx);
+    const { Q, W, E } = GORMUND_TUNING;
+    const hp = self.hp / self.maxHp;
+    const foeHp = foe.hp / foe.maxHp;
+    const d = gap(self, foe);
+    // Fury makes low health less scary for him than for anyone else, so he commits on even trades.
+    const fighting = foeHp < 0.6 || hp > foeHp - 0.05 || raging(world, self);
+    // Hitting a champion turns their minions on him, so don't dive into the middle of their wave
+    // unless it ends the fight (or Labyrinth Rage is carrying him through it).
+    const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
+    const safe = !unsafe(foe.pos) && (wave < 3 || foeHp < 0.3 || raging(world, self));
+    // Only chase what he can catch: slowed, stunned, nearly dead, or already in his face. Otherwise
+    // he farms and lets ranged champions come to him.
+    const caught = world.isRooted(foe) || !!world.status(foe, 'slow') || foeHp < 0.3 || near(2) || raging(world, self);
+    if (ready(3) && near(4) && fighting && safe) return cast(3, self.pos);
+    // Bellow when they're in reach: slows them for the chase and cuts what he takes in the trade.
+    if (ready(1) && near(W.radius - 0.5) && (fighting || world.tick - self.lastHurtTick < 10)) return cast(1, self.pos);
+    // Fresh from a Bull Rush or Hurl Stone: they're stuck, swing.
+    if (caught && fighting && near(4) && safe) return { type: 'attack', target: foe.id };
+    // Being poked from out of reach: charge them (unless their whole wave is waiting), or throw a
+    // stone, or back off out of their range. Never just stand and take it.
+    const poked = foe.attackTarget === self.id && d > self.range + 0.5;
+    if (poked) {
+      if (ready(2) && d < E.range - 0.5 && hp > 0.35 && !unsafe(foe.pos) && (wave < 4 || foeHp < 0.5)) {
+        const p = aimAfter(foe, E.windup + d / E.speed);
+        return cast(2, toward(self.pos, p, dist(self.pos, p) + 2));
+      }
+      if (ready(0) && near(Q.range - 0.5)) {
+        const p = aim(foe, Q.speed);
+        if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+      }
+      const back = self.team === 'blue' ? -1 : 1;
+      const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2), y: self.pos.y };
+      if (!unsafe(out)) return { type: 'move', to: out };
+    }
+    // Bull Rush through them (aimed past, so they're carried the full distance).
+    if (ready(2) && d > 1.5 && d < E.range - 0.5 && fighting && safe && (hp > 0.3 || foeHp < 0.3)) {
+      const p = aimAfter(foe, E.windup + d / E.speed);
+      return cast(2, toward(self.pos, p, dist(self.pos, p) + 2));
+    }
+    if (ready(0) && near(Q.range - 0.5) && (hp > 0.35 || raging(world, self) || foeHp < 0.3)) {
+      const p = aim(foe, Q.speed);
+      if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+    }
+    return this.gormundFarm(ctx);
+  }
+
+  /** Hurl Stone into a clump of minions when healthy: the shatter clears waves, and Thick Hide pays it back. */
+  private gormundFarm({ world, self, unsafe, ready }: Ctx): Command | null {
+    const { Q } = GORMUND_TUNING;
+    if (!ready(0) || self.hp < self.maxHp * 0.45) return null;
+    const minions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < Q.range && !unsafe(u.pos));
+    const best = minions.find((m) => minions.filter((o) => dist(o.pos, m.pos) < Q.shatter).length >= 3);
+    return best && !minionInTheWay(world, self, best.pos, Q.width, best) ? cast(0, best.pos) : null;
+  }
+
+  private gormundEscape({ self, near, ready }: Ctx): Command | null {
+    // Slow them and run.
+    if (ready(1) && near(GORMUND_TUNING.W.radius)) return cast(1, self.pos);
     return null;
   }
 

@@ -4,6 +4,7 @@ import { KITS } from './kits';
 import { SIGNATURE_SUMMONERS } from './summoners';
 import { MABEL_TUNING } from './kits/mabel';
 import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
+import { GORMUND_TUNING, fury } from './kits/gormund';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -730,8 +731,109 @@ describe('Aurelle', () => {
   });
 });
 
+describe('Gormund', () => {
+  const { HIDE, Q, W, E, R } = GORMUND_TUNING;
+  /** Count him as in combat for the whole test, so Thick Hide's regeneration stays out of the numbers. */
+  const fighting = (me: Unit) => ((me.champ!.data as { struck?: number }).struck = 1e9);
+
+  it('abilities cost a share of current health, never mana, and never kill him', () => {
+    const { w, me, cast } = setup('gormund');
+    fighting(me);
+    expect(w.castBlocker(me, 1)).toBe(null);
+    me.champ!.mana = 0;
+    me.hp = 100;
+    cast(1, 0);
+    expect(me.hp).toBeCloseTo(100 * (1 - W.cost), 0);
+    me.hp = 1;
+    me.champ!.abilities[2].readyAt = 0;
+    cast(2, 5);
+    expect(me.hp).toBeGreaterThan(0);
+    expect(me.dead).toBe(false);
+  });
+
+  it('Hurl Stone slows, and hitting the champion gives the health back', () => {
+    const { w, me, cast } = setup('gormund');
+    const t = dummy(w, 6);
+    fighting(me);
+    me.hp = me.maxHp * 0.5; // below full, so the refund has room
+    const before = me.hp;
+    cast(0, 6);
+    run(w, 0.6);
+    expect(w.status(t, 'slow', me.id)).toBeTruthy();
+    expect(me.hp).toBeGreaterThan(before - 1); // paid, then refunded (plus a little regen)
+    near(lost(t), KITS.gormund.abilities[0].damage!(1, me) * (1 + fury(me)), 20);
+
+    const { w: w2, me: me2, cast: cast2 } = setup('gormund');
+    fighting(me2);
+    me2.hp = me2.maxHp * 0.5;
+    const before2 = me2.hp;
+    cast2(0, -6); // a miss keeps the cost
+    run(w2, 0.6);
+    expect(me2.hp).toBeLessThan(before2 - before2 * Q.cost + 5);
+  });
+
+  it('Bellow slows enemies around him, speeds him up and cuts the damage he takes', () => {
+    const { w, me, cast } = setup('gormund');
+    const t = dummy(w, 2.5);
+    const far = dummy(w, W.radius + 3);
+    cast(1, 0);
+    expect(w.status(t, 'slow', me.id)).toBeTruthy();
+    expect(w.status(far, 'slow', me.id)).toBeFalsy();
+    expect(w.effectiveSpeed(me)).toBeCloseTo(me.speed * (1 + W.haste), 5);
+    const hp = me.hp;
+    w.dealDamage(null, me, 100);
+    expect(hp - me.hp).toBeCloseTo(100 * (1 - W.guard), 3);
+  });
+
+  it('Bull Rush carries the first champion to the end of the charge and stuns it', () => {
+    const { w, me, cast } = setup('gormund');
+    const t = dummy(w, 2);
+    cast(2, 10);
+    run(w, E.windup + E.range / E.speed + 0.3);
+    expect(me.pos.x).toBeGreaterThan(E.range - 0.3);
+    expect(t.pos.x).toBeGreaterThan(me.pos.x); // still in front of him, carried along
+    expect(w.isStunned(t)).toBe(true);
+    expect(lost(t)).toBeGreaterThan(KITS.gormund.abilities[2].damage!(1, me) - 10);
+  });
+
+  it('Labyrinth Rage: unstoppable, free abilities, and he heals off his damage', () => {
+    const { w, me, cast } = setup('gormund');
+    const t = dummy(w, 6);
+    w.addStatus(me, { kind: 'slow', value: 0.5, sourceId: t.id, seconds: 3 });
+    cast(3, 0);
+    expect(w.status(me, 'slow')).toBeFalsy(); // shaken off
+    w.addStatus(me, { kind: 'stun', value: 1, sourceId: t.id, seconds: 1 });
+    w.pull(me, { x: -5, y: 0 }, 20);
+    expect(w.isStunned(me)).toBe(false);
+    expect(me.forced).toBe(null);
+    fighting(me);
+    me.hp = me.maxHp * 0.5;
+    const before = me.hp;
+    cast(0, 6);
+    expect(me.hp).toBeCloseTo(before, 0); // free (base regen aside)
+    run(w, 0.6);
+    const dealt = lost(t);
+    expect(me.hp - before).toBeGreaterThan(dealt * R.vamp * 0.9);
+  });
+
+  it('Fury grows as his health drops, and he regenerates once out of combat', () => {
+    const { w, me } = setup('gormund');
+    expect(fury(me)).toBe(0);
+    me.hp = me.maxHp * HIDE.furyAt;
+    expect(fury(me)).toBeCloseTo(HIDE.fury, 5);
+    me.hp = me.maxHp * 0.5;
+    const t = dummy(w, 3);
+    w.dealDamage(t, me, 1);
+    const hurt = me.hp;
+    run(w, HIDE.calm - 0.5);
+    expect(me.hp - hurt).toBeLessThan(me.maxHp * 0.01); // only base regen while in combat
+    run(w, 1.5);
+    expect(me.hp - hurt).toBeGreaterThan(me.maxHp * HIDE.regen * 0.8);
+  });
+});
+
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });

@@ -14,10 +14,13 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'tower') return { name: 'tower', height: 7.2 };
   if (u.kind === 'nexus') return { name: 'nexus', height: 6.2 };
   // Champions are oversized next to structures, as in League, so they read from the MOBA camera.
-  // Tock is a big clockwork knight; Mabel a small mouse.
-  if (u.champ) return { name: `champ_${u.champ.kit}`, height: u.champ.kit === 'tock' ? 2.8 : u.champ.kit === 'mabel' ? 2.0 : 2.5 };
+  // Tock is a big clockwork knight, Gormund a hulking minotaur; Mabel a small mouse.
+  if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
   return undefined;
 }
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0 };
+/** Gormund's Labyrinth Rage: he grows this much while it lasts. */
+const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
 /** A dead champion's body stays visible this long (its death clip), then hides until respawn. */
 const CHAMP_CORPSE_SECONDS = 2.5;
@@ -105,6 +108,8 @@ function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMat
     spear: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xc9b6ff, height: 1.2 }),
     lance: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xe6dcff, height: 1.3, opacity: 0.55 }),
     // Tether: a glowing hook, open end forward.
+    // Gormund's Hurl Stone: a tumbling chunk of labyrinth floor.
+    stone: () => ({ geo: new THREE.DodecahedronGeometry(0.42), color: 0x8f877b, height: 1.3 }),
     tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
   };
   const look = looks[m.style]();
@@ -263,6 +268,12 @@ export class WorldView {
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
       if (u.champ?.kit === 'aurelle') this.aurelleVisuals(u, v);
+      if (u.champ?.kit === 'gormund') {
+        // Labyrinth Rage: swell up over a fifth of a second, shrink back when it ends.
+        const goal = !u.dead && u.statuses.some((s) => s.kind === 'unstoppable' && s.until > tick) ? RAGE_GROWTH : 1;
+        const s = v.obj.scale.x + (goal - v.obj.scale.x) * Math.min(1, dt * 10);
+        v.obj.scale.setScalar(s);
+      }
 
       if (v.anim) {
         // Skeletal: run/walk while moving, idle otherwise, one-shot clips for attacks and casts.

@@ -20,6 +20,7 @@ export const MODELS = {
   champ_lisha: 'Lisha.glb',
   champ_mabel: 'Mabel.glb',
   champ_aurelle: 'Aurelle.glb',
+  champ_gormund: 'Gormund.glb',
 } as const;
 export type ModelName = keyof typeof MODELS;
 

@@ -8,9 +8,11 @@ import { TICK_HZ, type World, xpToNext } from '../sim/world';
 const KEYS = ['Q', 'W', 'E', 'R'];
 const SLOTS: Slot[] = [0, 1, 2, 3];
 const SPELL_KEYS = ['D', 'F'];
-/** "40 mana", or for Mabel "1 bee" / "No bees". */
-const costText = (n: number, resource: 'mana' | 'bees' = 'mana') =>
-  resource === 'bees' ? (n ? `${n} bee${n === 1 ? '' : 's'}` : 'No bees') : `${n} mana`;
+/** "40 mana", for Mabel "1 bee" / "No bees", for Gormund "7% current health". */
+const costText = (n: number, resource: 'mana' | 'bees' | 'health' = 'mana') =>
+  resource === 'bees' ? (n ? `${n} bee${n === 1 ? '' : 's'}` : 'No bees')
+    : resource === 'health' ? (n ? `<span class="blood">${Math.round(n * 100)}% current health</span>` : 'No cost')
+    : `${n} mana`;
 /** Tooltip ids at or above this are summoner spells (SPELL_TIP + slot). */
 const SPELL_TIP = 10;
 
@@ -32,8 +34,9 @@ export class AbilityBar {
   private spells: { root: HTMLDivElement; cd: HTMLDivElement; cdText: HTMLSpanElement }[] = [];
   private hp: HTMLDivElement;
   private hpText: HTMLSpanElement;
-  private mana: HTMLDivElement;
-  private manaText: HTMLSpanElement;
+  /** Missing for kits with no mana bar (Gormund pays in health). */
+  private mana: HTMLDivElement | null;
+  private manaText: HTMLSpanElement | null;
   private xp: HTMLDivElement;
   private level: HTMLSpanElement;
   private tip = document.getElementById('tip')!;
@@ -64,14 +67,14 @@ export class AbilityBar {
           </div>
         </div>
         <div class="bar hp"><div></div><span></span></div>
-        <div class="bar mana${kit.resource === 'bees' ? ' bees' : ''}"><div></div><span></span></div>
+        ${kit.resource === 'health' ? '' : `<div class="bar mana${kit.resource === 'bees' ? ' bees' : ''}"><div></div><span></span></div>`}
         <div class="bar xp"><div></div></div>
       </div>`;
     const q = <T extends Element>(sel: string, el: ParentNode = this.root) => el.querySelector(sel) as T;
     this.hp = q('.hp > div');
     this.hpText = q('.hp > span');
-    this.mana = q('.mana > div');
-    this.manaText = q('.mana > span');
+    this.mana = this.root.querySelector<HTMLDivElement>('.mana > div');
+    this.manaText = this.root.querySelector<HTMLSpanElement>('.mana > span');
     this.xp = q('.xp > div');
     this.level = q('.portrait .lvl');
     this.root.querySelectorAll<HTMLDivElement>('.slot:not(.passive):not(.spell)').forEach((root, i) => {
@@ -105,10 +108,12 @@ export class AbilityBar {
     this.level.textContent = String(c.level);
     this.hp.style.width = `${(100 * me.hp) / me.maxHp}%`;
     this.hpText.textContent = `${Math.ceil(me.hp)} / ${Math.round(me.maxHp)}`;
-    this.mana.style.width = `${(100 * c.mana) / c.maxMana}%`;
-    this.manaText.textContent = kit.resource === 'bees'
-      ? `🐝 ${Math.floor(c.mana)} / ${Math.floor(c.maxMana)}`
-      : `${Math.floor(c.mana)} / ${Math.round(c.maxMana)}`;
+    if (this.mana && this.manaText) {
+      this.mana.style.width = `${(100 * c.mana) / c.maxMana}%`;
+      this.manaText.textContent = kit.resource === 'bees'
+        ? `🐝 ${Math.floor(c.mana)} / ${Math.floor(c.maxMana)}`
+        : `${Math.floor(c.mana)} / ${Math.round(c.maxMana)}`;
+    }
     this.xp.style.width = c.level >= 11 ? '100%' : `${(100 * c.xp) / xpToNext(c.level)}%`;
 
     SLOTS.forEach((s) => {
@@ -123,7 +128,7 @@ export class AbilityBar {
       el.cdText.textContent = !recast && left > 0 ? (left < 1 ? left.toFixed(1) : String(Math.ceil(left))) : '';
       el.root.classList.toggle('oncd', el.cdText.textContent !== '');
       el.root.classList.toggle('locked', st.rank === 0);
-      el.root.classList.toggle('nomana', st.rank > 0 && !recast && c.mana < def.cost(st.rank));
+      el.root.classList.toggle('nomana', st.rank > 0 && !recast && kit.resource !== 'health' && c.mana < def.cost(st.rank));
       el.root.classList.toggle('recast', recast);
       el.root.classList.toggle('casting', c.casting?.slot === s);
       el.root.classList.toggle('unavailable', !recast && world.castBlocker(me, s) === 'unavailable'); // Aurelle's spear is away

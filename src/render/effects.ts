@@ -367,6 +367,33 @@ export class EffectsView {
         });
         break;
       }
+      // ---- Gormund ----
+      case 'bellow': {
+        // Labyrinth roar: two rust-red shockwave rings racing out to the edge of its reach.
+        for (const [delay, opacity] of [[0, 0.85], [0.25, 0.5]] as const) {
+          const r = ringShape(fx.radius ?? 3, 0.25, basic(0xd0603a, opacity));
+          add(r, 0.55, (k) => {
+            const t = Math.max(0, (k - delay) / (1 - delay));
+            (r.material as THREE.MeshBasicMaterial).opacity = t > 0 ? opacity * (1 - t) : 0;
+            r.scale.setScalar(0.2 + t * 0.85);
+          });
+        }
+        break;
+      }
+      case 'slam': {
+        // Bull Rush's impact: a dust ring and a low brown dome.
+        const r = ringShape(fx.radius ?? 1.4, 0.35, basic(0xb89a72, 0.9));
+        add(r, 0.45, (k) => {
+          fade(r, 0.9)(k);
+          r.scale.setScalar(0.5 + k * 1.1);
+        });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(fx.radius ?? 1.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), basic(0x8a7458, 0.5));
+        add(dome, 0.4, (k) => {
+          fade(dome, 0.5)(k);
+          dome.scale.set(0.6 + k * 0.6, 0.5 * (1 - k), 0.6 + k * 0.6);
+        });
+        break;
+      }
       case 'rewind': {
         const c = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 3, 20, 1, true), basic(TIME, 0.6));
         c.position.y = 1.5;
