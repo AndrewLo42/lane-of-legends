@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
-import type { KitId, Missile, MissileStyle, Unit, Vec2 } from '../sim/types';
+import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
 import { RIGS } from './rigs';
 import { KITS } from '../sim/kits';
+import { Chain, Trail, buildMissile, type MissileLook } from './missiles';
 import { TEAM_COLOR, placeholderFor } from './scene';
 
 /** Unit → Meshy model and its in-game height (metres); placeholders are used when none is loaded. */
@@ -77,8 +78,11 @@ interface UnitView {
 interface MissileView {
   obj: THREE.Object3D;
   prev: Vec2;
-  mat: THREE.MeshBasicMaterial;
-  color: THREE.Color;
+  look: MissileLook;
+  trail?: Trail;
+  chain?: Chain;
+  /** Seconds since it was thrown (spins, wing flaps). */
+  age: number;
 }
 
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
@@ -92,35 +96,6 @@ const FLOAT_HEIGHT: Partial<Record<KitId, number>> = { aurelle: 0.35 };
 /** How fast a floater's idle plays while she glides (1 = normal). */
 const GLIDE_IDLE_SPEED = 0.3;
 
-/** Mesh per missile style, built pointing along +x. */
-function missileMesh(m: Missile): { obj: THREE.Object3D; mat: THREE.MeshBasicMaterial; height: number } {
-  const team = TEAM_COLOR[m.team];
-  const looks: Record<MissileStyle, () => { geo: THREE.BufferGeometry; color: number; height: number; opacity?: number }> = {
-    auto: () => ({ geo: new THREE.SphereGeometry(0.16, 8, 6), color: team, height: 1.1 }),
-    tower: () => ({ geo: new THREE.SphereGeometry(0.3, 10, 8), color: team, height: 6.4 }),
-    spark: () => ({ geo: new THREE.CapsuleGeometry(0.16, 1.1, 4, 8).rotateZ(Math.PI / 2), color: 0xffd76a, height: 1.1 }),
-    flare: () => ({ geo: new THREE.IcosahedronGeometry(0.38, 1), color: 0xb36bff, height: 1.1 }),
-    bolt: () => ({ geo: new THREE.OctahedronGeometry(0.22), color: 0x9fe8ff, height: 1.1 }),
-    wave: () => ({ geo: new THREE.BoxGeometry(1.2, 1.4, m.width), color: 0xffc94a, height: 0.9, opacity: 0.55 }),
-    tide: () => ({ geo: new THREE.ConeGeometry(0.3, 1.0, 8).rotateZ(-Math.PI / 2), color: 0x7fe0ff, height: 1.0, opacity: 0.85 }),
-    petal: () => ({ geo: new THREE.ConeGeometry(0.16, 0.9, 4).rotateZ(-Math.PI / 2).scale(1, 0.35, 1), color: 0xf7a8c8, height: 1.2 }),
-    // Bee: a small striped body (Mabel's autos, stings, hive and Queen's Fury).
-    bee: () => ({ geo: new THREE.SphereGeometry(0.13, 8, 6).scale(1.5, 1, 1), color: 0xf2b632, height: 1.0 }),
-    // Aurelle's spear: a long glowing shaft with a leaf blade, point forward; Arsenal's lances are ghostly copies.
-    spear: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xc9b6ff, height: 1.2 }),
-    lance: () => ({ geo: new THREE.CylinderGeometry(0.03, 0.12, 1.6, 6).rotateZ(-Math.PI / 2), color: 0xe6dcff, height: 1.3, opacity: 0.55 }),
-    // Tether: a glowing hook, open end forward.
-    // Gormund's Hurl Stone: a tumbling chunk of labyrinth floor.
-    stone: () => ({ geo: new THREE.DodecahedronGeometry(0.42), color: 0x8f877b, height: 1.3 }),
-    // Sable's Reaping Hook: the scythe's crescent blade, flying point-first on its chain.
-    hook: () => ({ geo: new THREE.TorusGeometry(0.42, 0.06, 6, 18, Math.PI * 1.1).rotateZ(-Math.PI * 0.55).rotateX(Math.PI / 2), color: 0xe6dcb0, height: 1.2 }),
-    tether: () => ({ geo: new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.3).rotateX(Math.PI / 2), color: 0xc9f2ff, height: 1.1 }),
-  };
-  const look = looks[m.style]();
-  const mat = new THREE.MeshBasicMaterial({ color: look.color, transparent: look.opacity != null, opacity: look.opacity ?? 1 });
-  return { obj: new THREE.Mesh(look.geo, mat), mat, height: look.height };
-}
-
 /**
  * Mirrors the sim into the scene: creates and removes meshes as units and missiles come and go,
  * interpolates positions between ticks, and adds cheap feedback (attack lunge, hit flash).
@@ -130,6 +105,8 @@ export class WorldView {
   /** Dead minions playing their death clip before they're removed. */
   private corpses: { v: UnitView; age: number; collapse: boolean }[] = [];
   private missiles = new Map<number, MissileView>();
+  /** Trails of missiles that just landed, fading out. */
+  private fadingTrails: Trail[] = [];
 
   constructor(private scene: THREE.Scene, private world: World) {
     this.sync();
@@ -189,19 +166,34 @@ export class WorldView {
     for (const m of this.world.missiles) {
       liveMissiles.add(m.id);
       if (this.missiles.has(m.id)) continue;
-      const { obj, mat, height } = missileMesh(m);
-      obj.position.set(m.pos.x, height, m.pos.y);
-      obj.userData.height = height;
+      const look = buildMissile(m);
+      const obj = look.obj;
+      obj.position.set(m.pos.x, look.height, m.pos.y);
+      obj.userData.height = look.height;
       this.scene.add(obj);
-      this.missiles.set(m.id, { obj, prev: { ...m.pos }, mat, color: mat.color.clone() });
+      const trail = look.trail ? new Trail(look.trail.color, look.trail.width, look.trail.life) : undefined;
+      if (trail) this.scene.add(trail.mesh);
+      const chain = look.chain ? new Chain() : undefined;
+      if (chain) this.scene.add(chain.group);
+      this.missiles.set(m.id, { obj, prev: { ...m.pos }, look, trail, chain, age: 0 });
     }
     for (const [id, v] of this.missiles) {
       if (liveMissiles.has(id)) continue;
-      this.scene.remove(v.obj);
-      (v.obj as THREE.Mesh).geometry.dispose();
-      v.mat.dispose();
+      this.removeMissile(v);
       this.missiles.delete(id);
     }
+  }
+
+  private removeMissile(v: MissileView) {
+    this.scene.remove(v.obj);
+    v.obj.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.geometry.dispose();
+      if ((o as THREE.Sprite).isSprite) ((o as THREE.Sprite).material as THREE.Material).dispose();
+    });
+    for (const { m } of v.look.mats) m.dispose();
+    v.chain?.dispose();
+    if (v.trail) this.fadingTrails.push(v.trail); // let the ribbon fade out behind where it landed
   }
 
   private removeView(v: UnitView) {
@@ -340,9 +332,26 @@ export class WorldView {
       // Tower shots drop toward their target's chest height.
       v.obj.position.set(x, m.style === 'tower' ? v.obj.position.y + (1.1 - v.obj.position.y) * Math.min(1, dt * 6) : h, z);
       v.obj.rotation.y = -Math.atan2(m.dir.y, m.dir.x);
-      v.mat.color.copy(frozen ? FROZEN : v.color);
+      for (const { m: mat, color } of v.look.mats) mat.color.copy(frozen ? FROZEN : color);
       if (frozen) v.obj.position.y += Math.sin(performance.now() / 60 + m.id) * 0.03; // shiver in place
+      if (!frozen) {
+        v.age += dt;
+        v.look.animate?.(v.age);
+      }
+      v.trail?.update(v.obj.position, dt);
+      if (v.chain) {
+        // From the thrower's hand (or chest height on placeholder figures) to the hook.
+        const src = this.units.get(m.sourceId);
+        const hand = src?.obj.getObjectByName('RightHand');
+        const from = hand ? hand.getWorldPosition(new THREE.Vector3()) : src ? src.obj.position.clone().setY(1.2) : v.obj.position;
+        v.chain.update(from, v.obj.position);
+      }
     }
+    this.fadingTrails = this.fadingTrails.filter((t) => {
+      if (t.update(null, dt)) return true;
+      t.dispose();
+      return false;
+    });
   }
 
   /** Mabel's stings (orbiting bees) and honey (an amber ring). */
@@ -584,7 +593,9 @@ export class WorldView {
     for (const v of this.units.values()) this.removeView(v);
     for (const c of this.corpses) this.removeView(c.v);
     this.corpses = [];
-    for (const v of this.missiles.values()) this.scene.remove(v.obj);
+    for (const v of this.missiles.values()) this.removeMissile(v);
+    for (const t of this.fadingTrails) t.dispose();
+    this.fadingTrails = [];
     this.units.clear();
     this.missiles.clear();
   }

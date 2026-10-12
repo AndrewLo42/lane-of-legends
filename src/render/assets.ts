@@ -237,6 +237,12 @@ const PROPS: Partial<Record<ModelName, PropSpec>> = {
   },
 };
 
+/** A fresh copy of a champion's prop (Aurelle's spear for her thrown spear), built for a model `refHeight` tall. */
+export function buildProp(name: ModelName): { obj: THREE.Object3D; refHeight: number } | null {
+  const spec = PROPS[name];
+  return spec ? { obj: spec.build(), refHeight: spec.refHeight } : null;
+}
+
 /**
  * An independently animatable copy of a model, scaled to `height` metres, facing +x (the sim's
  * facing 0). With a `team` colour, its magenta key cloth is tinted (champions keep their own colours).
