@@ -56,6 +56,7 @@ export const MAREN: Kit = {
   title: 'the Tidecaller',
   blurb: 'Ranged control mage. Land three abilities to root, hook enemies out of position, and drown them in a whirlpool that ends in a stun.',
   color: '#ff9f7a',
+  autoStyle: 'water',
   stats: {
     hp: 610, hpPerLevel: 88, mana: 420, manaPerLevel: 50, manaRegen: 2.6, damage: 52, damagePerLevel: 3,
     attackInterval: 0.8, attackSpeedPerLevel: 0.015, windup: 0.22, range: 5, projectileSpeed: 18, speed: 6.4, radius: 0.6,

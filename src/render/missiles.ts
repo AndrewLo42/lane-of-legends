@@ -38,6 +38,25 @@ function glowMap() {
   return glowTexture;
 }
 
+let bandTexture: THREE.Texture | null = null;
+/** Bright in the middle, fading to nothing at both ends along u: a band of light seen from above. */
+function bandMap() {
+  if (bandTexture) return bandTexture;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 4;
+  const g = c.getContext('2d')!;
+  const grad = g.createLinearGradient(0, 0, 64, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.75, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(0.92, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 4);
+  bandTexture = new THREE.CanvasTexture(c);
+  return bandTexture;
+}
+
 function glow(color: number, size: number) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap(), color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
   s.scale.setScalar(size);
@@ -66,38 +85,123 @@ export function buildMissile(m: Missile): MissileLook {
       add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), basic(team)), glow(team, 0.7));
       return { height: 1.1, trail: { color: team, width: 0.14, life: 0.1 } };
     },
+    // Tower shots: a team-coloured crystal shard, spinning as it falls on its target.
     tower: () => {
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), basic(new THREE.Color(team).lerp(new THREE.Color(0xffffff), 0.45).getHex())), glow(team, 1.7));
-      return { height: 6.4, trail: { color: team, width: 0.32, life: 0.12 } };
+      const light = new THREE.Color(team).lerp(new THREE.Color(0xffffff), 0.45).getHex();
+      const shard = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0).scale(2.2, 0.8, 0.8), basic(light)), glow(team, 1.8));
+      return { height: 6.4, trail: { color: team, width: 0.32, life: 0.12 }, animate: (t) => (shard.rotation.x = t * 10) };
     },
-    // Arlo's Sparkshot: a bright gold streak.
+    // Arlo's autos: a gold dart of gauntlet energy.
+    gauntlet: () => {
+      add(new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0).scale(2.6, 0.7, 0.7), basic(0xfff0b8)), glow(0xf2c14e, 0.75));
+      return { height: 1.1, trail: { color: 0xf2c14e, width: 0.12, life: 0.1 } };
+    },
+    // Maren's autos: an orb of seawater with droplets circling it.
+    water: () => {
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), basic(0x7fe0ff, 0.75));
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), basic(0xeafcff));
+      const drops = droplets(3, 0.2, 0.035, basic(0xbff4ff));
+      add(orb, core, drops, glow(0x7fe0ff, 0.8));
+      return { height: 1.1, trail: { color: 0x5fc8ff, width: 0.14, life: 0.1 }, animate: (t) => (drops.rotation.x = t * 9) };
+    },
+    // Arlo's Sparkshot: a white-hot core with lightning crackling round it.
     spark: () => {
-      add(new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.9, 4, 8).rotateZ(Math.PI / 2), basic(0xfff0b8)), glow(0xffd76a, 1.1));
-      return { height: 1.1, trail: { color: 0xffc94a, width: 0.3, life: 0.12 } };
+      add(new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.7, 4, 8).rotateZ(Math.PI / 2), basic(0xfffbe8)), glow(0xffd76a, 1.2));
+      const arcs = [lightning(0xffe08a, 1.3, 7, 0.14), lightning(0xfff3c4, 1.0, 6, 0.1)];
+      for (const a of arcs) {
+        add(a.group);
+        mats.push({ m: a.mat, color: a.mat.color.clone() });
+      }
+      let next = 0;
+      return {
+        height: 1.1,
+        trail: { color: 0xffc94a, width: 0.3, life: 0.12 },
+        animate: (t) => {
+          if (t < next) return;
+          next = t + 0.05; // re-strike ~20 times a second
+          for (const a of arcs) a.strike();
+        },
+      };
     },
-    // Arlo's Rune Flare: a slowly turning violet rune-orb.
+    // Arlo's Rune Flare: a violet core inside two counter-rotating rune rings.
     flare: () => {
-      const orb = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), basic(0xd2a8ff)), glow(0xb36bff, 1.5));
-      return { height: 1.1, trail: { color: 0xb36bff, width: 0.34, life: 0.25 }, animate: (t) => orb.rotation.set(t * 3, t * 4, 0) };
+      const core = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), basic(0xf0e0ff)), glow(0xb36bff, 1.5));
+      const ringMat = basic(0xb36bff);
+      const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.025, 6, 6), ringMat); // hexagonal: reads as a rune
+      const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.02, 6, 3), ringMat); // triangular
+      add(r1, r2);
+      return {
+        height: 1.1,
+        trail: { color: 0xb36bff, width: 0.34, life: 0.25 },
+        animate: (t) => {
+          core.rotation.set(t * 3, t * 4, 0);
+          r1.rotation.set(t * 2, t * 1.3, 0);
+          r2.rotation.set(-t * 2.6, 0, t * 1.7);
+        },
+      };
     },
-    // Aurelle's unarmed bolts.
+    // Aurelle's unarmed bolts: an arcane shard with two motes circling it.
     bolt: () => {
-      const gem = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.17), basic(0xe6dcff)), glow(0xa98bff, 0.9));
-      return { height: 1.1, trail: { color: 0xa98bff, width: 0.16, life: 0.15 }, animate: (t) => (gem.rotation.x = t * 12) };
+      const gem = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.15).scale(1.6, 1, 1), basic(0xe6dcff)), glow(0xa98bff, 0.9));
+      const motes = droplets(2, 0.2, 0.03, basic(0xcdb6ff));
+      add(motes);
+      return { height: 1.1, trail: { color: 0xa98bff, width: 0.16, life: 0.15 }, animate: (t) => ((gem.rotation.x = t * 12), (motes.rotation.x = -t * 10)) };
     },
-    // Arlo's Skyline Barrage: a translucent wall of light crossing the lane.
+    // Arlo's Skyline Barrage: a shimmering wall of gold light sweeping across the lane.
     wave: () => {
-      add(new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, m.width), basic(0xffc94a, 0.5)));
-      return { height: 0.9 };
+      const sheet = (h: number, op: number) => {
+        const mat = new THREE.MeshBasicMaterial({ map: glowMap(), color: 0xffc94a, blending: THREE.AdditiveBlending, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
+        mats.push({ m: mat, color: mat.color.clone() });
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(m.width + 0.8, h).rotateY(Math.PI / 2), mat);
+        return { mesh, mat };
+      };
+      const outer = sheet(2.2, 0.9);
+      const inner = sheet(1.1, 1);
+      inner.mat.color.set(0xfff3c4);
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, m.width), basic(0xfffbe8));
+      edge.position.y = -0.55;
+      // A broad band of light on the ground under the wall: from the top-down camera the wall itself is edge-on.
+      const bandMat = new THREE.MeshBasicMaterial({ map: bandMap(), color: 0xffc94a, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false });
+      mats.push({ m: bandMat, color: bandMat.color.clone() });
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(2.4, m.width).rotateX(-Math.PI / 2), bandMat);
+      band.position.set(-0.6, -0.95, 0);
+      add(outer.mesh, inner.mesh, edge, band);
+      return {
+        height: 1.0,
+        animate: (t) => {
+          const f = 0.8 + Math.sin(t * 30) * 0.1 + Math.sin(t * 47) * 0.1;
+          outer.mat.opacity = 0.9 * f;
+          inner.mesh.scale.y = 0.85 + Math.sin(t * 22) * 0.15;
+        },
+      };
     },
-    // Maren's Undertow Hook: a cresting water point.
+    // Maren's Undertow Hook: a point of water wrapped in a swirling ring, shedding droplets.
     tide: () => {
-      add(new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 10).rotateZ(-Math.PI / 2), basic(0xbff4ff, 0.9)), glow(0x7fe0ff, 1.0));
-      return { height: 1.0, trail: { color: 0x7fe0ff, width: 0.26, life: 0.12 } };
+      add(new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.8, 10).rotateZ(-Math.PI / 2), basic(0xbff4ff, 0.9)), glow(0x7fe0ff, 1.0));
+      const swirl = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 16, Math.PI * 1.5).rotateY(Math.PI / 2), basic(0x7fe0ff, 0.8));
+      swirl.position.x = -0.15;
+      const drops = droplets(4, 0.36, 0.04, basic(0xeafcff));
+      drops.position.x = -0.35;
+      add(swirl, drops);
+      return { height: 1.0, trail: { color: 0x7fe0ff, width: 0.26, life: 0.12 }, animate: (t) => ((swirl.rotation.x = t * 14), (drops.rotation.x = -t * 8)) };
     },
-    // Lisha's blades of blossom: a spinning petal.
+    // Lisha's blades of blossom: a pointed petal with a pale edge, spinning flat.
     petal: () => {
-      const petal = add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 6).scale(1.5, 0.15, 0.6), basic(0xf7a8c8)));
+      const lens = new THREE.Shape();
+      lens.moveTo(-0.28, 0);
+      lens.quadraticCurveTo(0, 0.13, 0.28, 0);
+      lens.quadraticCurveTo(0, -0.13, -0.28, 0);
+      const flat = (scale: number, color: number) => {
+        const mat = basic(color);
+        mat.side = THREE.DoubleSide;
+        return new THREE.Mesh(new THREE.ShapeGeometry(lens, 10).scale(scale, scale, 1).rotateX(-Math.PI / 2), mat);
+      };
+      const petal = new THREE.Group();
+      const edge = flat(1, 0xfbe2ec);
+      const face = flat(0.8, 0xf28ab3);
+      face.position.y = 0.005;
+      petal.add(edge, face);
+      add(petal, glow(0xe86f9a, 0.5));
       return { height: 1.2, trail: { color: 0xe86f9a, width: 0.12, life: 0.16 }, animate: (t) => (petal.rotation.y = t * 14) };
     },
     // Mabel's bees: a striped body, a dark head and flickering wings.
@@ -168,8 +272,52 @@ export function buildMissile(m: Missile): MissileLook {
     },
   };
   const look = looks[m.style]();
-  obj.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = true) : null));
+  // Solid things cast shadows; light (additive or see-through) doesn't.
+  obj.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mat = mesh.material as THREE.Material;
+    mesh.castShadow = !mat.transparent && mat.blending !== THREE.AdditiveBlending;
+  });
   return { obj, mats, ...look };
+}
+
+/** Small beads in a ring around the missile's axis (+x), for droplets and motes; spin the group to orbit them. */
+function droplets(n: number, radius: number, size: number, mat: THREE.Material) {
+  const g = new THREE.Group();
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const d = new THREE.Mesh(new THREE.SphereGeometry(size, 6, 5), mat);
+    d.position.set(0, Math.cos(a) * radius, Math.sin(a) * radius);
+    g.add(d);
+  }
+  return g;
+}
+
+/** A jagged arc of lightning along +x, re-struck on demand (thin boxes between jittered points). */
+function lightning(color: number, length: number, segments: number, amp: number) {
+  const mat = new THREE.MeshBasicMaterial({ color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false });
+  const geo = new THREE.BoxGeometry(1, 0.025, 0.025);
+  const group = new THREE.Group();
+  const bits = Array.from({ length: segments }, () => group.add(new THREE.Mesh(geo, mat)).children.at(-1) as THREE.Mesh);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const strike = () => {
+    const pts = Array.from({ length: segments + 1 }, (_, i) => {
+      const end = i === 0 || i === segments;
+      const j = () => (end ? 0 : (Math.random() * 2 - 1) * amp);
+      return new THREE.Vector3(-length * 0.75 + (length * i) / segments, j(), j());
+    });
+    bits.forEach((bit, i) => {
+      a.copy(pts[i]);
+      b.copy(pts[i + 1]);
+      bit.position.copy(a).add(b).multiplyScalar(0.5);
+      bit.scale.x = a.distanceTo(b);
+      bit.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), b.sub(a).normalize());
+    });
+  };
+  strike();
+  return { group, strike, mat };
 }
 
 /** Aurelle's spear prop laid point-forward (+x), solid or as a ghostly lance. */
