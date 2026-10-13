@@ -4,6 +4,7 @@ import { Duel, type Shell } from './duel';
 import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
 import { installCursors } from './ui/cursors';
+import { installHoverTips } from './ui/hoverTip';
 import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
@@ -36,6 +37,14 @@ addEventListener('resize', () => {
   cam.resize();
   stage?.resize();
   renderer.setSize(innerWidth, innerHeight);
+});
+
+// Right-click is the game's move/attack button, so the browser menu never opens anywhere in the game
+// (HUD, ability bar, menus), not just over the lane. Text fields keep it for copy and paste.
+installHoverTips();
+
+addEventListener('contextmenu', (e) => {
+  if (!(e.target as HTMLElement | null)?.closest?.('input, textarea')) e.preventDefault();
 });
 
 const shell: Shell = {
