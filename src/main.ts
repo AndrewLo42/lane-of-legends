@@ -5,7 +5,7 @@ import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
 import { installCursors } from './ui/cursors';
 import { installHoverTips } from './ui/hoverTip';
-import { NetClient, serverUrl } from './net/client';
+import { NetClient } from './net/client';
 import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
@@ -122,11 +122,9 @@ async function watchBots() {
 
 /** Online 1v1: connect, lobby (create or join a room), duel, recap, and back to the room for a rematch. */
 async function playOnline() {
-  let net: NetClient;
-  try {
-    net = await NetClient.connect();
-  } catch {
-    await onlineUnavailable(serverUrl());
+  const net = new NetClient();
+  if (!(await net.available())) {
+    await onlineUnavailable(net.url);
     return;
   }
   for (;;) {
@@ -143,8 +141,7 @@ async function playOnline() {
     await duelRecap(outcome.recap, outcome.won, outcome.reason, outcome.left ? 'Online · your opponent left' : `Online · Room ${code}`);
     if (net.closed) break;
   }
-  net.send({ t: 'leave' });
-  net.close();
+  net.leave();
 }
 
 /** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */

@@ -20,14 +20,15 @@ export interface LobbyPlayer {
   ready: boolean;
 }
 
+/**
+ * Players don't send create or join: they connect to `/room/new` or `/room/CODE`, and the room answers
+ * with a lobby message (or an error, then closes). Leaving is closing the connection.
+ */
 export type ClientMsg =
-  | { t: 'create' }
-  | { t: 'join'; code: string }
   | { t: 'pick'; kit: KitId; summoners: [SummonerId, SummonerId] }
   | { t: 'ready'; ready: boolean }
   /** `seq` increases with every batch; snapshots acknowledge the last one applied. */
-  | { t: 'cmds'; seq: number; cmds: Command[] }
-  | { t: 'leave' };
+  | { t: 'cmds'; seq: number; cmds: Command[] };
 
 export type ServerMsg =
   | { t: 'lobby'; code: string; you: Team; players: LobbyPlayer[] }

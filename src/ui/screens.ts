@@ -537,7 +537,7 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
         error = 'Room codes are 4 letters.';
         return render();
       }
-      net.send({ t: 'join', code });
+      net.enter(code);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && (e.target as HTMLElement).matches('input.code')) join();
@@ -547,14 +547,13 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
       const kit = t.closest<HTMLElement>('[data-kit]')?.dataset.kit as KitId | undefined;
       if (kit && net.lobby) return net.send({ t: 'pick', kit, summoners: spells });
       const action = t.closest<HTMLElement>('[data-net]')?.dataset.net;
-      if (action === 'create') net.send({ t: 'create' });
+      if (action === 'create') net.enter(null);
       else if (action === 'join') join();
       else if (action === 'ready' && net.lobby) {
         const me = net.lobby.players.find((p) => p.team === net.lobby!.you)!;
         net.send({ t: 'ready', ready: !me.ready });
       } else if (action === 'leave') {
-        net.send({ t: 'leave' });
-        net.lobby = null;
+        net.leave();
         render();
       } else if (action === 'back') {
         el.classList.remove('online');
