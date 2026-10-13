@@ -139,6 +139,33 @@
       #dmgnums .dmg.ability { color: #ffd76a; }
       #dmgnums .dmg.dot { color: #ff9a5a; font-size: 12px; }
       #dmgnums .dmg.dot.champ { font-size: 15px; }
+      /* Kill banner and death recap (src/ui/killFeed.ts). */
+      #killbanner { position: fixed; top: 64px; left: 50%; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 8px 18px 8px 10px;
+        border-radius: 30px; background: #12141bf0; border: 2px solid #ffd76a; box-shadow: 0 6px 20px #000a; pointer-events: none; transform-origin: 50% 50%; }
+      #killbanner.bad { border-color: #ff6b5e; }
+      #killbanner .mini-portrait { width: 40px; height: 40px; }
+      #killbanner .arrow { font-size: 18px; opacity: 0.8; }
+      #killbanner .exec { width: 40px; height: 40px; display: grid; place-items: center; font-size: 24px; }
+      #killbanner b { font-size: 17px; margin-left: 6px; white-space: nowrap; }
+      #killbanner.good b { color: #ffd76a; }
+      #killbanner.bad b { color: #ff8a7a; }
+      #deathrecap { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); z-index: 6; width: min(360px, 92vw); padding: 10px 12px;
+        background: #12141bf2; border: 1px solid #ff6b5e88; border-radius: 10px; box-shadow: 0 6px 20px #000a; pointer-events: none; font-size: 12.5px; }
+      #deathrecap .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+      #deathrecap .head b { color: #ff8a7a; font-size: 14px; }
+      #deathrecap .head span { opacity: 0.6; font-size: 11.5px; }
+      #deathrecap .rrow { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; margin-bottom: 3px; border-radius: 6px;
+        background: #ffffff0a; overflow: hidden; }
+      #deathrecap .rrow i { font-style: normal; width: 18px; text-align: center; z-index: 1; }
+      #deathrecap .rrow .lbl { flex: 1; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #deathrecap .rrow b { z-index: 1; font-variant-numeric: tabular-nums; }
+      #deathrecap .rrow kbd { font-size: 10px; padding: 0 4px; }
+      #deathrecap .rrow .fill { position: absolute; left: 0; top: 0; bottom: 0; opacity: 0.28; border-radius: 6px; }
+      #deathrecap .rrow.attack .fill { background: #e8e6df; }
+      #deathrecap .rrow.ability .fill { background: #ffd76a; }
+      #deathrecap .rrow.effect .fill { background: #ff9a5a; }
+      #deathrecap .rrow.minion .fill { background: #7aa7ff; }
+      #deathrecap .rrow.tower .fill { background: #b8c2cc; }
       /* Instant tooltip for anything with a title (src/ui/hoverTip.ts), styled like #tip. */
       #hovertip { position: fixed; left: 0; top: 0; display: none; max-width: 280px; z-index: 1000; background: #12141bf2; color: #e8e6df;
         border: 1px solid #ffffff30; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; pointer-events: none;
@@ -282,6 +309,28 @@
       #screen .itemcard:hover:not(:disabled) { border-color: #f2c14e; }
       #screen .itemcard:disabled { cursor: default; opacity: 0.55; transform: none; }
       #screen .itemcard.sold { opacity: 0.3; }
+      /* Duel recap: damage you dealt and everything that hit you, as bars scaled to the biggest source. */
+      #screen .recap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; width: min(820px, 94vw); }
+      @media (max-width: 640px) { #screen .recap { grid-template-columns: 1fr; } }
+      #screen .recapside { background: #151922e6; border: 1px solid #ffffff1f; border-radius: 12px; padding: 12px 14px; }
+      #screen .recapside .who { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; }
+      #screen .recapside .who small { opacity: 0.65; }
+      #screen .recapside .mini-portrait { width: 44px; height: 44px; flex: none; }
+      #screen .recapcol h4 { margin: 0 0 8px; font-size: 13px; display: flex; justify-content: space-between; opacity: 0.9; }
+      #screen .recapcol h4 span { color: #ffd76a; }
+      #screen .rrow { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 8px; margin-bottom: 4px; border-radius: 6px;
+        background: #ffffff0a; font-size: 12.5px; overflow: hidden; }
+      #screen .rrow i { font-style: normal; width: 18px; text-align: center; z-index: 1; }
+      #screen .rrow .lbl { flex: 1; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #screen .rrow b { z-index: 1; font-variant-numeric: tabular-nums; }
+      #screen .rrow kbd { font-size: 10px; padding: 0 4px; }
+      #screen .rrow .fill { position: absolute; left: 0; top: 0; bottom: 0; opacity: 0.28; border-radius: 6px; }
+      #screen .rrow.attack .fill { background: #e8e6df; }
+      #screen .rrow.ability .fill { background: #ffd76a; }
+      #screen .rrow.effect .fill { background: #ff9a5a; }
+      #screen .rrow.minion .fill { background: #7aa7ff; }
+      #screen .rrow.tower .fill { background: #b8c2cc; }
+      #screen .recapcol .none { font-size: 12.5px; }
       #screen .results { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; min-width: min(420px, 90vw); }
       #screen .results li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; border-radius: 6px; background: #ffffff0d; font-size: 14px; }
       #screen .results li.won span { color: #8fe08a; }

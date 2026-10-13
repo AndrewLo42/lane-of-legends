@@ -228,12 +228,28 @@ export interface Hit {
   seq: number;
   tick: number;
   sourceId: number | null;
+  /** The source's kind, kept because dead minions leave the world. */
+  sourceKind: UnitKind | null;
   targetId: number;
   /** Damage dealt, including anything a shield absorbed. */
   amount: number;
+  /** The part that counted: overkill on the killing blow left out (for recaps). */
+  effective: number;
   attack: boolean;
   /** Damage over time and on-hit extras (burns, stings, procs). */
   proc: boolean;
+  /** The ability it came from, if any. */
+  slot?: Slot;
+}
+
+/** A champion death, for the kill banner. */
+export interface ChampionKill {
+  tick: number;
+  victimId: number;
+  /** The champion credited with it, or null (a tower or minion finished them). */
+  killerId: number | null;
+  /** What landed the killing blow when it wasn't a champion. */
+  executedBy: 'tower' | 'minion' | null;
 }
 
 /** One-shot visual events for the renderer (swings, blinks, detonations). */

@@ -7,6 +7,7 @@ import type { WinReason } from '../sim/rules';
 import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
 import type { AugmentId, KitId, SummonerId, Unit } from '../sim/types';
 import { World } from '../sim/world';
+import { total, type DuelRecap, type RecapRow } from '../sim/recap';
 import { augmentChips, spellChips } from './chips';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
@@ -424,6 +425,44 @@ export async function shop(run: RunState, onBuy: (id: AugmentId) => void, onSpel
 }
 
 // ---------- end of run ----------
+
+// ---------- after each duel ----------
+
+const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+/** A damage breakdown: one bar per source, scaled to the largest. */
+function breakdown(title: string, rs: RecapRow[], empty: string) {
+  const sum = total(rs);
+  const max = Math.max(1, ...rs.map((r) => r.amount));
+  return `<div class="recapcol"><h4>${title} <span>${Math.round(sum)}</span></h4>
+    ${rs.length ? rs.map((r) => `
+      <div class="rrow ${r.kind}" title="${Math.round(r.amount)} damage (${Math.round((100 * r.amount) / Math.max(1, sum))}%)">
+        <i>${r.icon}</i><span class="lbl">${r.key ? `<kbd>${r.key}</kbd> ` : ''}${r.label}</span><b>${Math.round(r.amount)}</b>
+        <div class="fill" style="width:${(100 * r.amount) / max}%"></div>
+      </div>`).join('') : `<p class="none">${empty}</p>`}</div>`;
+}
+
+/**
+ * The recap after every duel, won or lost: damage you dealt to the opponent and everything that hit
+ * you, by source, with kills, deaths and CS. `subtitle` says which floor (or bot match) it was.
+ */
+export async function duelRecap(recap: DuelRecap, won: boolean, reason: WinReason | null, subtitle: string): Promise<void> {
+  const { me, foe } = recap;
+  const stat = (side: typeof me) => `<span class="mini-portrait" style="--accent:${KITS[side.kit].color}">${portraitHtml(side.kit)}</span>
+    <div>${kitName(side.kit)}<br><small>Level ${side.level} · ${side.kills} kill${side.kills === 1 ? '' : 's'} · ${side.deaths} death${side.deaths === 1 ? '' : 's'} · ${side.cs} CS</small></div>`;
+  const el = show(`
+    <div class="floorhead"><small>${subtitle} · ${fmtTime(recap.seconds)}${reason ? ` · ${won ? 'won' : 'lost'} on ${REASON[reason]}` : ''}</small>
+      ${reason ? `<h1 class="${won ? 'gold' : 'red'}">${won ? 'Victory' : 'Defeat'}</h1>` : '<h1>Match over</h1>' /* left a bot match early */}</div>
+    <div class="recap">
+      <div class="recapside"><div class="who">${stat(me)}</div>
+        ${breakdown(`You dealt to ${foe.name}`, me.dealt, `No damage to ${foe.name}.`)}</div>
+      <div class="recapside"><div class="who">${stat(foe)}</div>
+        ${breakdown('What hit you', me.taken, 'Untouched.')}</div>
+    </div>
+    <div class="actions"><button class="go" data-action="next">Continue</button></div>`);
+  await waitFor(el);
+  hide();
+}
 
 export async function runEnd(run: RunState, won: boolean, meta: Meta): Promise<void> {
   const reached = won ? FLOORS.length : run.floor + 1;

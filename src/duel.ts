@@ -13,6 +13,8 @@ import { DT, TICK_HZ, World } from './sim/world';
 import { AbilityBar } from './ui/abilityBar';
 import { HealthBars } from './ui/bars';
 import { DamageNumbers } from './ui/damageNumbers';
+import { KillFeed } from './ui/killFeed';
+import { duelRecap, type DuelRecap } from './sim/recap';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -58,6 +60,8 @@ export interface DuelOutcome {
   seconds: number;
   /** Gold the player earned in the duel. */
   gold: number;
+  /** Damage breakdown for the recap screen. */
+  recap: DuelRecap;
 }
 
 /** Human controller: queues commands from input; the sim drains them on its next tick. */
@@ -88,6 +92,7 @@ export class Duel {
   private effects: EffectsView;
   private bars: HealthBars;
   private damageNumbers: DamageNumbers;
+  private killFeed: KillFeed;
   private hud: Hud;
   private abilityBar: AbilityBar;
   private minimap: Minimap;
@@ -117,6 +122,7 @@ export class Duel {
     this.effects = new EffectsView(shell.scene, world, this.me.team);
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
     this.damageNumbers = new DamageNumbers(world, this.view, this.me.id);
+    this.killFeed = new KillFeed(world, this.me, !!setup.spectate);
     this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox, !!setup.spectate);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
     this.targetRing = new TargetRing(shell.scene);
@@ -159,7 +165,7 @@ export class Duel {
       if (this.setup.sandbox && input.wasPressed('KeyR')) location.reload();
       this.decidedAt ??= performance.now();
       if (!this.setup.sandbox && performance.now() - this.decidedAt >= END_PAUSE * 1000) {
-        this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold });
+        this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe) });
       }
     }
 
@@ -180,6 +186,7 @@ export class Duel {
     renderer.render(shell.scene, cam.camera);
     this.bars.update(cam.camera);
     this.damageNumbers.update(cam.camera, simDt);
+    this.killFeed.update(simDt);
     this.hud.update();
     this.abilityBar.update();
     this.minimap.update(dt);
@@ -192,6 +199,7 @@ export class Duel {
     this.effects.dispose();
     this.bars.dispose();
     this.damageNumbers.dispose();
+    this.killFeed.dispose();
     this.hud.dispose();
     this.abilityBar.dispose();
     this.minimap.dispose();
@@ -203,7 +211,7 @@ export class Duel {
   /** Bot vs bot: stop watching now (resolves `finished` as if the match ended). */
   leave() {
     const { world, me } = this;
-    this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold });
+    this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe) });
   }
 
   /**

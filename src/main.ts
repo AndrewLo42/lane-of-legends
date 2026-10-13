@@ -20,7 +20,7 @@ import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
-import { augmentPick, floorIntro, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
+import { augmentPick, duelRecap, floorIntro, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
 installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -112,9 +112,11 @@ async function watchBots() {
     enemyKit: pick.red, enemyAugments: [], enemySummoners: SIGNATURE_SUMMONERS[pick.red], enemyStatMult: 1, enemyAccuracy: 0.9,
     label: `${KITS[pick.blue].name} vs ${KITS[pick.red].name}`, spectate: true,
   });
-  await duel.finished;
+  const outcome = await duel.finished;
   duel.dispose();
   duel = null;
+  // Spectating: "you" are the blue bot.
+  await duelRecap(outcome.recap, outcome.won, outcome.reason, `Bot vs bot · ${KITS[pick.blue].name} vs ${KITS[pick.red].name}`);
 }
 
 /** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */
@@ -183,6 +185,7 @@ async function runLoop() {
       const outcome = await duel.finished;
       duel.dispose();
       duel = null;
+      await duelRecap(outcome.recap, outcome.won, outcome.reason, `Floor ${run.floor + 1} · ${plan.title}`);
 
       result = { floor: run.floor, won: outcome.won, reason: outcome.reason, opponent: plan.opponent, seconds: outcome.seconds, gold: outcome.gold };
       if (!outcome.won || isFinalFloor(run)) {

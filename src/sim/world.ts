@@ -12,7 +12,7 @@ import {
 } from './stats';
 import type {
   AugmentId, ChampState, Command, DamageSource, Controller, Fx, KitId, MinionRole, Missile, MissileStyle, Slot, Status, SummonerId, SummonerSlot,
-  Hit, Team, Telegraph, Unit, UnitKind, Vec2, Zone,
+  ChampionKill, Hit, Team, Telegraph, Unit, UnitKind, Vec2, Zone,
 } from './types';
 import { DT, TICK_HZ, angleTo, dist, dirTo, enemyOf, gap, inCone, segmentDistance, ticks, toward } from './util';
 
@@ -34,6 +34,15 @@ export class World {
   readonly fx: Fx[] = [];
   /** Recent damage (kept ~1 s), for floating damage numbers. */
   readonly hits: Hit[] = [];
+  /**
+   * Damage taken by each champion over the whole duel, for the end-of-duel recap. Key:
+   * `${targetId}|${source}|${category}` where source is `c<id>` for a champion or the unit kind, and
+   * category (champion sources only) is 'attack', 'slot0'..'slot3' or 'effect' (procs, burns, items).
+   * Overkill isn't counted.
+   */
+  readonly damageTotals = new Map<string, number>();
+  /** Every champion death this duel, in order (the HUD announces them). */
+  readonly championKills: ChampionKill[] = [];
   private hitSeq = 0;
   readonly rng: Rng;
   winner: Team | null = null;
@@ -413,6 +422,16 @@ export class World {
     return u.hp - before;
   }
 
+  /** What champion `targetId` has taken over the duel, by source and category (see `damageTotals`). */
+  damageTaken(targetId: number): { source: string; category: string; amount: number }[] {
+    const out: { source: string; category: string; amount: number }[] = [];
+    for (const [key, amount] of this.damageTotals) {
+      const [t, source, category] = key.split('|');
+      if (Number(t) === targetId) out.push({ source, category, amount });
+    }
+    return out;
+  }
+
   // ---------- summoner spells ----------
 
   /** Why a summoner spell can't be cast right now, or null if it can. */
@@ -734,7 +753,17 @@ export class World {
       amount *= 1 - guard;
       if (src?.kind === 'tower') amount *= target.champ.mods.towerTakenMult;
     }
-    this.hits.push({ seq: ++this.hitSeq, tick: this.tick, sourceId: src?.id ?? null, targetId: target.id, amount, attack: !!from.attack, proc: !!from.proc });
+    const shield = target.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);
+    const effective = Math.min(amount, Math.max(0, target.hp) + shield);
+    this.hits.push({
+      seq: ++this.hitSeq, tick: this.tick, sourceId: src?.id ?? null, sourceKind: src?.kind ?? null, targetId: target.id,
+      amount, effective, attack: !!from.attack, proc: !!from.proc, slot: from.slot,
+    });
+    if (target.champ) {
+      const cat = !src?.champ ? '' : from.attack ? 'attack' : from.slot != null ? `slot${from.slot}` : 'effect';
+      const key = `${target.id}|${src?.champ ? `c${src.id}` : src?.kind ?? 'none'}|${cat}`;
+      this.damageTotals.set(key, (this.damageTotals.get(key) ?? 0) + effective);
+    }
     // Shields soak damage first (oldest first); an emptied shield expires this tick.
     for (const sh of target.statuses) {
       if (sh.kind !== 'shield' || amount <= 0) continue;
@@ -818,6 +847,10 @@ export class World {
       const foe = this.champions().find((c) => c.team !== u.team);
       if (foe?.champ) foe.champ.kills++;
       u.champ!.deaths++;
+      this.championKills.push({
+        tick: this.tick, victimId: u.id, killerId: byChampion?.id ?? null,
+        executedBy: byChampion ? null : killer?.kind === 'tower' ? 'tower' : killer?.kind === 'minion' ? 'minion' : null,
+      });
       if (byChampion) this.grantXp(byChampion, champKillXp(u.champ!.level) * xpMult);
       u.champ!.casting = null;
       u.champ!.dash = null;
