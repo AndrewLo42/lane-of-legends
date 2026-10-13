@@ -8,6 +8,8 @@ import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
 import type { AugmentId, KitId, SummonerId, Unit } from '../sim/types';
 import { World } from '../sim/world';
 import { total, type DuelRecap, type RecapRow } from '../sim/recap';
+import type { NetClient } from '../net/client';
+import type { LobbyPlayer, ServerMsg } from '../net/protocol';
 import { augmentChips, spellChips } from './chips';
 
 const KEYS = ['Q', 'W', 'E', 'R'];
@@ -142,7 +144,7 @@ const EXPERIMENTAL = 'lane-rogue.experimental';
  * Start (or Enter) to begin; the arrow keys step through the roster.
  */
 /** What the home screen chose: start a run, or watch two bots duel. */
-export type HomeChoice = { mode: 'run'; kit: KitId; summoners: SpellPair } | { mode: 'watch' };
+export type HomeChoice = { mode: 'run'; kit: KitId; summoners: SpellPair } | { mode: 'watch' } | { mode: 'online' };
 
 export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<HomeChoice> {
   let current: KitId = KIT_IDS[0];
@@ -162,7 +164,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   const el = show(`
     <div class="selecthead"><h1>Lane Rogue</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-      <div class="homelinks"><button class="link watch" data-watch>🤖 Watch bots duel</button>
+      <div class="homelinks"><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button>
         <label class="exptoggle" title="Champions without a model yet, as placeholders. Bots never play them."><input type="checkbox" data-experimental${experimental ? ' checked' : ''}> 🧪 Experimental champions</label></div></div>
     <div class="roster">
       ${KIT_IDS.map((id) => `
@@ -202,7 +204,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     spellPicker(info.querySelector('.spellpick')!, spells, sample, (p) => (spells = p));
   };
 
-  const kit = await new Promise<KitId | 'watch'>((resolve) => {
+  const kit = await new Promise<KitId | 'watch' | 'online'>((resolve) => {
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       const pick = t.closest<HTMLElement>('[data-kit]');
@@ -220,6 +222,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       }
       if (t.closest('[data-start]')) done();
       if (t.closest('[data-watch]')) finish('watch');
+      if (t.closest('[data-online]')) finish('online');
     };
     const onDouble = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest('[data-kit]')) done();
@@ -238,7 +241,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       } else return;
       e.preventDefault();
     };
-    const finish = (choice: KitId | 'watch') => {
+    const finish = (choice: KitId | 'watch' | 'online') => {
       el.removeEventListener('click', onClick);
       el.removeEventListener('dblclick', onDouble);
       removeEventListener('keydown', onKey);
@@ -253,6 +256,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   el.classList.remove('select', 'show-experimental');
   hide();
   if (kit === 'watch') return { mode: 'watch' };
+  if (kit === 'online') return { mode: 'online' };
   try {
     localStorage.setItem(LAST_KIT, kit);
     localStorage.setItem(LAST_SPELLS, JSON.stringify(spells));
@@ -426,6 +430,144 @@ export async function shop(run: RunState, onBuy: (id: AugmentId) => void, onSpel
 
 // ---------- end of run ----------
 
+// ---------- online PvP ----------
+
+type StartMsg = Extract<ServerMsg, { t: 'start' }>;
+
+/** Shown when the PvP server can't be reached. */
+export async function onlineUnavailable(url: string): Promise<void> {
+  const el = show(`
+    <div class="floorhead"><small>Online</small><h1>Can't reach the server</h1></div>
+    <p class="hint">No PvP server answered at <code>${url}</code>.<br>
+      On the machine running the game, start it with <code>npm run server</code>, then try again.</p>
+    <div class="actions"><button class="go" data-action="back">Back</button></div>`);
+  await waitFor(el);
+  hide();
+}
+
+/**
+ * Online lobby: create a room (and share its code) or join one, pick a champion and summoner spells,
+ * and ready up. Resolves with the server's start message once both players are ready, or null if
+ * the player leaves. Re-entered after each duel: the room is still there for a rematch.
+ */
+export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
+  return new Promise((resolve) => {
+    let error = '';
+    let spells: SpellPair = [...DEFAULT_SUMMONERS];
+    const finish = (r: StartMsg | null) => {
+      el.removeEventListener('click', onClick);
+      el.removeEventListener('keydown', onKey);
+      net.onMessage = () => {};
+      net.onClose = () => {};
+      hide();
+      resolve(r);
+    };
+
+    const entry = () => `
+      <div class="floorhead"><small>Online · 1v1</small><h1>Play a friend</h1></div>
+      <div class="netentry">
+        <button class="go" data-net="create">Create a room</button>
+        <div class="joinrow"><input class="code" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false">
+          <button class="go" data-net="join">Join</button></div>
+        ${error ? `<p class="neterr">${error}</p>` : ''}
+      </div>
+      <div class="actions"><button class="link" data-net="back">Back</button></div>`;
+
+    const card = (p: LobbyPlayer | undefined, label: string) => p
+      ? `<div class="netplayer${p.ready ? ' ready' : ''}" style="--accent:${KITS[p.kit].color}"><small>${label}</small>
+          <span class="mini-portrait big">${portraitHtml(p.kit)}</span>${kitName(p.kit)}
+          <div class="chips">${spellChips(p.summoners)}</div><b class="state">${p.ready ? 'Ready' : 'Picking…'}</b></div>`
+      : `<div class="netplayer waiting"><small>${label}</small><p>Waiting for someone to join…</p></div>`;
+
+    const room = () => {
+      const lobby = net.lobby!;
+      const me = lobby.players.find((p) => p.team === lobby.you)!;
+      const them = lobby.players.find((p) => p.team !== lobby.you);
+      spells = [...me.summoners] as SpellPair;
+      return `
+        <div class="floorhead"><small>Online · share this code with your opponent</small><h1 class="roomcode">${lobby.code}</h1></div>
+        <div class="netplayers">${card(me, 'You')}<span class="vs">VS</span>${card(them, 'Opponent')}</div>
+        <div class="roster">${KIT_IDS.map((id) => `
+          <button class="pick${me.kit === id ? ' on' : ''}" data-kit="${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}">
+            <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span></button>`).join('')}
+        </div>
+        <div class="spellpick"></div>
+        <div class="actions">
+          <button class="go" data-net="ready" ${them ? '' : 'disabled'}>${me.ready ? 'Not ready' : 'Ready'}</button>
+          <button class="link" data-net="leave">Leave room</button></div>
+        ${error ? `<p class="neterr">${error}</p>` : ''}`;
+    };
+
+    const el = show('');
+    el.classList.add('online');
+    const render = () => {
+      const fresh = !el.querySelector('.roomcode') !== !net.lobby; // switched between entry and room
+      el.innerHTML = net.lobby ? room() : entry();
+      if (fresh) el.scrollTop = 0;
+      if (!net.lobby) return;
+      const me = net.lobby.players.find((p) => p.team === net.lobby!.you)!;
+      const sample = new World(1).spawnChampion('blue', me.kit, { think: () => [] });
+      spellPicker(el.querySelector('.spellpick')!, spells, sample, (p) => {
+        spells = p;
+        net.send({ t: 'pick', kit: me.kit, summoners: p });
+      });
+    };
+
+    net.onMessage = (msg) => {
+      if (msg.t === 'lobby') {
+        error = '';
+        render();
+      } else if (msg.t === 'error') {
+        error = msg.message;
+        render();
+      } else if (msg.t === 'start') {
+        el.classList.remove('online');
+        finish(msg);
+      }
+    };
+    net.onClose = () => {
+      net.lobby = null;
+      error = 'Lost the connection to the server.';
+      render();
+    };
+
+    const join = () => {
+      const code = el.querySelector<HTMLInputElement>('input.code')?.value.trim().toUpperCase() ?? '';
+      if (code.length !== 4) {
+        error = 'Room codes are 4 letters.';
+        return render();
+      }
+      net.send({ t: 'join', code });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.target as HTMLElement).matches('input.code')) join();
+    };
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      const kit = t.closest<HTMLElement>('[data-kit]')?.dataset.kit as KitId | undefined;
+      if (kit && net.lobby) return net.send({ t: 'pick', kit, summoners: spells });
+      const action = t.closest<HTMLElement>('[data-net]')?.dataset.net;
+      if (action === 'create') net.send({ t: 'create' });
+      else if (action === 'join') join();
+      else if (action === 'ready' && net.lobby) {
+        const me = net.lobby.players.find((p) => p.team === net.lobby!.you)!;
+        net.send({ t: 'ready', ready: !me.ready });
+      } else if (action === 'leave') {
+        net.send({ t: 'leave' });
+        net.lobby = null;
+        render();
+      } else if (action === 'back') {
+        el.classList.remove('online');
+        finish(null);
+      }
+    };
+    el.addEventListener('click', onClick);
+    el.addEventListener('keydown', onKey);
+    render();
+    if (!net.lobby) el.querySelector<HTMLInputElement>('input.code')?.focus();
+  });
+}
+
 // ---------- after each duel ----------
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -452,7 +594,7 @@ export async function duelRecap(recap: DuelRecap, won: boolean, reason: WinReaso
     <div>${kitName(side.kit)}<br><small>Level ${side.level} · ${side.kills} kill${side.kills === 1 ? '' : 's'} · ${side.deaths} death${side.deaths === 1 ? '' : 's'} · ${side.cs} CS</small></div>`;
   const el = show(`
     <div class="floorhead"><small>${subtitle} · ${fmtTime(recap.seconds)}${reason ? ` · ${won ? 'won' : 'lost'} on ${REASON[reason]}` : ''}</small>
-      ${reason ? `<h1 class="${won ? 'gold' : 'red'}">${won ? 'Victory' : 'Defeat'}</h1>` : '<h1>Match over</h1>' /* left a bot match early */}</div>
+      ${reason || won ? `<h1 class="${won ? 'gold' : 'red'}">${won ? 'Victory' : 'Defeat'}</h1>` : '<h1>Match over</h1>' /* left a bot match early */}</div>
     <div class="recap">
       <div class="recapside"><div class="who">${stat(me)}</div>
         ${breakdown(`You dealt to ${foe.name}`, me.dealt, `No damage to ${foe.name}.`)}</div>

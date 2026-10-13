@@ -15,6 +15,8 @@ import { HealthBars } from './ui/bars';
 import { DamageNumbers } from './ui/damageNumbers';
 import { KillFeed } from './ui/killFeed';
 import { duelRecap, type DuelRecap } from './sim/recap';
+import type { NetClient } from './net/client';
+import { applySnapshot, type ServerMsg, type Snapshot } from './net/protocol';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -52,6 +54,11 @@ export interface DuelSetup {
   sandbox?: boolean;
   /** Bot vs bot: the blue side is a bot too (at `enemyAccuracy`); the player only watches. */
   spectate?: boolean;
+  /**
+   * Online PvP: the server runs the sim; this client draws from its snapshots and sends the player's
+   * commands. Champions, seed and rules come from `start`; the other setup fields are ignored.
+   */
+  net?: { client: NetClient; start: Extract<ServerMsg, { t: 'start' }> };
 }
 
 export interface DuelOutcome {
@@ -62,6 +69,8 @@ export interface DuelOutcome {
   gold: number;
   /** Damage breakdown for the recap screen. */
   recap: DuelRecap;
+  /** Online: the opponent disconnected (you win by forfeit). */
+  left?: boolean;
 }
 
 /** Human controller: queues commands from input; the sim drains them on its next tick. */
@@ -108,16 +117,32 @@ export class Duel {
   /** Bot vs bot: simulation speed and the speed/leave panel. */
   private speed = 1;
   private spectatorPanel?: HTMLDivElement;
+  /** Online: snapshots received since the last frame, when the latest arrived, and the server's verdict. */
+  private snaps: Snapshot[] = [];
+  private lastSnapAt = performance.now();
+  private netEnd: Extract<ServerMsg, { t: 'end' }> | null = null;
 
   constructor(private shell: Shell, private setup: DuelSetup) {
     this.finished = new Promise((r) => (this.resolve = r));
-    const world = (this.world = new World(setup.seed, setup.rules));
-    this.me = world.spawnChampion('blue', setup.kit, setup.spectate ? new BotController(setup.enemyAccuracy) : this.player, {
-      augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels, summoners: setup.summoners,
-    });
-    this.foe = world.spawnChampion('red', setup.enemyKit, new BotController(setup.enemyAccuracy), {
-      augments: setup.enemyAugments, items: setup.enemyItems, statMult: setup.enemyStatMult, summoners: setup.enemySummoners,
-    });
+    const net = setup.net;
+    const world = (this.world = new World(net?.start.seed ?? setup.seed, net?.start.rules ?? setup.rules));
+    if (net) {
+      // A mirror of the server's world: never stepped here, only overwritten by snapshots.
+      applySnapshot(world, net.start.snap);
+      this.me = world.get(net.start.you)!;
+      this.foe = world.get(net.start.foe)!;
+      net.client.onMessage = (msg) => {
+        if (msg.t === 'snap') this.snaps.push(msg.snap);
+        else if (msg.t === 'end') this.netEnd = msg;
+      };
+    } else {
+      this.me = world.spawnChampion('blue', setup.kit, setup.spectate ? new BotController(setup.enemyAccuracy) : this.player, {
+        augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels, summoners: setup.summoners,
+      });
+      this.foe = world.spawnChampion('red', setup.enemyKit, new BotController(setup.enemyAccuracy), {
+        augments: setup.enemyAugments, items: setup.enemyItems, statMult: setup.enemyStatMult, summoners: setup.enemySummoners,
+      });
+    }
     this.view = new WorldView(shell.scene, world);
     this.effects = new EffectsView(shell.scene, world, this.me.team);
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
@@ -138,12 +163,15 @@ export class Duel {
     const { input, cam, marker, renderer } = shell;
 
     const spectating = !!this.setup.spectate;
-    const hover = me.dead || world.winner || spectating ? undefined : this.enemyUnderCursor();
+    const net = this.setup.net;
+    /** Decided: someone won (online, the server's word, which also covers a forfeit). */
+    const over = net ? !!this.netEnd || !!world.winner : !!world.winner;
+    const hover = me.dead || over || spectating ? undefined : this.enemyUnderCursor();
     renderer.domElement.style.cursor = hover ? CURSOR.attack : this.aiming != null || this.aimingSpell != null ? CURSOR.aim : CURSOR.normal;
 
-    if (spectating && !world.winner) {
+    if (spectating && !over) {
       if (input.wasPressed('Escape')) this.leave();
-    } else if (!world.winner) {
+    } else if (!over) {
       this.handleAbilities();
       // Right-click an enemy to attack it, the ground to move; holding keeps re-issuing, like League.
       this.reissue -= dt;
@@ -164,21 +192,41 @@ export class Duel {
       shell.indicator.hide();
       if (this.setup.sandbox && input.wasPressed('KeyR')) location.reload();
       this.decidedAt ??= performance.now();
-      if (!this.setup.sandbox && performance.now() - this.decidedAt >= END_PAUSE * 1000) {
+      const paused = performance.now() - this.decidedAt >= END_PAUSE * 1000;
+      if (net) {
+        // The server sends the recap (only it has the full damage history).
+        const end = this.netEnd;
+        if (end && paused) {
+          this.resolve({ won: end.winner === me.team, reason: end.reason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: end.recap, left: end.left });
+        }
+      } else if (!this.setup.sandbox && paused) {
         this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe) });
       }
     }
 
     // Spectators can fast-forward; the sim and the animations speed up together.
     const simDt = dt * (spectating ? this.speed : 1);
-    this.acc += simDt;
-    while (this.acc >= DT) {
-      this.view.snapshot();
-      world.step();
-      this.acc -= DT;
+    let alpha: number;
+    if (net) {
+      // Online: send what the player did this frame, then catch up on the server's snapshots.
+      if (player.queue.length) net.client.send({ t: 'cmds', cmds: player.queue.splice(0) });
+      for (const snap of this.snaps.splice(0)) {
+        this.view.snapshot();
+        applySnapshot(world, snap);
+        this.lastSnapAt = performance.now();
+      }
+      alpha = Math.min(1, (performance.now() - this.lastSnapAt) / (DT * 1000));
+    } else {
+      this.acc += simDt;
+      while (this.acc >= DT) {
+        this.view.snapshot();
+        world.step();
+        this.acc -= DT;
+      }
+      alpha = this.acc / DT;
     }
 
-    this.view.update(this.acc / DT, simDt);
+    this.view.update(alpha, simDt);
     this.effects.update(simDt);
     marker.update(dt);
     this.targetRing.update(dt, hover ? this.view.positionOf(hover.id) ?? null : null, hover?.radius);

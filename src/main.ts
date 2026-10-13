@@ -5,6 +5,7 @@ import { MobaCamera } from './render/camera';
 import { loadModels } from './render/assets';
 import { installCursors } from './ui/cursors';
 import { installHoverTips } from './ui/hoverTip';
+import { NetClient, serverUrl } from './net/client';
 import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
@@ -20,7 +21,7 @@ import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
-import { augmentPick, duelRecap, floorIntro, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
+import { augmentPick, duelRecap, floorIntro, onlineLobby, onlineUnavailable, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
 installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -119,6 +120,33 @@ async function watchBots() {
   await duelRecap(outcome.recap, outcome.won, outcome.reason, `Bot vs bot · ${KITS[pick.blue].name} vs ${KITS[pick.red].name}`);
 }
 
+/** Online 1v1: connect, lobby (create or join a room), duel, recap, and back to the room for a rematch. */
+async function playOnline() {
+  let net: NetClient;
+  try {
+    net = await NetClient.connect();
+  } catch {
+    await onlineUnavailable(serverUrl());
+    return;
+  }
+  for (;;) {
+    const start = await onlineLobby(net);
+    if (!start) break;
+    const code = net.lobby?.code ?? '';
+    duel = new Duel(shell, {
+      seed: start.seed, rules: start.rules, kit: 'arlo', augments: [], enemyKit: 'arlo', enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 1,
+      label: `Online · Room ${code}`, net: { client: net, start },
+    });
+    const outcome = await duel.finished;
+    duel.dispose();
+    duel = null;
+    await duelRecap(outcome.recap, outcome.won, outcome.reason, outcome.left ? 'Online · your opponent left' : `Online · Room ${code}`);
+    if (net.closed) break;
+  }
+  net.send({ t: 'leave' });
+  net.close();
+}
+
 /** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */
 async function runLoop() {
   let run: RunState | null = loadRun();
@@ -131,6 +159,10 @@ async function runLoop() {
       s.focus(null);
       if (choice.mode === 'watch') {
         await watchBots();
+        continue;
+      }
+      if (choice.mode === 'online') {
+        await playOnline();
         continue;
       }
       run = newRun(choice.kit, Date.now() % 1e9, choice.summoners);

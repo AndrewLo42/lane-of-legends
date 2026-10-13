@@ -18,6 +18,11 @@ npm test           # sim tests
 
 **Controls:** right-click the ground to move or an enemy to attack (hold to steer) · hold Q/W/E/R to aim and release to cast (right-click while aiming cancels) · Alt+Q/W/E/R or the + buttons to level an ability · S stop · Y lock/unlock camera (edge-pan when unlocked) · hold Space to centre the camera · wheel zoom · minimap (bottom right): left-click or drag to look there (unlocks the camera; Y or Space brings it back), right-click or drag to walk there. Free play (no run, nexus to win): `?champ=arlo|tock|maren|lisha|mabel|aurelle|gormund|sable`, `&enemy=…` (defaults to the other one), `&seed=42`, `&augments=brute,haste&items=i.blade` (comma-separated ids) to start with upgrades. Augments and items show as icon rows left of the ability bar, growing outward.
 
+**Online 1v1 (PvP).** Start the server next to the game (`npm run server`, port 8787), then pick **⚔ Play online** on the home screen: one player creates a room and shares its 4-letter code, the other joins, both pick a champion and summoner spells and ready up. The duel uses the normal duel rules (first to 2 kills, 30 CS or the first tower), both players get the recap, and the room stays open for a rematch. Leaving mid-duel forfeits.
+- The server (`server/main.ts`) runs the only simulation at 30 Hz; clients send their commands and draw from a snapshot of the world each tick (`src/net/protocol.ts`), compressed to roughly 50 KB/s a player.
+- By default the game looks for the server on the machine serving it (LAN: whoever runs `npm run dev` also runs `npm run server`). Point it elsewhere with `?server=wss://host:port` or `VITE_PVP_SERVER` at build time, for a hosted server.
+- Not yet: augments and items in PvP, matchmaking (it would pair players into a room instead of trading a code), and local prediction for your own movement on high-ping connections.
+
 **Champions** (kits in `src/sim/kits/`):
 
 Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Currently: Gormund.

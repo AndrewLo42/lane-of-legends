@@ -309,6 +309,24 @@
       #screen .itemcard:hover:not(:disabled) { border-color: #f2c14e; }
       #screen .itemcard:disabled { cursor: default; opacity: 0.55; transform: none; }
       #screen .itemcard.sold { opacity: 0.3; }
+      /* Online lobby */
+      #screen .netentry { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      #screen .joinrow { display: flex; gap: 8px; }
+      #screen input.code { width: 120px; padding: 8px 10px; font: 700 22px/1 inherit; letter-spacing: 6px; text-transform: uppercase; text-align: center;
+        background: #0c0f14; color: #e8e6df; border: 2px solid #ffffff30; border-radius: 8px; }
+      #screen input.code:focus { outline: none; border-color: #ffd76a; }
+      #screen .neterr { color: #ff8a7a; margin: 4px 0 0; font-size: 13px; }
+      #screen .roomcode { letter-spacing: 10px; font-size: 44px; color: #ffd76a; }
+      #screen .netplayers { display: flex; align-items: center; gap: 16px; }
+      #screen .netplayers .vs { font-weight: 800; opacity: 0.5; }
+      #screen .netplayer { width: 210px; min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px;
+        background: #151922e6; border: 2px solid #ffffff1f; border-radius: 12px; text-align: center; }
+      #screen .netplayer.ready { border-color: #8fe08a; }
+      #screen .netplayer .state { font-size: 12px; opacity: 0.75; }
+      #screen .netplayer.ready .state { color: #8fe08a; opacity: 1; }
+      #screen .netplayer.waiting { justify-content: center; opacity: 0.6; }
+      #screen .netplayer .chips { justify-content: center; }
+      #screen .actions .go:disabled { opacity: 0.4; cursor: not-allowed; }
       /* Duel recap: damage you dealt and everything that hit you, as bars scaled to the biggest source. */
       #screen .recap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; width: min(820px, 94vw); }
       @media (max-width: 640px) { #screen .recap { grid-template-columns: 1fr; } }
