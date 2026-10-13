@@ -17,7 +17,7 @@ const W = { base: [60, 90, 120, 150, 180], ad: 0.5, cost: [35, 35, 35, 35, 35], 
 const BIND = { base: [30, 45, 60, 75, 90], ad: 0.3, root: 1.25 };
 const E = { cost: [40, 40, 40, 40, 40], cd: [16, 15, 14, 13, 12], range: 4, speed: 22, guard: 0.25, guardFor: 2 };
 const VAULT = { base: [40, 60, 80, 100, 120], ad: 0.4, over: 0.8, speed: 20, slow: 0.4, slowFor: 1.5 };
-const R = { base: [150, 250], ad: 0.6, cost: [100, 100], cd: [80, 65], radius: 7, angle: 1.6, windup: 0.45, speed: 22 };
+const R = { base: [150, 250], ad: 0.6, cost: [100, 100], cd: [80, 65], radius: 7, angle: 1.6, windup: 0.5, speed: 22 };
 
 const rank = (u: Unit, slot: number) => Math.max(1, u.champ!.abilities[slot].rank);
 
