@@ -22,9 +22,9 @@ export const SANDBOX_RULES: DuelRules = {
   killsToWin: Infinity, csToWin: Infinity, firstTowerWins: false, waveInterval: 30, towerHpMult: 1, xpMult: 1, goldMult: 1, startLevel: 1, haste: 0,
 };
 
-/** League's 1v1 rules, tuned so a duel takes a few minutes: first to 2 kills, first tower or 30 CS. */
+/** League's 1v1 rules, tuned so a duel takes a few minutes: first to 2 kills, first tower or 45 CS. */
 export const DUEL_RULES: DuelRules = {
-  killsToWin: 2, csToWin: 30, firstTowerWins: true, waveInterval: 25, towerHpMult: 0.75, xpMult: 2, goldMult: 1, startLevel: 3, haste: 0,
+  killsToWin: 2, csToWin: 45, firstTowerWins: true, waveInterval: 25, towerHpMult: 0.75, xpMult: 2, goldMult: 1, startLevel: 3, haste: 0,
 };
 
 export type WinReason = 'nexus' | 'kills' | 'cs' | 'tower';
