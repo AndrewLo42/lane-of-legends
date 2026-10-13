@@ -909,6 +909,14 @@ export class World {
 
   // ---------- movement ----------
 
+  /**
+   * Online play: walk one unit a single tick, exactly as `step` would (steering round units and
+   * structures), without stepping anything else. The client uses it to predict its own champion.
+   */
+  predictMove(u: Unit) {
+    if (!u.dead && u.speed > 0) this.move(u);
+  }
+
   private move(u: Unit) {
     if (!u.moveTarget || u.windup > 0 || this.isBusy(u) || this.isRooted(u)) return;
     const dx = u.moveTarget.x - u.pos.x;

@@ -139,6 +139,10 @@
       #dmgnums .dmg.ability { color: #ffd76a; }
       #dmgnums .dmg.dot { color: #ff9a5a; font-size: 12px; }
       #dmgnums .dmg.dot.champ { font-size: 15px; }
+      /* Online: round-trip time to the PvP server. */
+      #ping { position: fixed; top: 12px; left: 12px; z-index: 6; padding: 3px 8px; border-radius: 6px; background: #12141bd9; font-size: 12px;
+        font-variant-numeric: tabular-nums; pointer-events: none; border: 1px solid #ffffff22; }
+      #ping.good { color: #8fe08a; } #ping.ok { color: #ffd76a; } #ping.bad { color: #ff8a7a; }
       /* Kill banner and death recap (src/ui/killFeed.ts). */
       #killbanner { position: fixed; top: 64px; left: 50%; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 8px 18px 8px 10px;
         border-radius: 30px; background: #12141bf0; border: 2px solid #ffd76a; box-shadow: 0 6px 20px #000a; pointer-events: none; transform-origin: 50% 50%; }

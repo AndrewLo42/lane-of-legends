@@ -17,6 +17,7 @@ import { KillFeed } from './ui/killFeed';
 import { duelRecap, type DuelRecap } from './sim/recap';
 import type { NetClient } from './net/client';
 import { applySnapshot, type ServerMsg, type Snapshot } from './net/protocol';
+import { predictOwn, type PendingBatch } from './net/predict';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -121,6 +122,15 @@ export class Duel {
   private snaps: Snapshot[] = [];
   private lastSnapAt = performance.now();
   private netEnd: Extract<ServerMsg, { t: 'end' }> | null = null;
+  /**
+   * Online movement prediction: command batches the server hasn't applied yet (with when they were
+   * sent), the round-trip time measured from its acknowledgements, and a small ping readout.
+   */
+  private pending: PendingBatch[] = [];
+  private seq = 0;
+  private acked = 0;
+  private rtt = 100;
+  private pingEl?: HTMLDivElement;
 
   constructor(private shell: Shell, private setup: DuelSetup) {
     this.finished = new Promise((r) => (this.resolve = r));
@@ -209,10 +219,16 @@ export class Duel {
     let alpha: number;
     if (net) {
       // Online: send what the player did this frame, then catch up on the server's snapshots.
-      if (player.queue.length) net.client.send({ t: 'cmds', cmds: player.queue.splice(0) });
+      if (player.queue.length) {
+        const cmds = player.queue.splice(0);
+        net.client.send({ t: 'cmds', seq: ++this.seq, cmds });
+        this.pending.push({ seq: this.seq, at: performance.now(), cmds });
+      }
       for (const snap of this.snaps.splice(0)) {
         this.view.snapshot();
         applySnapshot(world, snap);
+        this.acknowledge(snap.ack);
+        if (!this.setup.spectate) predictOwn(world, me, this.pending, this.rtt, performance.now());
         this.lastSnapAt = performance.now();
       }
       alpha = Math.min(1, (performance.now() - this.lastSnapAt) / (DT * 1000));
@@ -242,6 +258,7 @@ export class Duel {
 
   dispose() {
     this.spectatorPanel?.remove();
+    this.pingEl?.remove();
     document.getElementById('abilities')?.classList.remove('spectating');
     this.view.dispose();
     this.effects.dispose();
@@ -296,6 +313,27 @@ export class Duel {
    * The enemy under the cursor: a mesh hit first, then (since minions are small) the nearest enemy
    * within a forgiving radius of the ground point.
    */
+  /** Drop the command batches the server has applied, timing the round trip of the newest one. */
+  private acknowledge(ack: number) {
+    if (ack <= this.acked) return;
+    this.acked = ack;
+    const sent = this.pending.find((p) => p.seq === ack);
+    if (sent) this.rtt += (performance.now() - sent.at - this.rtt) * 0.2; // smoothed
+    this.pending = this.pending.filter((p) => p.seq > ack);
+    this.showPing();
+  }
+
+  private showPing() {
+    if (!this.pingEl) {
+      this.pingEl = document.createElement('div');
+      this.pingEl.id = 'ping';
+      document.body.appendChild(this.pingEl);
+    }
+    const ms = Math.round(this.rtt);
+    this.pingEl.textContent = `${ms} ms`;
+    this.pingEl.className = ms < 80 ? 'good' : ms < 160 ? 'ok' : 'bad';
+  }
+
   private enemyUnderCursor(): Unit | undefined {
     const { world, me, view } = this;
     const { cam, input } = this.shell;

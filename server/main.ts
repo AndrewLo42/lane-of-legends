@@ -19,7 +19,11 @@ import { World } from '../src/sim/world';
 /** Feeds a player's commands to their champion: whatever arrived since the last tick. */
 class NetController implements Controller {
   queue: Command[] = [];
+  /** The newest command batch received, and the newest applied (acknowledged in snapshots). */
+  received = 0;
+  applied = 0;
   think() {
+    this.applied = this.received;
     return this.queue.splice(0);
   }
 }
@@ -41,7 +45,17 @@ interface Room {
 const rooms = new Map<string, Room>();
 const roomOf = new Map<WebSocket, Room>();
 
-const send = (ws: WebSocket, msg: ServerMsg) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(msg));
+/**
+ * Simulated network delay for testing prediction on one machine: `LATENCY=100 npm run server` holds every
+ * message for 100 ms each way (about a 200 ms ping).
+ */
+const LATENCY = Number(process.env.LATENCY ?? 0);
+const later = (fn: () => void) => (LATENCY > 0 ? setTimeout(fn, LATENCY) : fn());
+
+const send = (ws: WebSocket, msg: ServerMsg) => {
+  const data = JSON.stringify(msg);
+  later(() => ws.readyState === ws.OPEN && ws.send(data));
+};
 
 function newCode() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they read as 1 and 0)
@@ -69,13 +83,13 @@ function startDuel(room: Room) {
   const rules = { ...DUEL_RULES };
   const world = (room.world = new World(seed, rules));
   for (const p of room.players) {
+    p.controller = new NetController(); // fresh queue and command acks for each duel
     p.unit = world.spawnChampion(p.team, p.kit, p.controller, { summoners: p.summoners });
-    p.controller.queue = [];
     p.cursor = newCursor();
   }
   for (const p of room.players) {
     const foe = room.players.find((o) => o !== p)!;
-    send(p.ws, { t: 'start', seed, rules, you: p.unit!.id, foe: foe.unit!.id, snap: takeSnapshot(world, p.cursor) });
+    send(p.ws, { t: 'start', seed, rules, you: p.unit!.id, foe: foe.unit!.id, snap: takeSnapshot(world, p.cursor, p.controller.applied) });
   }
   // Step on a fixed clock, catching up if the event loop runs late.
   let next = performance.now();
@@ -88,7 +102,7 @@ function startDuel(room: Room) {
       steps++;
     }
     if (steps === 0) return;
-    for (const p of room.players) send(p.ws, { t: 'snap', snap: takeSnapshot(world, p.cursor) });
+    for (const p of room.players) send(p.ws, { t: 'snap', snap: takeSnapshot(world, p.cursor, p.controller.applied) });
     if (world.winner) endDuel(room, false);
   }, 5);
 }
@@ -182,6 +196,7 @@ function handle(ws: WebSocket, msg: ClientMsg) {
       // Only ever their own champion, and only commands the sim understands.
       if (!room?.world || !me || !Array.isArray(msg.cmds)) return;
       for (const c of msg.cmds.slice(0, 20)) if (validCommand(c)) me.controller.queue.push(c);
+      if (Number.isInteger(msg.seq) && msg.seq > me.controller.received) me.controller.received = msg.seq;
       return;
     case 'leave':
       return leave(ws);
@@ -192,13 +207,15 @@ const port = Number(process.env.PORT ?? PVP_PORT);
 // Snapshots are repetitive JSON: per-message compression cuts them to about a sixth (~280 -> ~50 KB/s a player).
 const wss = new WebSocketServer({ port, perMessageDeflate: { threshold: 512 } });
 wss.on('connection', (ws) => {
-  ws.on('message', (data) => {
-    try {
-      handle(ws, JSON.parse(String(data)) as ClientMsg);
-    } catch {
-      /* ignore malformed messages */
-    }
-  });
+  ws.on('message', (data) =>
+    later(() => {
+      try {
+        handle(ws, JSON.parse(String(data)) as ClientMsg);
+      } catch {
+        /* ignore malformed messages */
+      }
+    }),
+  );
   ws.on('close', () => leave(ws));
 });
-console.log(`Lane Rogue PvP server on ws://0.0.0.0:${port}`);
+console.log(`Lane Rogue PvP server on ws://0.0.0.0:${port}${LATENCY ? ` (simulating ${LATENCY} ms each way)` : ''}`);

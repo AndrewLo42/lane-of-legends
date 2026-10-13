@@ -25,7 +25,8 @@ export type ClientMsg =
   | { t: 'join'; code: string }
   | { t: 'pick'; kit: KitId; summoners: [SummonerId, SummonerId] }
   | { t: 'ready'; ready: boolean }
-  | { t: 'cmds'; cmds: Command[] }
+  /** `seq` increases with every batch; snapshots acknowledge the last one applied. */
+  | { t: 'cmds'; seq: number; cmds: Command[] }
   | { t: 'leave' };
 
 export type ServerMsg =
@@ -41,6 +42,8 @@ export type MissileSnap = Omit<Missile, 'canHit' | 'onHit' | 'onEnd'>;
 
 export interface Snapshot {
   tick: number;
+  /** The last command batch of yours the server has applied (client-side prediction replays the rest). */
+  ack: number;
   winner: Team | null;
   winReason: WinReason | null;
   units: Unit[];
@@ -63,7 +66,7 @@ export interface SnapCursor {
 export const newCursor = (): SnapCursor => ({ fxTick: -1, hitSeq: 0, kills: 0 });
 
 /** Server side: the world as one client should see it next, advancing that client's cursor. */
-export function takeSnapshot(world: World, cursor: SnapCursor): Snapshot {
+export function takeSnapshot(world: World, cursor: SnapCursor, ack = 0): Snapshot {
   const fx = world.fx.filter((f) => f.tick > cursor.fxTick);
   const hits = world.hits.filter((h) => h.seq > cursor.hitSeq);
   const kills = world.championKills.slice(cursor.kills);
@@ -73,6 +76,7 @@ export function takeSnapshot(world: World, cursor: SnapCursor): Snapshot {
   cursor.kills = world.championKills.length;
   return {
     tick: world.tick,
+    ack,
     winner: world.winner,
     winReason: world.winReason,
     units: world.units,
