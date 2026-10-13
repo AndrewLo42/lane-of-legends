@@ -810,9 +810,9 @@ export class World {
       }
     }
     if (u.kind === 'champion') {
-      // Any death scores for the other side (a tower execute counts), worth more with Bounty Hunter.
+      // Any death scores one for the other side (a tower execute counts).
       const foe = this.champions().find((c) => c.team !== u.team);
-      if (foe?.champ) foe.champ.kills += byChampion ? Math.max(1, ...perksOf(byChampion).map((a) => a.killValue ?? 1)) : 1;
+      if (foe?.champ) foe.champ.kills++;
       u.champ!.deaths++;
       if (byChampion) this.grantXp(byChampion, champKillXp(u.champ!.level) * xpMult);
       u.champ!.casting = null;

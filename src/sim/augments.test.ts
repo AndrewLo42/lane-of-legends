@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUGMENTS, combineMods } from './augments';
+import { AUGMENTS, FIRST_STRIKE, combineMods } from './augments';
 import { ITEMS, PERMANENT_ITEMS, STARTER_ITEMS } from './items';
 import { DUEL_RULES, SANDBOX_RULES } from './rules';
 import type { AugmentId, Command, Controller, Unit } from './types';
@@ -115,10 +115,34 @@ describe('duel rules', () => {
     expect(win(w)).toEqual(['blue', 'kills']);
   });
 
-  it('Bounty Hunter kills count double', () => {
-    const { w, me, foe } = duel(['bounty'], { ...DUEL_RULES, killsToWin: 2 });
+  it('First Strike: the opening hit of a trade deals bonus damage, then not again until things calm down', () => {
+    const { w, me, foe } = duel(['firststrike']);
+    me.range = foe.range = 0; // no autos of their own, only the hits below
+    foe.maxHp = foe.hp = 5000;
+    const bonus = FIRST_STRIKE.base + FIRST_STRIKE.perLevel * me.champ!.level;
+    let hp = foe.hp;
+    w.dealDamage(me, foe, 10);
+    expect(hp - foe.hp).toBeCloseTo(10 + bonus, 3);
+    hp = foe.hp;
+    w.dealDamage(me, foe, 10); // mid-trade: no bonus
+    expect(hp - foe.hp).toBeCloseTo(10, 3);
+    run(w, FIRST_STRIKE.calm - 1);
+    w.dealDamage(foe, me, 5); // getting hit keeps the trade going
+    run(w, 1.5);
+    hp = foe.hp;
+    w.dealDamage(me, foe, 10);
+    expect(hp - foe.hp).toBeLessThan(15);
+    run(w, FIRST_STRIKE.calm + 0.1);
+    hp = foe.hp;
+    w.dealDamage(me, foe, 10);
+    expect(hp - foe.hp).toBeGreaterThan(bonus);
+  });
+
+  it('a champion kill counts once toward the kill goal', () => {
+    const { w, me, foe } = duel([], { ...DUEL_RULES, killsToWin: 2 });
     w.dealDamage(me, foe, 1e6);
-    expect(win(w)).toEqual(['blue', 'kills']);
+    expect(me.champ!.kills).toBe(1);
+    expect(w.winner).toBeNull();
   });
 
   it('the CS goal wins', () => {

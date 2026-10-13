@@ -30,8 +30,6 @@ export interface Perk {
   onTick?: (world: World, self: Unit) => void;
   /** Our minions get this much extra health and damage. */
   minionBuff?: number;
-  /** A champion kill counts this many times toward the kill goal. */
-  killValue?: number;
 }
 
 /** A run-long power-up picked after a win. */
@@ -44,6 +42,9 @@ const data = <T>(self: Unit, id: string, init: T): T => {
   if (d[id] === undefined) d[id] = init;
   return d[id] as T;
 };
+
+/** First Strike: bonus damage on the opening hit of a trade. */
+export const FIRST_STRIKE = { calm: 5, base: 60, perLevel: 10 };
 
 const LIST: Augment[] = [
   // ---- silver: plain stats ----
@@ -95,7 +96,23 @@ const LIST: Augment[] = [
       self.champ!.mana = Math.min(self.champ!.maxMana, self.champ!.mana + gain);
     },
   },
-  { id: 'bounty', name: 'Bounty Hunter', icon: '🎯', tier: 'gold', describe: 'Champion kills count double toward the kill goal.', killValue: 2 },
+  {
+    id: 'firststrike', name: 'First Strike', icon: '🎯', tier: 'gold',
+    describe: `Your first hit on the enemy champion after ${FIRST_STRIKE.calm}s without trading with them deals ${FIRST_STRIKE.base} + ${FIRST_STRIKE.perLevel} per level bonus damage.`,
+    onDamage: (w, self, t, _amt, from) => {
+      if (t.kind !== 'champion' || from.proc) return;
+      const d = data(self, 'firststrike', { last: -1e9 });
+      const fresh = w.tick - d.last >= ticks(FIRST_STRIKE.calm);
+      d.last = w.tick;
+      if (!fresh || t.dead) return;
+      w.dealDamage(self, t, FIRST_STRIKE.base + FIRST_STRIKE.perLevel * self.champ!.level, { proc: true });
+      w.addFx({ kind: 'detonate', pos: t.pos, team: self.team });
+    },
+    // Getting hit by them counts as trading too.
+    onHurt: (w, self, src) => {
+      if (src?.kind === 'champion') data(self, 'firststrike', { last: -1e9 }).last = w.tick;
+    },
+  },
   { id: 'siege', name: 'Siegebreaker', icon: '🏰', tier: 'gold', describe: 'Your minions have 40% more health and damage.', minionBuff: 0.4 },
 
   // ---- prismatic: build-defining ----

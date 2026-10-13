@@ -301,6 +301,8 @@ export function loadRun(): RunState | null {
     const saved = JSON.parse(localStorage.getItem(RUN_KEY) ?? 'null') as Partial<RunState> | null;
     // Saves from before the shop existed lack its fields.
     const run = saved && ({ gold: 0, items: [], consumables: [], shopping: false, bought: [], ...saved } as RunState);
+    // Bounty Hunter (kills counted double) was replaced by First Strike.
+    if (run?.augments) run.augments = run.augments.map((a) => (a === 'bounty' ? 'firststrike' : a));
     if (
       run?.version === 1 && KIT_IDS.includes(run.kit) && run.floor < FLOORS.length && run.augments.every((a) => AUGMENTS[a]) &&
       [...run.items, ...run.consumables].every((i) => ITEMS[i]) && (run.summoners == null || validSummoners(run.summoners))
