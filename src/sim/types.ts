@@ -222,6 +222,20 @@ export interface Telegraph {
   end: number;
 }
 
+/** A damage event, kept briefly for the HUD's floating damage numbers (display only). */
+export interface Hit {
+  /** Increases by one per hit, so readers can tell which they've already seen. */
+  seq: number;
+  tick: number;
+  sourceId: number | null;
+  targetId: number;
+  /** Damage dealt, including anything a shield absorbed. */
+  amount: number;
+  attack: boolean;
+  /** Damage over time and on-hit extras (burns, stings, procs). */
+  proc: boolean;
+}
+
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;

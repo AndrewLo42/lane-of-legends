@@ -12,7 +12,7 @@ import {
 } from './stats';
 import type {
   AugmentId, ChampState, Command, DamageSource, Controller, Fx, KitId, MinionRole, Missile, MissileStyle, Slot, Status, SummonerId, SummonerSlot,
-  Team, Telegraph, Unit, UnitKind, Vec2, Zone,
+  Hit, Team, Telegraph, Unit, UnitKind, Vec2, Zone,
 } from './types';
 import { DT, TICK_HZ, angleTo, dist, dirTo, enemyOf, gap, inCone, segmentDistance, ticks, toward } from './util';
 
@@ -32,6 +32,9 @@ export class World {
   readonly telegraphs: Telegraph[] = [];
   /** Recent one-shot visual events (kept ~3 s). */
   readonly fx: Fx[] = [];
+  /** Recent damage (kept ~1 s), for floating damage numbers. */
+  readonly hits: Hit[] = [];
+  private hitSeq = 0;
   readonly rng: Rng;
   winner: Team | null = null;
   winReason: WinReason | null = null;
@@ -731,6 +734,7 @@ export class World {
       amount *= 1 - guard;
       if (src?.kind === 'tower') amount *= target.champ.mods.towerTakenMult;
     }
+    this.hits.push({ seq: ++this.hitSeq, tick: this.tick, sourceId: src?.id ?? null, targetId: target.id, amount, attack: !!from.attack, proc: !!from.proc });
     // Shields soak damage first (oldest first); an emptied shield expires this tick.
     for (const sh of target.statuses) {
       if (sh.kind !== 'shield' || amount <= 0) continue;
@@ -851,6 +855,7 @@ export class World {
     for (const u of this.units) if (u.statuses.length) u.statuses = u.statuses.filter((s) => s.until > this.tick);
     for (let i = this.telegraphs.length - 1; i >= 0; i--) if (this.telegraphs[i].end <= this.tick) this.telegraphs.splice(i, 1);
     while (this.fx.length && this.fx[0].tick < this.tick - 3 * TICK_HZ) this.fx.shift();
+    while (this.hits.length && this.hits[0].tick < this.tick - TICK_HZ) this.hits.shift();
   }
 
   /** Remove dead non-champions; bring champions back at their fountain. */

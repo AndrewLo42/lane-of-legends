@@ -12,6 +12,7 @@ import type { AugmentId, Command, Controller, KitId, Slot, SummonerId, SummonerS
 import { DT, TICK_HZ, World } from './sim/world';
 import { AbilityBar } from './ui/abilityBar';
 import { HealthBars } from './ui/bars';
+import { DamageNumbers } from './ui/damageNumbers';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -86,6 +87,7 @@ export class Duel {
   private view: WorldView;
   private effects: EffectsView;
   private bars: HealthBars;
+  private damageNumbers: DamageNumbers;
   private hud: Hud;
   private abilityBar: AbilityBar;
   private minimap: Minimap;
@@ -114,6 +116,7 @@ export class Duel {
     this.view = new WorldView(shell.scene, world);
     this.effects = new EffectsView(shell.scene, world, this.me.team);
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
+    this.damageNumbers = new DamageNumbers(world, this.view, this.me.id);
     this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox, !!setup.spectate);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
     this.targetRing = new TargetRing(shell.scene);
@@ -176,6 +179,7 @@ export class Duel {
     cam.update(dt, input, spectating ? this.watchPoint() : this.view.positionOf(me.id) ?? toV3(me.pos));
     renderer.render(shell.scene, cam.camera);
     this.bars.update(cam.camera);
+    this.damageNumbers.update(cam.camera, simDt);
     this.hud.update();
     this.abilityBar.update();
     this.minimap.update(dt);
@@ -187,6 +191,7 @@ export class Duel {
     this.view.dispose();
     this.effects.dispose();
     this.bars.dispose();
+    this.damageNumbers.dispose();
     this.hud.dispose();
     this.abilityBar.dispose();
     this.minimap.dispose();
