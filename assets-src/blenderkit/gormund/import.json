@@ -1,0 +1,23 @@
+{
+  "out": "public/assets/meshy/Gormund.glb",
+  "rigged": "assets-src/blenderkit/gormund/rigged_gormund.glb",
+  "anims": ["assets-src/blenderkit/gormund/anims_gormund.glb"],
+  "textures": { "baseColor": 1024, "normal": 512, "metallicRoughness": 256 },
+  "fists": {
+    "LeftHand": { "palm": [1, 0, 0], "knuckle": 0.2, "radius": 0.03, "wrap": 230 },
+    "RightHand": { "palm": [-1, 0, 0], "knuckle": 0.2, "radius": 0.03, "wrap": 230 }
+  },
+  "clips": {
+    "Idle": { "src": "G_Idle" },
+    "Run": { "src": "G_Run" },
+    "Attack": { "src": "G_Jab", "start": 0.05, "end": 0.95 },
+    "Attack2": { "src": "G_Upper", "start": 0.1, "end": 0.95 },
+    "CastQ": { "src": "G_Throw", "start": 3.0, "end": 4.4 },
+    "CastW": { "src": "G_Pound", "start": 0.6, "end": 2.2 },
+    "CastE": { "src": "G_Charge" },
+    "CastR": { "src": "G_Slam", "start": 0.6, "end": 2.2 },
+    "Death": { "src": "G_Dead", "start": 0.9, "end": 2.8 },
+    "Hit": { "src": "G_Hit", "start": 0.0, "end": 1.0 },
+    "Select": { "src": "G_Pound", "start": 0.0, "end": 3.5 }
+  }
+}

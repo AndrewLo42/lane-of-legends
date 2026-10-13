@@ -1,4 +1,4 @@
-# Lane Rogue
+# Lane League
 
 One lane, you against a CPU opponent, League-style, wrapped in a roguelike run. Built with Three.js, TypeScript and Vite.
 
@@ -27,7 +27,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Currently: Gormund.
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). None right now: every champion has a model.
 
 | | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
 |---|---|---|---|

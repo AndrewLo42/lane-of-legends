@@ -162,7 +162,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   }
 
   const el = show(`
-    <div class="selecthead"><h1>Lane Rogue</h1>
+    <div class="selecthead"><h1>Lane League</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
       <div class="homelinks"><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button>
         <label class="exptoggle" title="Champions without a model yet, as placeholders. Bots never play them."><input type="checkbox" data-experimental${experimental ? ' checked' : ''}> 🧪 Experimental champions</label></div></div>

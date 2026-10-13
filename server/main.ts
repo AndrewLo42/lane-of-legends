@@ -1,5 +1,5 @@
 /**
- * Lane Rogue PvP server: rooms with join codes, a lobby where both players pick and ready up, then
+ * Lane League PvP server: rooms with join codes, a lobby where both players pick and ready up, then
  * an authoritative 1v1 duel stepped at 30 Hz with a snapshot to each player every tick.
  *
  *   npm run server            (port 8787, or PORT=…)
@@ -218,4 +218,4 @@ wss.on('connection', (ws) => {
   );
   ws.on('close', () => leave(ws));
 });
-console.log(`Lane Rogue PvP server on ws://0.0.0.0:${port}${LATENCY ? ` (simulating ${LATENCY} ms each way)` : ''}`);
+console.log(`Lane League PvP server on ws://0.0.0.0:${port}${LATENCY ? ` (simulating ${LATENCY} ms each way)` : ''}`);

@@ -1,4 +1,4 @@
-# Lane Rogue: plan
+# Lane League: plan
 
 A single-lane, League-style duel against a CPU opponent, wrapped in a roguelike run.
 
