@@ -49,6 +49,7 @@ function roomRequest(request: Request, code: string, create: boolean) {
   const headers = new Headers(request.headers);
   headers.set('x-room-code', code);
   headers.set('x-room-create', create ? '1' : '0');
+  headers.set('x-room-seat', new URL(request.url).searchParams.get('seat') ?? '');
   return new Request(request.url, { headers });
 }
 
@@ -59,6 +60,7 @@ export class RoomObject extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const code = request.headers.get('x-room-code') ?? '';
     const create = request.headers.get('x-room-create') === '1';
+    const seat = request.headers.get('x-room-seat');
     if (this.room?.empty) this.room = null;
     if (create && this.room) return new Response('Room code in use', { status: 409 });
 
@@ -69,14 +71,17 @@ export class RoomObject extends DurableObject<Env> {
     // A turned-away player closes the connection on the error message; closing it from here as well
     // (the fallback) only after a while, as a close from the room's side logs a spurious error.
     const socket: Socket = { send: (data) => quietly(() => server.send(data)), close: () => setTimeout(() => quietly(() => server.close(1000)), 5000) };
-    if (create) this.room = new Room(code);
+    if (create) {
+      const fresh: Room = new Room(code, () => {
+        if (this.room === fresh) this.room = null;
+      });
+      this.room = fresh;
+    }
     const room = this.room;
     // Listen before anything can close the connection (a turned-away player is closed straight away).
     const gone = () => {
       quietly(() => server.close(1000)); // answer the player's close
-      if (!room) return;
-      room.leave(socket);
-      if (room.empty && this.room === room) this.room = null;
+      room?.leave(socket);
     };
     server.addEventListener('close', gone);
     server.addEventListener('error', gone);
@@ -84,7 +89,8 @@ export class RoomObject extends DurableObject<Env> {
     if (!room || !validCode(code)) {
       send(socket, { t: 'error', message: 'No room with that code.' });
       socket.close();
-    } else room.add(socket);
+    } else if (seat) room.rejoin(socket, seat);
+    else room.add(socket);
     return new Response(null, { status: 101, webSocket: client });
   }
 }

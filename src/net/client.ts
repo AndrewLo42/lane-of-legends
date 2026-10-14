@@ -26,6 +26,9 @@ export class NetClient {
   lobby: Extract<ServerMsg, { t: 'lobby' }> | null = null;
   /** The room's connection dropped and hasn't been replaced. */
   closed = false;
+  /** The room you're in and your seat token: enough to get back into a duel after a drop. */
+  private code: string | null = null;
+  private seat: string | null = null;
   private ws: WebSocket | null = null;
 
   constructor(readonly url = serverUrl()) {}
@@ -43,7 +46,31 @@ export class NetClient {
   /** Create a room (no code) or join one. The room answers with a lobby message, or an error and a close. */
   enter(code: string | null) {
     this.leave();
-    const ws = (this.ws = new WebSocket(`${this.url}/room/${code ?? 'new'}`));
+    this.open(`${this.url}/room/${code ?? 'new'}`);
+  }
+
+  /** Back into the duel after a drop (the room answers `resume`, or an error if the seat is gone). */
+  rejoin() {
+    if (!this.code || !this.seat) return false;
+    this.drop();
+    this.open(`${this.url}/room/${this.code}?seat=${encodeURIComponent(this.seat)}`);
+    return true;
+  }
+
+  /** A connection is open or opening. */
+  get active() {
+    return this.ws != null;
+  }
+
+  /** Give up on a connection that has gone quiet, keeping the seat for `rejoin()`. */
+  drop() {
+    const ws = this.ws;
+    this.ws = null;
+    ws?.close();
+  }
+
+  private open(url: string) {
+    const ws = (this.ws = new WebSocket(url));
     this.closed = false;
     ws.addEventListener('message', (e) => {
       if (ws !== this.ws) return;
@@ -53,8 +80,12 @@ export class NetClient {
       } catch {
         return; // ignore malformed messages
       }
-      if (msg.t === 'lobby') this.lobby = msg;
-      if (msg.t === 'error' && !this.lobby) this.leave(); // turned away (no such room, or full)
+      if (msg.t === 'seat') this.seat = msg.token;
+      if (msg.t === 'lobby') {
+        this.lobby = msg;
+        this.code = msg.code;
+      }
+      if (msg.t === 'error' && !this.lobby) this.leave(); // turned away (no such room, full, or the duel is over)
       this.onMessage(msg);
     });
     ws.addEventListener('close', () => {
@@ -72,9 +103,8 @@ export class NetClient {
 
   /** Leave the room (an opponent mid-duel wins by forfeit). */
   leave() {
-    const ws = this.ws;
-    this.ws = null;
+    this.drop();
     this.lobby = null;
-    ws?.close();
+    this.code = this.seat = null;
   }
 }

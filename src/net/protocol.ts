@@ -12,6 +12,9 @@ import type { World } from '../sim/world';
 
 export const PVP_PORT = 8787;
 
+/** How long a dropped player's seat is held (the duel paused) before it counts as leaving. */
+export const SEAT_GRACE = 30;
+
 /** What a player has picked in the room. */
 export interface LobbyPlayer {
   team: Team;
@@ -22,7 +25,8 @@ export interface LobbyPlayer {
 
 /**
  * Players don't send create or join: they connect to `/room/new` or `/room/CODE`, and the room answers
- * with a lobby message (or an error, then closes). Leaving is closing the connection.
+ * with their seat token and a lobby message (or an error, then closes). Leaving is closing the connection.
+ * A player who drops mid-duel reconnects to `/room/CODE?seat=TOKEN` within `SEAT_GRACE` seconds.
  */
 export type ClientMsg =
   | { t: 'pick'; kit: KitId; summoners: [SummonerId, SummonerId] }
@@ -31,9 +35,18 @@ export type ClientMsg =
   | { t: 'cmds'; seq: number; cmds: Command[] };
 
 export type ServerMsg =
+  /** Your seat in the room: the token that lets you back into a duel after a drop. Sent on joining. */
+  | { t: 'seat'; token: string }
   | { t: 'lobby'; code: string; you: Team; players: LobbyPlayer[] }
   | { t: 'start'; seed: number; rules: DuelRules; you: number; foe: number; snap: Snapshot }
   | { t: 'snap'; snap: Snapshot }
+  /** You're back in the duel after a drop: the whole world as it is now. */
+  | { t: 'resume'; you: number; foe: number; snap: Snapshot }
+  /**
+   * The other player dropped (the duel is paused; `wait` is the seconds left before it's a forfeit),
+   * or is back. Repeated about once a second while they're away.
+   */
+  | { t: 'peer'; connected: boolean; wait: number }
   /** The duel is over. `left`: the opponent disconnected (you win). Afterwards the room is back in the lobby. */
   | { t: 'end'; winner: Team | null; reason: WinReason | null; left: boolean; recap: DuelRecap }
   | { t: 'error'; message: string };

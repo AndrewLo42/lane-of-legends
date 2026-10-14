@@ -445,12 +445,12 @@ export async function onlineUnavailable(url: string): Promise<void> {
   hide();
 }
 
-/** Your connection dropped mid-duel. The server counts it as leaving, so the opponent wins by forfeit. */
+/** Your connection dropped mid-duel and couldn't get back in before the seat ran out: a forfeit. */
 export async function connectionLost(): Promise<void> {
   const el = show(`
     <div class="floorhead"><small>Online</small><h1>Connection lost</h1></div>
-    <p class="hint">The connection to the server dropped during the duel, so it counts as a forfeit:<br>
-      your opponent wins. Check your connection, then create or join a room to play again.</p>
+    <p class="hint">The connection to the server dropped during the duel and couldn't get back in time,<br>
+      so it counts as a forfeit: your opponent wins. Check your connection, then create or join a room to play again.</p>
     <div class="actions"><button class="go" data-action="back">Back to online play</button></div>`);
   await waitFor(el);
   hide();

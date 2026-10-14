@@ -3,7 +3,7 @@
  * Durable Object (worker/index.ts) holds exactly one. Players pick and ready up in the lobby, then the
  * room runs an authoritative 1v1 duel stepped at 30 Hz with a snapshot to each player every tick.
  */
-import { newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
+import { SEAT_GRACE, newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
 import { KIT_IDS } from '../src/sim/kits';
 import { duelRecap } from '../src/sim/recap';
 import { DUEL_RULES } from '../src/sim/rules';
@@ -32,9 +32,13 @@ class NetController implements Controller {
 
 interface Player extends LobbyPlayer {
   socket: Socket;
+  /** Secret to this player: proves it's them reconnecting. */
+  token: string;
   controller: NetController;
   unit?: Unit;
   cursor: SnapCursor;
+  /** Mid-duel drop: when their held seat runs out (performance.now() ms), or null while connected. */
+  goneUntil: number | null;
 }
 
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they read as 1 and 0)
@@ -46,10 +50,16 @@ export class Room {
   private world: World | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(readonly code: string) {}
+  /** `onEmpty`: the last player has gone (including a held seat running out), so the host can drop the room. */
+  constructor(readonly code: string, private onEmpty: () => void = () => {}) {}
 
   get empty() {
     return this.players.length === 0;
+  }
+
+  /** Someone has dropped mid-duel and their seat is held: the duel is paused. */
+  private get paused() {
+    return this.players.some((p) => p.goneUntil != null);
   }
 
   /** Seat a new connection, or turn it away (with an error message) if the room is full. */
@@ -61,8 +71,27 @@ export class Room {
     }
     const team: Team = this.players.some((p) => p.team === 'blue') ? 'red' : 'blue';
     const kit: KitId = team === 'blue' ? 'arlo' : 'tock';
-    this.players.push({ socket, team, kit, summoners: SIGNATURE_SUMMONERS[kit], ready: false, controller: new NetController(), cursor: newCursor() });
+    const token = crypto.randomUUID();
+    this.players.push({ socket, token, team, kit, summoners: SIGNATURE_SUMMONERS[kit], ready: false, controller: new NetController(), cursor: newCursor(), goneUntil: null });
+    send(socket, { t: 'seat', token });
     this.lobbyUpdate();
+  }
+
+  /** A player back after a drop, with their seat token: back into the duel where it was paused. */
+  rejoin(socket: Socket, token: string) {
+    const p = this.players.find((o) => o.token === token);
+    if (!p || !this.world || !p.unit) {
+      send(socket, { t: 'error', message: 'That duel is over.' });
+      socket.close();
+      return;
+    }
+    if (p.socket !== socket) p.socket.close(); // a connection that went quiet without closing
+    p.socket = socket;
+    p.goneUntil = null;
+    p.cursor = newCursor();
+    const foe = this.players.find((o) => o !== p)!;
+    send(socket, { t: 'resume', you: p.unit.id, foe: foe.unit!.id, snap: takeSnapshot(this.world, p.cursor, p.controller.applied) });
+    this.peerUpdate();
   }
 
   /** A message from one of the players (raw text off the wire; anything malformed is ignored). */
@@ -97,12 +126,37 @@ export class Room {
     }
   }
 
-  /** A player's connection closed. If a duel was on, whoever's left wins by forfeit. */
+  /**
+   * A player's connection closed. In the lobby they're gone; mid-duel their seat is held for
+   * SEAT_GRACE seconds with the duel paused, and if they don't come back the other player wins by forfeit.
+   */
   leave(socket: Socket) {
-    if (!this.players.some((p) => p.socket === socket)) return;
-    this.players = this.players.filter((p) => p.socket !== socket);
-    if (this.world) this.endDuel(true);
-    else this.lobbyUpdate();
+    const p = this.players.find((o) => o.socket === socket);
+    if (!p) return;
+    if (this.world) {
+      p.goneUntil = performance.now() + SEAT_GRACE * 1000;
+      p.controller.queue.length = 0;
+      this.peerUpdate();
+      return;
+    }
+    this.remove(p);
+    this.lobbyUpdate();
+  }
+
+  private remove(p: Player) {
+    this.players = this.players.filter((o) => o !== p);
+    if (this.empty) this.onEmpty();
+  }
+
+  /** Tell everyone connected whether the other player is there (and how long the seat is held). */
+  private peerUpdate() {
+    const now = performance.now();
+    for (const p of this.players) {
+      if (p.goneUntil != null) continue;
+      const other = this.players.find((o) => o !== p);
+      const wait = other?.goneUntil != null ? Math.max(0, Math.ceil((other.goneUntil - now) / 1000)) : 0;
+      send(p.socket, { t: 'peer', connected: other?.goneUntil == null, wait });
+    }
   }
 
   private lobbyUpdate() {
@@ -125,8 +179,23 @@ export class Room {
     }
     // Step on a fixed clock, catching up if the timer runs late.
     let next = performance.now();
+    let peerAt = 0;
     this.timer = setInterval(() => {
       const now = performance.now();
+      if (this.paused) {
+        // Hold the world still; tell the other player about once a second (it doubles as a heartbeat).
+        next = now;
+        const expired = this.players.find((p) => p.goneUntil != null && now >= p.goneUntil);
+        if (expired) {
+          this.remove(expired);
+          return this.endDuel(true);
+        }
+        if (now - peerAt >= 1000) {
+          peerAt = now;
+          this.peerUpdate();
+        }
+        return;
+      }
       let steps = 0;
       while (now >= next && steps < 5) {
         world.step();
@@ -140,7 +209,7 @@ export class Room {
     }, 5);
   }
 
-  /** Send the players their recap and put the room back in the lobby for a rematch. */
+  /** Send the players their recap and put the room back in the lobby for a rematch (without anyone still away). */
   private endDuel(left: boolean) {
     const world = this.world;
     if (this.timer) clearInterval(this.timer);
@@ -155,6 +224,7 @@ export class Room {
       });
       p.ready = false;
     }
+    for (const p of this.players.filter((o) => o.goneUntil != null)) this.remove(p);
     this.lobbyUpdate();
   }
 }

@@ -16,7 +16,7 @@ import { DamageNumbers } from './ui/damageNumbers';
 import { KillFeed } from './ui/killFeed';
 import { duelRecap, type DuelRecap } from './sim/recap';
 import type { NetClient } from './net/client';
-import { applySnapshot, type ServerMsg, type Snapshot } from './net/protocol';
+import { SEAT_GRACE, applySnapshot, type ServerMsg, type Snapshot } from './net/protocol';
 import { predictOwn, type PendingBatch } from './net/predict';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
@@ -72,13 +72,18 @@ export interface DuelOutcome {
   recap: DuelRecap;
   /** Online: the opponent disconnected (you win by forfeit). */
   left?: boolean;
-  /** Online: your own connection dropped mid-duel (a forfeit; `recap` is only what this client saw). */
+  /** Online: your connection dropped mid-duel and couldn't get back in time (a forfeit; `recap` is only what this client saw). */
   lost?: boolean;
 }
 
-/** Online: seconds without a word from the server before warning the player, and before giving up. */
+/**
+ * Online: seconds without a word from the server before warning the player, and before treating the
+ * connection as dropped and reconnecting; how often to retry, and how long the server holds the seat.
+ */
 const STALL_WARN = 2;
-const STALL_LOST = 10;
+const STALL_DROP = 6;
+const RETRY_EVERY = 1.5;
+const RETRY_STUCK = 5;
 
 /** Human controller: queues commands from input; the sim drains them on its next tick. */
 class PlayerController implements Controller {
@@ -140,7 +145,12 @@ export class Duel {
   /** When the server was last heard from (messages arrive even while the tab is hidden), and whether it's gone. */
   private heardAt = performance.now();
   private lost = false;
-  private stallEl?: HTMLDivElement;
+  /** Reconnecting after a drop: since when, and when the last attempt started. */
+  private reconnectingSince: number | null = null;
+  private attemptAt = 0;
+  /** The other player has dropped: seconds left of their held seat (the duel is paused), else null. */
+  private peerAway: number | null = null;
+  private bannerEl?: HTMLDivElement;
 
   constructor(private shell: Shell, private setup: DuelSetup) {
     this.finished = new Promise((r) => (this.resolve = r));
@@ -155,8 +165,15 @@ export class Duel {
         this.heardAt = performance.now();
         if (msg.t === 'snap') this.snaps.push(msg.snap);
         else if (msg.t === 'end') this.netEnd = msg;
+        else if (msg.t === 'peer') this.peerAway = msg.connected ? null : msg.wait;
+        else if (msg.t === 'resume') {
+          // Back in: the whole world as the server has it now; anything unacknowledged was lost with the drop.
+          this.snaps = [msg.snap];
+          this.pending = [];
+          this.reconnectingSince = null;
+        } else if (msg.t === 'error' && this.reconnectingSince != null) this.lost = true; // the seat is gone
       };
-      net.client.onClose = () => (this.lost = true);
+      net.client.onClose = () => (this.reconnectingSince ??= performance.now());
     } else {
       this.me = world.spawnChampion('blue', setup.kit, setup.spectate ? new BotController(setup.enemyAccuracy) : this.player, {
         augments: setup.augments, items: setup.items, extraLevels: setup.extraLevels, summoners: setup.summoners,
@@ -177,7 +194,7 @@ export class Duel {
     if (setup.spectate) this.buildSpectatorPanel();
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
-    if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam });
+    if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam, net: net?.client });
   }
 
   frame(dt: number) {
@@ -231,6 +248,8 @@ export class Duel {
     let alpha: number;
     if (net) {
       // Online: send what the player did this frame, then catch up on the server's snapshots.
+      // While anyone is away the duel is paused: nothing to send.
+      if (this.reconnectingSince != null || this.peerAway != null) player.queue.length = 0;
       if (player.queue.length) {
         const cmds = player.queue.splice(0);
         net.client.send({ t: 'cmds', seq: ++this.seq, cmds });
@@ -244,13 +263,7 @@ export class Duel {
         this.lastSnapAt = performance.now();
       }
       alpha = Math.min(1, (performance.now() - this.lastSnapAt) / (DT * 1000));
-      // The connection dropped, or the server has gone quiet for too long: the duel is over for us.
-      const silent = (performance.now() - this.heardAt) / 1000;
-      if (!this.netEnd && !this.lost && silent > STALL_LOST) {
-        this.lost = true;
-        net.client.leave();
-      }
-      this.showStall(!this.netEnd && !this.lost && silent > STALL_WARN);
+      this.keepConnected(net.client);
       if (this.lost && !this.netEnd) {
         this.resolve({ won: false, reason: null, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe), lost: true });
       }
@@ -281,7 +294,7 @@ export class Duel {
   dispose() {
     this.spectatorPanel?.remove();
     this.pingEl?.remove();
-    this.stallEl?.remove();
+    this.bannerEl?.remove();
     document.getElementById('abilities')?.classList.remove('spectating');
     this.view.dispose();
     this.effects.dispose();
@@ -357,18 +370,50 @@ export class Duel {
     this.pingEl.className = ms < 80 ? 'good' : ms < 160 ? 'ok' : 'bad';
   }
 
-  /** A banner while the server is quiet (lag spike or a dropping connection). */
-  private showStall(on: boolean) {
-    if (!on) {
-      this.stallEl?.remove();
-      this.stallEl = undefined;
+  /**
+   * Online: notice a dropped or silent connection and get back into the duel with the seat token (the
+   * server pauses the duel and holds the seat for SEAT_GRACE seconds), giving up once it can't be held.
+   * Shows a banner for whatever is going on.
+   */
+  private keepConnected(client: NetClient) {
+    const now = performance.now();
+    if (this.netEnd || this.lost) return this.banner(null);
+    const silent = (now - this.heardAt) / 1000;
+    if (this.reconnectingSince == null && silent > STALL_DROP) {
+      client.drop(); // gone quiet without closing
+      this.reconnectingSince = now;
+    }
+    if (this.reconnectingSince != null) {
+      const left = SEAT_GRACE - (now - this.reconnectingSince) / 1000;
+      if (left <= 0) {
+        this.lost = true;
+        client.leave();
+        return this.banner(null);
+      }
+      const since = (now - this.attemptAt) / 1000;
+      if ((!client.active && since > RETRY_EVERY) || since > RETRY_STUCK) {
+        this.attemptAt = now;
+        if (!client.rejoin()) this.lost = true;
+      }
+      return this.banner('Connection lost', `Reconnecting… ${Math.ceil(left)}s`);
+    }
+    if (this.peerAway != null) return this.banner('Opponent disconnected', `Paused · ${this.peerAway}s for them to return`);
+    this.banner(silent > STALL_WARN ? 'Connection unstable' : null, 'Waiting for the server…');
+  }
+
+  private banner(title: string | null, sub = '') {
+    if (!title) {
+      this.bannerEl?.remove();
+      this.bannerEl = undefined;
       return;
     }
-    if (this.stallEl) return;
-    this.stallEl = document.createElement('div');
-    this.stallEl.id = 'netstall';
-    this.stallEl.innerHTML = '<b>Connection unstable</b><span>Waiting for the server…</span>';
-    document.body.appendChild(this.stallEl);
+    if (!this.bannerEl) {
+      this.bannerEl = document.createElement('div');
+      this.bannerEl.id = 'netstall';
+      document.body.appendChild(this.bannerEl);
+    }
+    const html = `<b>${title}</b><span>${sub}</span>`;
+    if (this.bannerEl.innerHTML !== html) this.bannerEl.innerHTML = html;
   }
 
   private enemyUnderCursor(): Unit | undefined {

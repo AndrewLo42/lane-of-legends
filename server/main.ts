@@ -40,12 +40,14 @@ const http = createServer((req, res) => {
 const wss = new WebSocketServer({ server: http, perMessageDeflate: { threshold: 512 } });
 wss.on('connection', (ws, req) => {
   const socket = socketFor(ws);
-  const path = (req.url ?? '').split('?')[0];
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  const path = url.pathname;
+  const seat = url.searchParams.get('seat');
   let room: Room | undefined;
   if (path === '/room/new') {
     let code = newCode();
     while (rooms.has(code)) code = newCode();
-    rooms.set(code, (room = new Room(code)));
+    rooms.set(code, (room = new Room(code, () => rooms.delete(code))));
   } else {
     const code = path.startsWith('/room/') ? path.slice(6).toUpperCase() : '';
     room = validCode(code) ? rooms.get(code) : undefined;
@@ -55,14 +57,9 @@ wss.on('connection', (ws, req) => {
     }
   }
   const r = room;
-  later(() => r.add(socket));
+  later(() => (seat ? r.rejoin(socket, seat) : r.add(socket)));
   ws.on('message', (data) => later(() => r.message(socket, String(data))));
-  ws.on('close', () =>
-    later(() => {
-      r.leave(socket);
-      if (r.empty) rooms.delete(r.code);
-    }),
-  );
+  ws.on('close', () => later(() => r.leave(socket)));
 });
 
 const port = Number(process.env.PORT ?? PVP_PORT);
