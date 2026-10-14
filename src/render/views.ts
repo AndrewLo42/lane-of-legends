@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
+import { riding } from '../sim/kits/pip';
 import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
@@ -88,11 +89,13 @@ interface MissileView {
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 /** Height of a unit's health bar anchor above its feet. */
-export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6 };
+export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6, pet: 1.9 };
 
 const FROZEN = new THREE.Color(0xd8fffb);
 /** Champions that float instead of walking, and how high (Aurelle). */
 const FLOAT_HEIGHT: Partial<Record<KitId, number>> = { aurelle: 0.35 };
+/** Pip stands on Thistle's back while riding, like a tiny surfer. */
+const RIDE_HEIGHT = 0.95;
 /** How fast a floater's idle plays while she glides (1 = normal). */
 const GLIDE_IDLE_SPEED = 0.3;
 
@@ -263,6 +266,7 @@ export class WorldView {
       // Floaters (Aurelle) hover off the ground with a slow bob and glide instead of running.
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
+      if (u.champ?.kit === 'pip' && !u.dead && riding(u)) v.obj.position.y = RIDE_HEIGHT; // up on Thistle's back
       if (u.champ?.kit === 'aurelle') this.aurelleVisuals(u, v);
       if (u.champ?.kit === 'gormund') {
         // Labyrinth Rage: swell up over a fifth of a second, shrink back when it ends.

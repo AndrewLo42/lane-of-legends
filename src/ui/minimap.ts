@@ -100,7 +100,7 @@ export class Minimap {
     ctx.fillRect(px(-LANE.halfLength), py(-LANE.halfWidth), LANE.halfLength * 2 * SCALE, LANE.halfWidth * 2 * SCALE);
 
     // Structures, then minions, then champions on top.
-    const order = { nexus: 0, tower: 1, minion: 2, champion: 3 } as const;
+    const order = { nexus: 0, tower: 1, minion: 2, pet: 3, champion: 4 } as const;
     const units = world.units.filter((u) => !u.dead).sort((a, b) => order[a.kind] - order[b.kind]);
     for (const u of units) {
       const x = px(u.pos.x);
@@ -117,6 +117,15 @@ export class Minimap {
         ctx.beginPath();
         ctx.arc(x, y, 1.8, 0, Math.PI * 2);
         ctx.fill();
+      } else if (u.kind === 'pet') {
+        if (u.pet?.mounted) continue; // under its rider's dot
+        ctx.fillStyle = TEAM[u.team];
+        ctx.strokeStyle = '#000a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
       } else if (u.champ) {
         ctx.fillStyle = KITS[u.champ.kit].color;
         ctx.strokeStyle = u === me ? '#fff' : TEAM[u.team];

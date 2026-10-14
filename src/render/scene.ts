@@ -67,6 +67,9 @@ export function placeholderFor(u: Unit): THREE.Object3D {
     case 'champion':
       g.add(championPlaceholder(u, mat));
       break;
+    case 'pet':
+      g.add(thistlePlaceholder(mat));
+      break;
     case 'minion': {
       const body = u.role === 'melee'
         ? new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.8, 0.75), mat)
@@ -106,12 +109,77 @@ export function placeholderFor(u: Unit): THREE.Object3D {
   return g;
 }
 
+/**
+ * Thistle, Pip's giant anxious toad: a squat green body, bulging eyes, a pale belly and a ridge of
+ * thistle spikes down his back, with a collar in his team's colour. Facing +x.
+ */
+function thistlePlaceholder(teamMat: THREE.Material) {
+  const g = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: 0x5f8f4a, flatShading: true });
+  const belly = new THREE.MeshStandardMaterial({ color: 0xd8d29a, flatShading: true });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 10), skin);
+  body.scale.set(1.1, 0.62, 1);
+  body.position.y = 0.55;
+  const under = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 8), belly);
+  under.scale.set(1, 0.45, 0.85);
+  under.position.set(0.15, 0.38, 0);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 6, 16), teamMat);
+  collar.rotation.y = Math.PI / 2;
+  collar.position.set(0.55, 0.62, 0);
+  g.add(body, under, collar);
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf2e6a0 }));
+    eye.position.set(0.55, 0.95, side * 0.38);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    pupil.position.set(0.72, 0.97, side * 0.38);
+    const leg = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), skin);
+    leg.scale.set(1.3, 0.6, 0.8);
+    leg.position.set(-0.45, 0.22, side * 0.72);
+    g.add(eye, pupil, leg);
+  }
+  const spike = new THREE.MeshStandardMaterial({ color: 0x8d5aa8, flatShading: true });
+  for (let i = 0; i < 4; i++) {
+    const s = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.32, 5), spike);
+    s.position.set(-0.55 + i * 0.28, 0.98 - Math.abs(i - 1.5) * 0.05, 0);
+    s.rotation.z = 0.35;
+    g.add(s);
+  }
+  return g;
+}
+
 /** Champion stand-ins: Arlo is a slim capsule with a glowing gauntlet, Tock a squat clockwork knight with a scythe. */
 function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const g = new THREE.Group();
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
+  if (u.champ!.kit === 'pip') {
+    // Pip: a tiny sprout-knight in a green tunic, a leaf on his head, a pot-lid shield and a slingshot.
+    const tunic = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0x4f8a3c, flatShading: true }));
+    tunic.position.y = 0.45;
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.04, 6, 14), teamMat);
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 0.42;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe9c39b }));
+    head.position.y = 0.95;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.32, 5), new THREE.MeshStandardMaterial({ color: 0x8fd16a, flatShading: true }));
+    leaf.position.set(-0.04, 1.27, 0);
+    leaf.rotation.z = 0.4;
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 14), metal);
+    lid.rotation.x = Math.PI / 2;
+    lid.position.set(0.12, 0.55, -0.32);
+    const sling = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 5, 10, Math.PI), new THREE.MeshStandardMaterial({ color: 0x7a5434 }));
+    sling.position.set(0.2, 0.75, 0.3);
+    g.add(tunic, belt, head, leaf, lid, sling);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+      eye.position.set(0.2, 0.98, side * 0.08);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.25, 6), new THREE.MeshStandardMaterial({ color: 0x5a4030 }));
+      leg.position.set(0, 0.12, side * 0.1);
+      g.add(eye, leg);
+    }
+    return g;
+  }
   if (u.champ!.kit === 'sable') {
     // A tall, quiet harvester: a tattered field cloak, a dark crow-feather mantle, a deep hood with two
     // pale eyes, and a long scythe with a small lantern hanging from the blade.

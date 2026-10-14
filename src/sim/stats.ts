@@ -22,7 +22,7 @@ export const MINIONS: Record<MinionRole, BaseStats> = {
   caster: { radius: 0.4, hp: 190, speed: 4.6, damage: 24, range: 5.0, attackInterval: 1.6, windup: 0.35, projectileSpeed: 14, bounty: 14 },
 };
 
-export const STRUCTURES: Record<Exclude<UnitKind, 'champion' | 'minion'>, BaseStats> = {
+export const STRUCTURES: Record<Exclude<UnitKind, 'champion' | 'minion' | 'pet'>, BaseStats> = {
   tower: { radius: 1.4, hp: 2400, speed: 0, damage: 160, range: 7, attackInterval: 1.0, windup: 0.15, projectileSpeed: 24, bounty: 150 },
   nexus: { radius: 2.6, hp: 4000, speed: 0, damage: 0, range: 0, attackInterval: 1, windup: 0, projectileSpeed: 0, bounty: 0 },
 };

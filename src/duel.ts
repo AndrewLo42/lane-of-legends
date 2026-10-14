@@ -5,7 +5,7 @@ import { EffectsView, type AimIndicator } from './render/effects';
 import { TargetRing, toV3, type ClickMarker } from './render/scene';
 import { WorldView } from './render/views';
 import { BotController } from './sim/bot';
-import { kitOf } from './sim/kits';
+import { abilitiesOf } from './sim/kits';
 import type { DuelRules, WinReason } from './sim/rules';
 import { SUMMONERS } from './sim/summoners';
 import type { AugmentId, Command, Controller, KitId, Slot, SummonerId, SummonerSlot, Unit } from './sim/types';
@@ -481,6 +481,6 @@ export class Duel {
       return indicator.hide();
     }
     const blocker = world.castBlocker(me, this.aiming);
-    indicator.show(kitOf(me).abilities[this.aiming].aim, this.view.positionOf(me.id)!, at, blocker === null || blocker === 'busy');
+    indicator.show(abilitiesOf(me)[this.aiming].aim, this.view.positionOf(me.id)!, at, blocker === null || blocker === 'busy');
   }
 }

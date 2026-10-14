@@ -132,6 +132,7 @@ export const DEFAULT_SUMMONERS: [SummonerId, SummonerId] = ['flash', 'ignite'];
 /** Each champion's signature pair: what the CPU takes (and a sensible first pick for players). */
 export const SIGNATURE_SUMMONERS: Record<KitId, [SummonerId, SummonerId]> = {
   arlo: ['flash', 'barrier'],
+  pip: ['flash', 'ghost'],
   tock: ['flash', 'ignite'],
   maren: ['flash', 'ignite'],
   lisha: ['flash', 'ghost'],

@@ -1,5 +1,5 @@
 import { portraitHtml } from '../render/portraits';
-import { kitOf } from '../sim/kits';
+import { abilitiesOf, kitOf } from '../sim/kits';
 import { SUMMONERS } from '../sim/summoners';
 import { augmentChips } from './chips';
 import type { Slot, Unit } from '../sim/types';
@@ -18,6 +18,7 @@ const SPELL_TIP = 10;
 
 interface SlotEls {
   root: HTMLDivElement;
+  icon: HTMLElement;
   cd: HTMLDivElement;
   cdText: HTMLSpanElement;
   pips: HTMLDivElement;
@@ -57,7 +58,7 @@ export class AbilityBar {
           ${SLOTS.map((s) => `
             <div class="slot" data-tip="${s}">
               <button class="plus" title="Level up (Alt+${KEYS[s]})">+</button>
-              <i>${kit.abilities[s].icon}</i>
+              <i class="aicon">${abilitiesOf(me)[s].icon}</i>
               <div class="cd"></div><span class="cdtext"></span>
               <span class="key">${KEYS[s]}</span>
               <div class="pips"></div>
@@ -86,7 +87,7 @@ export class AbilityBar {
         e.stopPropagation();
         onLevel(i as Slot);
       });
-      this.slots.push({ root, plus, cd: q('.cd', root), cdText: q('.cdtext', root), pips: q('.pips', root) });
+      this.slots.push({ root, plus, icon: q('.aicon', root), cd: q('.cd', root), cdText: q('.cdtext', root), pips: q('.pips', root) });
     });
     this.root.querySelectorAll<HTMLDivElement>('.slot.spell').forEach((root) => {
       this.spells.push({ root, cd: q('.cd', root), cdText: q('.cdtext', root) });
@@ -122,7 +123,8 @@ export class AbilityBar {
     SLOTS.forEach((s) => {
       const el = this.slots[s];
       const st = c.abilities[s];
-      const def = kit.abilities[s];
+      const def = abilitiesOf(me)[s];
+      if (el.icon.textContent !== def.icon) el.icon.textContent = def.icon; // Pip's change when he gets off Thistle
       const left = Math.max(0, st.readyAt - world.tick) / TICK_HZ;
       const recast = st.recastUntil > world.tick;
       const total = def.cooldown(Math.max(1, st.rank));
@@ -168,7 +170,7 @@ export class AbilityBar {
       return `<b>${sp.name}</b> <small>${SPELL_KEYS[i - SPELL_TIP]} · hero skill</small><p>${sp.describe(this.me)}</p>
         <small class="cost">${sp.cooldown}s cooldown</small>`;
     }
-    const def = kit.abilities[i];
+    const def = abilitiesOf(this.me)[i];
     const rank = this.me.champ!.abilities[i].rank;
     const r = Math.max(1, rank);
     return `<b>${def.name}</b> <small>${KEYS[i]} · rank ${rank}/${def.maxRank}</small>

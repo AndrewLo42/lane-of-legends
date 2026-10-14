@@ -1,5 +1,5 @@
 import { lead, leadTime, minionInTheWay } from './aim';
-import { kitOf } from './kits';
+import { abilitiesOf, kitOf } from './kits';
 import { holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
@@ -84,7 +84,6 @@ export class BotController implements Controller {
     const enemyTowers = alive.filter((u) => u.team === foeTeam && u.kind === 'tower');
     const allies = alive.filter((u) => u.team === self.team && u.kind === 'minion');
     const foe = alive.find((u) => u.team === foeTeam && u.kind === 'champion');
-    const kit = kitOf(self);
     const abilities = self.champ!.abilities;
     const ctx: Ctx = {
       world, self, foe,
@@ -96,7 +95,7 @@ export class BotController implements Controller {
         }),
       ready: (slot) => world.castBlocker(self, slot) === null && abilities[slot].recastUntil <= world.tick,
       recasting: (slot) => world.castBlocker(self, slot) === null && abilities[slot].recastUntil > world.tick,
-      dmg: (slot) => kit.abilities[slot].damage?.(abilities[slot].rank, self) ?? 0,
+      dmg: (slot) => abilitiesOf(self)[slot].damage?.(abilities[slot].rank, self) ?? 0,
       aim: (target, speed) => this.miss(world, lead(world, self.pos, target, speed)),
       aimAfter: (target, seconds) => this.miss(world, leadTime(world, target, seconds)),
     };
@@ -109,6 +108,7 @@ export class BotController implements Controller {
       aurelle: { play: this.aurelle, escape: this.aurelleEscape },
       gormund: { play: this.gormund, escape: this.gormundEscape },
       sable: { play: this.sable, escape: this.sableEscape },
+      pip: { play: this.none, escape: this.none }, // experimental: bots never play Pip & Thistle yet
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -145,6 +145,11 @@ export class BotController implements Controller {
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
     return { type: 'move', to: spot };
+  }
+
+  /** A champion with no kit-specific play: plain trading and farming. */
+  private none(): Command | null {
+    return null;
   }
 
   // ---------- dodging ----------

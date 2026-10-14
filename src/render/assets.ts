@@ -22,6 +22,7 @@ export const MODELS = {
   champ_aurelle: 'Aurelle.glb',
   champ_gormund: 'Gormund.glb',
   champ_sable: 'Sable.glb',
+  champ_pip: 'Pip.glb', // not built yet: Pip & Thistle play as placeholders
 } as const;
 export type ModelName = keyof typeof MODELS;
 

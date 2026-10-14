@@ -105,6 +105,15 @@ export interface Kit {
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */
   autoDamageMult?: (world: World, self: Unit) => number;
   abilities: [AbilityDef, AbilityDef, AbilityDef, AbilityDef];
+  /**
+   * A second set of abilities the champion switches to (Pip on foot); `inOtherForm` says when. Use
+   * `abilitiesOf(u)` to get whichever set is active.
+   */
+  otherForm?: { label: string; abilities: [AbilityDef, AbilityDef, AbilityDef, AbilityDef]; active: (self: Unit) => boolean };
+  /** Takes damage meant for us first; returns what's left over for our own health (Thistle while Pip rides). */
+  soak?: (world: World, self: Unit, amount: number) => number;
+  /** Our pet hit 0 health (pets don't die; the kit decides what happens). */
+  onPetDown?: (world: World, self: Unit, pet: Unit) => void;
   /** Order the bot spends skill points in. */
   levelOrder: Slot[];
   /** An auto-attack of ours landed. */

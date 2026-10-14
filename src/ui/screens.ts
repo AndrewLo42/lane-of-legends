@@ -198,6 +198,9 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
         <li><i>${k.passive.icon}</i><div><b>${k.passive.name}</b> <small>Passive</small><p>${k.passive.describe(sample)}</p></div></li>
         ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`).join('')}
       </ul>
+      ${k.otherForm ? `<h4>${k.otherForm.label}</h4><ul class="abilities">
+        ${k.otherForm.abilities.map((a, s) => (a === k.abilities[s] ? '' : `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`)).join('')}
+      </ul>` : ''}
       <h4>Hero skills <small>swappable in the shop between floors</small></h4>
       <div class="spellpick"></div>
       <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>

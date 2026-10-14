@@ -9,9 +9,10 @@ export interface Vec2 {
 }
 
 export type Team = 'blue' | 'red';
-export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus';
+/** `pet`: a champion's companion unit (Pip's Thistle), fighting alongside but not a champion. */
+export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'pet';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -164,6 +165,16 @@ export interface Unit {
   /** Being pulled or knocked somewhere; can't act until it lands. */
   forced: { to: Vec2; speed: number } | null;
   champ?: ChampState;
+  pet?: PetState;
+}
+
+/** A pet's tie to its champion. Its owner's kit drives it (where it walks, what it attacks). */
+export interface PetState {
+  ownerId: number;
+  /** Carrying its owner (Pip riding Thistle): it moves with them and can't be targeted. */
+  mounted: boolean;
+  /** Broken at 0 health: untargetable and out of the fight until this tick. */
+  panicUntil: number;
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
