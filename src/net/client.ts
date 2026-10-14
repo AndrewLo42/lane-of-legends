@@ -13,6 +13,14 @@ export function serverUrl() {
   return (fromUrl ?? fromBuild ?? here).replace(/\/+$/, '');
 }
 
+/** Your seat in a duel, kept for the tab's session so a page refresh can rejoin. */
+const SEAT_KEY = 'lane-rogue.seat';
+interface SavedSeat {
+  url: string;
+  code: string;
+  seat: string;
+}
+
 /**
  * The PvP server, and your connection to a room on it. Each room is its own connection: `enter()`
  * opens one (creating a room, or joining one by code) and `leave()` closes it. Every message received
@@ -32,6 +40,31 @@ export class NetClient {
   private ws: WebSocket | null = null;
 
   constructor(readonly url = serverUrl()) {}
+
+  /** A client holding the seat this tab had before a refresh (on the same server), if any. */
+  static saved(): NetClient | null {
+    let seat: SavedSeat | null = null;
+    try {
+      seat = JSON.parse(sessionStorage.getItem(SEAT_KEY) ?? 'null') as SavedSeat | null;
+    } catch {
+      /* storage unavailable */
+    }
+    const net = new NetClient();
+    if (!seat || seat.url !== net.url || !seat.code || !seat.seat) return null;
+    net.code = seat.code;
+    net.seat = seat.seat;
+    return net;
+  }
+
+  /** Remember the seat for this tab (or forget it). */
+  private save() {
+    try {
+      if (this.code && this.seat) sessionStorage.setItem(SEAT_KEY, JSON.stringify({ url: this.url, code: this.code, seat: this.seat } satisfies SavedSeat));
+      else sessionStorage.removeItem(SEAT_KEY);
+    } catch {
+      /* storage unavailable: a refresh just won't rejoin */
+    }
+  }
 
   /** Whether a server answers at all (before showing the lobby). */
   async available(timeoutMs = 4000) {
@@ -55,6 +88,11 @@ export class NetClient {
     this.drop();
     this.open(`${this.url}/room/${this.code}?seat=${encodeURIComponent(this.seat)}`);
     return true;
+  }
+
+  /** The room you're in (also while reconnecting to it). */
+  get room() {
+    return this.code;
   }
 
   /** A connection is open or opening. */
@@ -81,10 +119,11 @@ export class NetClient {
         return; // ignore malformed messages
       }
       if (msg.t === 'seat') this.seat = msg.token;
-      if (msg.t === 'lobby') {
-        this.lobby = msg;
+      if (msg.t === 'lobby' && msg.code !== this.code) {
         this.code = msg.code;
+        this.save();
       }
+      if (msg.t === 'lobby') this.lobby = msg;
       if (msg.t === 'error' && !this.lobby) this.leave(); // turned away (no such room, full, or the duel is over)
       this.onMessage(msg);
     });
@@ -106,5 +145,6 @@ export class NetClient {
     this.drop();
     this.lobby = null;
     this.code = this.seat = null;
+    this.save();
   }
 }

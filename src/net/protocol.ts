@@ -40,8 +40,8 @@ export type ServerMsg =
   | { t: 'lobby'; code: string; you: Team; players: LobbyPlayer[] }
   | { t: 'start'; seed: number; rules: DuelRules; you: number; foe: number; snap: Snapshot }
   | { t: 'snap'; snap: Snapshot }
-  /** You're back in the duel after a drop: the whole world as it is now. */
-  | { t: 'resume'; you: number; foe: number; snap: Snapshot }
+  /** You're back in the duel after a drop: the duel's setup (as in `start`) and the whole world as it is now. */
+  | { t: 'resume'; seed: number; rules: DuelRules; you: number; foe: number; snap: Snapshot }
   /**
    * The other player dropped (the duel is paused; `wait` is the seconds left before it's a forfeit),
    * or is back. Repeated about once a second while they're away.

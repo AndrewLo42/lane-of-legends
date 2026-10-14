@@ -50,7 +50,7 @@ function ladder(run: RunState) {
 }
 
 const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · hold <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> to aim,
-  release to cast (right-click cancels) · <kbd>D</kbd><kbd>F</kbd> summoner spells · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
+  release to cast (right-click cancels) · <kbd>D</kbd><kbd>F</kbd> hero skills · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
   hold <kbd>Space</kbd> centre camera · wheel zoom · minimap: left-click to look, right-click to walk</p>`;
 
 const kitName = (id: KitId) => `<b style="color:${KITS[id].color}">${KITS[id].name}</b> <small>${KITS[id].title}</small>`;
@@ -197,7 +197,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
         <li><i>${k.passive.icon}</i><div><b>${k.passive.name}</b> <small>Passive</small><p>${k.passive.describe(sample)}</p></div></li>
         ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`).join('')}
       </ul>
-      <h4>Summoner spells <small>swappable in the shop between floors</small></h4>
+      <h4>Hero skills <small>swappable in the shop between floors</small></h4>
       <div class="spellpick"></div>
       <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
       <div class="actions"><button class="go" data-start>Start run as ${k.name}</button></div>`;
@@ -289,7 +289,7 @@ export async function pickBots(): Promise<{ blue: KitId; red: KitId } | null> {
       ${row('blue')}
       <div class="vs">VS</div>
       ${row('red')}
-      <p class="hint">Both sides play at Legend-level aim with their signature summoner spells. Speed it up to 2× or 4× while watching.</p>
+      <p class="hint">Both sides play at Legend-level aim with their signature hero skills. Speed it up to 2× or 4× while watching.</p>
       <div class="actions"><button class="go" data-action="go">Watch</button><button class="link" data-action="back">Back</button></div>`);
     const action = await waitFor(el);
     if (action === 'back') {
@@ -416,7 +416,7 @@ export async function shop(run: RunState, onBuy: (id: AugmentId) => void, onSpel
       <h3>Consumables <small>next duel only</small></h3>
       <div class="cards shelf">${CONSUMABLES.map(card).join('')}</div>
       <div class="chips">${augmentChips([...run.items, ...run.consumables], true, 'Nothing bought yet')}</div>
-      <h3>Summoner spells <small>free to swap</small></h3>
+      <h3>Hero skills <small>free to swap</small></h3>
       <div class="spellpick"></div>
       <div class="actions"><button class="go" data-action="leave">Next floor →</button></div>`);
     const sample = new World(1).spawnChampion('blue', run.kit, { think: () => [] });

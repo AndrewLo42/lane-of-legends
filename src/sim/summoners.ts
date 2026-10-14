@@ -40,7 +40,7 @@ export function igniteTarget(world: World, self: Unit, at: Vec2): Unit | undefin
 
 const LIST: SummonerDef[] = [
   {
-    id: 'flash', name: 'Flash', icon: '✦', cooldown: 75, aim: { shape: 'dash', range: FLASH.range },
+    id: 'flash', name: 'Blink', icon: '✦', cooldown: 75, aim: { shape: 'dash', range: FLASH.range },
     describe: () => `Blink up to ${FLASH.range} units toward the cursor. Works while rooted and mid-cast.`,
     cast: (w, self, at) => {
       w.blink(self, at, FLASH.range);
@@ -48,7 +48,7 @@ const LIST: SummonerDef[] = [
     },
   },
   {
-    id: 'ignite', name: 'Ignite', icon: '🔥', cooldown: 75, aim: { shape: 'target', range: IGNITE.range },
+    id: 'ignite', name: 'Scorch', icon: '🔥', cooldown: 75, aim: { shape: 'target', range: IGNITE.range },
     describe: (self) =>
       `Set the enemy champion ablaze for ${Math.round(IGNITE.base + IGNITE.perLevel * level(self))} damage over ${IGNITE.seconds}s. ` +
       `They heal ${IGNITE.grievous * 100}% less while burning.`,
@@ -72,7 +72,7 @@ const LIST: SummonerDef[] = [
     },
   },
   {
-    id: 'barrier', name: 'Barrier', icon: '🛡', cooldown: 70, aim: SELF,
+    id: 'barrier', name: 'Ward', icon: '🛡', cooldown: 70, aim: SELF,
     describe: (self) => `Shield yourself from ${Math.round(BARRIER.base + BARRIER.perLevel * level(self))} damage for ${BARRIER.seconds}s.`,
     cast: (w, self) => {
       w.addStatus(self, { kind: 'shield', value: BARRIER.base + BARRIER.perLevel * level(self), sourceId: self.id, seconds: BARRIER.seconds });

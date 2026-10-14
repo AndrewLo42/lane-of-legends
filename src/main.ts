@@ -6,6 +6,7 @@ import { loadModels } from './render/assets';
 import { installCursors } from './ui/cursors';
 import { installHoverTips } from './ui/hoverTip';
 import { NetClient } from './net/client';
+import type { ServerMsg } from './net/protocol';
 import { bakePortraits } from './render/portraits';
 import { AimIndicator } from './render/effects';
 import { SelectStage } from './render/selectStage';
@@ -120,17 +121,22 @@ async function watchBots() {
   await duelRecap(outcome.recap, outcome.won, outcome.reason, `Bot vs bot · ${KITS[pick.blue].name} vs ${KITS[pick.red].name}`);
 }
 
-/** Online 1v1: connect, lobby (create or join a room), duel, recap, and back to the room for a rematch. */
-async function playOnline() {
-  const net = new NetClient();
-  if (!(await net.available())) {
+type StartMsg = Extract<ServerMsg, { t: 'start' }>;
+
+/**
+ * Online 1v1: connect, lobby (create or join a room), duel, recap, and back to the room for a rematch.
+ * `rejoined`: already back in a duel after a page refresh (see `rejoinAfterRefresh`).
+ */
+async function playOnline(rejoined?: { net: NetClient; start: StartMsg }) {
+  const net = rejoined?.net ?? new NetClient();
+  if (!rejoined && !(await net.available())) {
     await onlineUnavailable(net.url);
     return;
   }
-  for (;;) {
-    const start = await onlineLobby(net);
+  for (let first = rejoined?.start; ; first = undefined) {
+    const start = first ?? (await onlineLobby(net));
     if (!start) break;
-    const code = net.lobby?.code ?? '';
+    const code = net.room ?? '';
     duel = new Duel(shell, {
       seed: start.seed, rules: start.rules, kit: 'arlo', augments: [], enemyKit: 'arlo', enemyAugments: [], enemyStatMult: 1, enemyAccuracy: 1,
       label: `Online · Room ${code}`, net: { client: net, start },
@@ -145,8 +151,35 @@ async function playOnline() {
   net.leave();
 }
 
+/**
+ * The page was refreshed mid-duel: this tab still has its seat, so try to get back into that duel (the
+ * server holds the seat for a while). Resolves with the duel to continue, or null (no seat, or it's gone).
+ */
+function rejoinAfterRefresh(): Promise<{ net: NetClient; start: StartMsg } | null> {
+  const net = NetClient.saved();
+  if (!net) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const done = (r: { net: NetClient; start: StartMsg } | null) => {
+      clearTimeout(timer);
+      net.onMessage = () => {};
+      net.onClose = () => {};
+      if (!r) net.leave(); // forget the seat
+      resolve(r);
+    };
+    const timer = setTimeout(() => done(null), 5000);
+    net.onMessage = (msg) => {
+      if (msg.t === 'resume') done({ net, start: { ...msg, t: 'start' } });
+      else if (msg.t === 'error') done(null);
+    };
+    net.onClose = () => done(null);
+    net.rejoin();
+  });
+}
+
 /** Champion select → floor intro → duel → augment pick → shop → ... until a loss or the boss falls. */
 async function runLoop() {
+  const rejoined = await rejoinAfterRefresh();
+  if (rejoined) await playOnline(rejoined);
   let run: RunState | null = loadRun();
   for (;;) {
     if (!run) {

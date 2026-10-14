@@ -48,6 +48,7 @@ export const validCode = (code: string) => /^[A-Z]{4}$/.test(code);
 export class Room {
   players: Player[] = [];
   private world: World | null = null;
+  private seed = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   /** `onEmpty`: the last player has gone (including a held seat running out), so the host can drop the room. */
@@ -90,7 +91,7 @@ export class Room {
     p.goneUntil = null;
     p.cursor = newCursor();
     const foe = this.players.find((o) => o !== p)!;
-    send(socket, { t: 'resume', you: p.unit.id, foe: foe.unit!.id, snap: takeSnapshot(this.world, p.cursor, p.controller.applied) });
+    send(socket, { t: 'resume', seed: this.seed, rules: this.world.rules, you: p.unit.id, foe: foe.unit!.id, snap: takeSnapshot(this.world, p.cursor, p.controller.applied) });
     this.peerUpdate();
   }
 
@@ -167,6 +168,7 @@ export class Room {
   private startDuel() {
     const seed = Math.floor(Math.random() * 1e9);
     const rules = { ...DUEL_RULES };
+    this.seed = seed;
     const world = (this.world = new World(seed, rules));
     for (const p of this.players) {
       p.controller = new NetController(); // fresh queue and command acks for each duel

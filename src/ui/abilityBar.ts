@@ -165,7 +165,7 @@ export class AbilityBar {
     if (i < 0) return `<b>${kit.passive.name}</b> <small>Passive</small><p>${kit.passive.describe(this.me)}</p>`;
     if (i >= SPELL_TIP) {
       const sp = SUMMONERS[this.me.champ!.summoners[i - SPELL_TIP].id];
-      return `<b>${sp.name}</b> <small>${SPELL_KEYS[i - SPELL_TIP]} · summoner spell</small><p>${sp.describe(this.me)}</p>
+      return `<b>${sp.name}</b> <small>${SPELL_KEYS[i - SPELL_TIP]} · hero skill</small><p>${sp.describe(this.me)}</p>
         <small class="cost">${sp.cooldown}s cooldown</small>`;
     }
     const def = kit.abilities[i];
