@@ -20,7 +20,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -280,9 +280,11 @@ export class WorldView {
         const moving = !u.dead && Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
         // Library cycles are paced for a ~1.8 m human (walk ≈ 3.2 m/s, run ≈ 5.8 m/s); match the unit's pace.
         const gait = v.anim.has('Run') ? 'Run' : 'Walk';
+        // Pip riding Thistle stands on his back and lets the toad do the walking.
+        const riderIdle = u.champ?.kit === 'pip' && riding(u);
         const glides = hover != null; // floaters keep their idle pose while they move, slowed right down so its
         // hand gestures come round rarely and she reads as calmly gliding
-        v.anim.setBase(moving && !glides ? gait : 'Idle', moving ? (glides ? GLIDE_IDLE_SPEED : u.speed / (gait === 'Run' ? 5.8 : 3.2)) : 1);
+        v.anim.setBase(moving && !glides && !riderIdle ? gait : 'Idle', moving ? (glides ? GLIDE_IDLE_SPEED : u.speed / (gait === 'Run' ? 5.8 : 3.2)) : 1);
         const cast = u.champ?.lastCast;
         if (cast && cast.tick !== v.lastCastSeen && !u.dead) {
           v.lastCastSeen = cast.tick;

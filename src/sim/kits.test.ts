@@ -953,14 +953,14 @@ describe('experimental champions', () => {
     const models = Object.keys(import.meta.glob('../../public/assets/meshy/*.glb'));
     expect(models.length).toBeGreaterThan(0);
     for (const kit of Object.values(KITS)) {
-      const model = models.some((m) => m.endsWith(`/${kit.name}.glb`));
+      const model = models.some((m) => m.toLowerCase().endsWith(`/${kit.id}.glb`)); // Arlo.glb, Pip.glb (Pip & Thistle)
       expect({ kit: kit.id, experimental: !!kit.experimental }).toEqual({ kit: kit.id, experimental: !model });
     }
   });
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable'], ['pip', 'arlo'], ['gormund', 'pip']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });

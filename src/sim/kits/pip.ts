@@ -339,7 +339,6 @@ export const PIP: Kit = {
     'A tiny sprout-knight and the giant, anxious toad he rides. Riding, a fast melee bruiser behind Thistle\'s health; ' +
     'on foot, a fragile slingshot poker with a toad bodyguard. Break the toad, then catch the kid.',
   color: '#7cc46a',
-  experimental: true,
   stats: {
     hp: 520, hpPerLevel: 80, mana: 300, manaPerLevel: 40, manaRegen: 2, damage: 54, damagePerLevel: 3,
     attackInterval: 0.85, attackSpeedPerLevel: 0.025, windup: 0.2, range: 5, projectileSpeed: 22, speed: 6.3, radius: 0.5,
