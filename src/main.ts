@@ -21,7 +21,7 @@ import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
 import type { KitId } from './sim/types';
-import { augmentPick, duelRecap, floorIntro, onlineLobby, onlineUnavailable, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
+import { augmentPick, connectionLost, duelRecap, floorIntro, onlineLobby, onlineUnavailable, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
 
 installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -138,8 +138,9 @@ async function playOnline() {
     const outcome = await duel.finished;
     duel.dispose();
     duel = null;
-    await duelRecap(outcome.recap, outcome.won, outcome.reason, outcome.left ? 'Online · your opponent left' : `Online · Room ${code}`);
-    if (net.closed) break;
+    // After a drop (or a drop on the recap screen) the lobby opens on create/join again.
+    if (outcome.lost) await connectionLost();
+    else await duelRecap(outcome.recap, outcome.won, outcome.reason, outcome.left ? 'Online · your opponent left' : `Online · Room ${code}`);
   }
   net.leave();
 }
