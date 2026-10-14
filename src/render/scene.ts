@@ -153,6 +153,38 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
+  if (u.champ!.kit === 'gerrit') {
+    // Gerrit: a broad old knight in dented plate with a team-coloured tabard, a helm with a plume, and a halberd.
+    const plate = new THREE.MeshStandardMaterial({ color: 0x8d8f94, metalness: 0.65, roughness: 0.4, flatShading: true });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.2, 8), plate);
+    body.position.y = 1.0;
+    const tabard = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.86), teamMat);
+    tabard.position.set(0.12, 0.85, 0);
+    const helm = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.42, 8), plate);
+    helm.position.y = 1.85;
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.34), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    visor.position.set(0.29, 1.88, 0);
+    const plume = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0xc9a24a }));
+    plume.position.set(-0.08, 2.25, 0);
+    plume.rotation.z = 0.5;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5b3a1e });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.8, 6), wood);
+    shaft.position.set(0.45, 1.35, 0.55);
+    shaft.rotation.z = -0.12;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.3), metal);
+    blade.position.set(0.62, 2.7, 0.62);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.35, 6), metal);
+    spike.position.set(0.62, 3.05, 0.55);
+    g.add(body, tabard, helm, visor, plume, shaft, blade, spike);
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.5, 6), plate);
+      leg.position.set(0, 0.25, side * 0.2);
+      const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), plate);
+      pauldron.position.set(0, 1.55, side * 0.48);
+      g.add(leg, pauldron);
+    }
+    return g;
+  }
   if (u.champ!.kit === 'pip') {
     // Pip: a tiny sprout-knight in a green tunic, a leaf on his head, a pot-lid shield and a slingshot.
     const tunic = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0x4f8a3c, flatShading: true }));

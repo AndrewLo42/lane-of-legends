@@ -4,6 +4,7 @@ import { holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
+import { GERRIT_TUNING, nearStandard, standardOnLine, standardsOf } from './kits/gerrit';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -110,6 +111,7 @@ export class BotController implements Controller {
       gormund: { play: this.gormund, escape: this.gormundEscape },
       sable: { play: this.sable, escape: this.sableEscape },
       pip: { play: this.pip, escape: this.pipEscape },
+      gerrit: { play: this.gerrit, escape: this.gerritEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -198,6 +200,20 @@ export class BotController implements Controller {
       if (m.team === self.team || m.targetId != null || m.width < 1.5 || !reacts(m.id)) continue;
       const to = fromLine(m.pos, Math.atan2(m.dir.y, m.dir.x), m.range - m.travelled, m.width);
       if (to) return { type: 'move', to };
+    }
+    // Gerrit's standards: never stand on the line between him and one he can thrust to (it pulls him
+    // through you for a knock-up). Only while his thrust is ready or nearly so.
+    const { Q } = GERRIT_TUNING;
+    for (const g of world.champions()) {
+      if (g.team === self.team || g.dead || g.champ!.kit !== 'gerrit') continue;
+      const q = g.champ!.abilities[0];
+      if (q.rank === 0 || q.readyAt - world.tick > TICK_HZ * 1.5) continue;
+      for (const z of standardsOf(world, g)) {
+        const d = dist(g.pos, z.pos);
+        if (d > Q.length + 0.5 || !reacts(z.id)) continue;
+        const to = fromLine(g.pos, Math.atan2(z.pos.y - g.pos.y, z.pos.x - g.pos.x), d, Q.width + 0.6);
+        if (to) return { type: 'move', to };
+      }
     }
     if (this.noticed.size > 200) this.noticed.clear();
     return null;
@@ -734,6 +750,95 @@ export class BotController implements Controller {
     if (riding(self) && ready(1) && near(5)) return cast(1, toward(self.pos, spawnPoint(self.team), HOP.range)); // hop away
     // Puff Thistle up in their path while Pip runs.
     if (!riding(self) && ready(1) && near(PUFF.range + 2)) return cast(1, toward(self.pos, foe.pos, Math.min(PUFF.range, dist(self.pos, foe.pos) * 0.6)));
+    return null;
+  }
+
+  // ---------- Gerrit ----------
+
+  /**
+   * Engage with the standard: plant it just past the enemy, then thrust through them into it (a knock-up
+   * and he lands on his own ground). R leaps in and drops banners behind them, then the refreshed thrust
+   * carries him through them to cut off the retreat. Bulwark when trading, slammed down point-blank.
+   */
+  private gerrit(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, recasting } = ctx;
+    const { Q, E, R } = GERRIT_TUNING;
+    const thrustAt = (p: Vec2) => toward(self.pos, p, Q.length);
+    if (foe) {
+      const hp = self.hp / self.maxHp;
+      const foeHp = foe.hp / foe.maxHp;
+      const d = gap(self, foe);
+      const winning = foeHp < 0.55 || hp > foeHp - 0.05;
+      const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 4).length;
+      const safe = !unsafe(foe.pos) && (wave < 4 || foeHp < 0.35);
+      // Slam the shield down on someone standing right on him.
+      if (recasting(1) && d <= GERRIT_TUNING.W.rootReach) return cast(1, self.pos);
+      // A standard just past them: thrust through them into it.
+      const flag = standardOnLine(world, self, self.pos, thrustAt(foe.pos));
+      if (ready(0) && flag && dist(self.pos, flag.pos) > dist(self.pos, foe.pos) && (winning || foeHp < 0.4) && !unsafe(flag.pos)) {
+        return cast(0, flag.pos);
+      }
+      if (ready(3) && d < R.range - 0.3 && winning && safe) return cast(3, foe.pos);
+      // A fight's starting and he's not on his own ground: plant the standard at his feet (a little toward
+      // them, so it lands on them if they're close) and fight there.
+      const grounded = nearStandard(world, self);
+      const fighting = d < 4 || foe.attackTarget === self.id;
+      if (!grounded && fighting && ready(2)) return cast(2, toward(self.pos, foe.pos, Math.min(1.2, dist(self.pos, foe.pos))));
+      // Plant the standard behind them for the thrust (the next decision throws Q once it lands).
+      const past = dist(self.pos, foe.pos) + 1.5;
+      if (ready(2) && ready(0) && !fighting && past < Math.min(E.range, Q.length) - 0.3 && winning && safe) return cast(2, toward(self.pos, foe.pos, past));
+      if (ready(1) && near(3) && foe.attackTarget === self.id) return cast(1, self.pos);
+      if (ready(0) && near(Q.length - 0.6) && safe && !standardsOf(world, self).length && self.champ!.mana > self.champ!.maxMana * 0.4) return cast(0, foe.pos);
+      if (near(2.5) && winning && safe) return { type: 'attack', target: foe.id };
+      // Being hit up close: hit back if the trade is even (their minions only turn on him if he starts it),
+      // otherwise step out of their reach.
+      if (foe.attackTarget === self.id && d <= foe.range + 1.5) {
+        if (hp > foeHp - 0.1 || hp > 0.55 || (grounded && hp > foeHp - 0.25)) return { type: 'attack', target: foe.id };
+        const back = self.team === 'blue' ? -1 : 1;
+        const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2.5), y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+      // Hitting a champion in their wave turns the wave on him: farm instead of trading there.
+      if (!safe && near(5)) {
+        const farm = world.units
+          .filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && gap(self, u) < 7 && !unsafe(u.pos))
+          .sort((a, b) => a.hp - b.hp || gap(self, a) - gap(self, b))[0];
+        if (farm) return { type: 'attack', target: farm.id }; // (re-issuing the same target doesn't cancel a swing)
+        // Nothing to farm: hold just behind our own wave rather than walking into theirs.
+        const towardFoe = self.team === 'blue' ? 1 : -1;
+        const ours = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === self.team);
+        const front = ours.length ? ours.reduce((f, m) => (m.pos.x * towardFoe > f * towardFoe ? m.pos.x : f), ours[0].pos.x) : self.pos.x;
+        return { type: 'move', to: { x: front - towardFoe * 2, y: self.pos.y } };
+      }
+      // Poked from out of reach and not winning: back off out of their range.
+      if (foe.attackTarget === self.id && d > self.range + 0.5 && !winning) {
+        const back = self.team === 'blue' ? -1 : 1;
+        const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2), y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+    }
+    // Farm with the thrust: through two or more minions, or to finish one he can't reach with a swing.
+    if (ready(0) && self.champ!.mana > self.champ!.maxMana * 0.35) {
+      const minions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < Q.length - 0.3 && !unsafe(u.pos));
+      const killing = (m: Unit) => m.hp < ctx.dmg(0);
+      const line = (m: Unit) => minions.filter((o) => segmentDistance(o.pos, self.pos, thrustAt(m.pos)).d < Q.width / 2 + o.radius);
+      const best =
+        minions.find((m) => line(m).filter(killing).length >= 2 || line(m).length >= 3) ??
+        minions.find((m) => killing(m) && gap(self, m) > self.range + 0.3 && self.champ!.mana > self.champ!.maxMana * 0.5);
+      if (best) return cast(0, best.pos);
+    }
+    return null;
+  }
+
+  /** Run home: plant the standard toward the tower and thrust away to it. */
+  private gerritEscape({ world, self, foe, near, ready }: Ctx): Command | null {
+    const { Q, E } = GERRIT_TUNING;
+    if (!foe || !near(7)) return null;
+    const home = spawnPoint(self.team);
+    const flag = standardOnLine(world, self, self.pos, toward(self.pos, home, Q.length));
+    if (ready(0) && flag && dist(flag.pos, home) < dist(self.pos, home)) return cast(0, flag.pos);
+    if (ready(2) && ready(0)) return cast(2, toward(self.pos, home, Math.min(E.range, Q.length) - 0.5));
+    if (ready(1) && near(3)) return cast(1, self.pos);
     return null;
   }
 

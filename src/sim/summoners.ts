@@ -133,6 +133,7 @@ export const DEFAULT_SUMMONERS: [SummonerId, SummonerId] = ['flash', 'ignite'];
 export const SIGNATURE_SUMMONERS: Record<KitId, [SummonerId, SummonerId]> = {
   arlo: ['flash', 'barrier'],
   pip: ['flash', 'ghost'],
+  gerrit: ['flash', 'ignite'],
   tock: ['flash', 'ignite'],
   maren: ['flash', 'ignite'],
   lisha: ['flash', 'ghost'],

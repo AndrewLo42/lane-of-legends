@@ -33,7 +33,7 @@ function ringShape(radius: number, width: number, mat: THREE.Material) {
 /** Ground telegraphs, persistent zones and one-shot effects, mirrored from the sim each frame. */
 export class EffectsView {
   private telegraphs = new Map<number, { g: THREE.Group; fill: THREE.Object3D; t: Telegraph }>();
-  private zones = new Map<number, { g: THREE.Group; z: Zone }>();
+  private zones = new Map<number, { g: THREE.Group; z: Zone; from?: Vec2 }>();
   private bursts: { obj: THREE.Object3D; age: number; life: number; tick: (k: number) => void }[] = [];
   private seenFx = -1;
 
@@ -114,6 +114,18 @@ export class EffectsView {
       }
       const left = (z.until - this.world.tick) / TICK_HZ;
       const total = (z.until - z.start) / TICK_HZ;
+      const flag = v.g.getObjectByName('flag');
+      if (flag) {
+        // Thrown from its owner: an arc from his hands to where it plants, then a flutter in the wind.
+        const age = (this.world.tick - z.start) / TICK_HZ;
+        const k = Math.min(1, age / 0.35);
+        const owner = this.world.get(z.ownerId);
+        const from = v.from ?? (v.from = owner ? { x: owner.pos.x - z.pos.x, y: owner.pos.y - z.pos.y } : { x: 0, y: 0 });
+        flag.position.set(from.x * (1 - k), 1.2 * (1 - k) + Math.sin(Math.PI * k) * 1.6, from.y * (1 - k));
+        flag.rotation.z = (1 - k) * 0.9;
+        const cloth = flag.getObjectByName('cloth') as THREE.Mesh | undefined;
+        if (cloth) cloth.rotation.y = Math.sin(performance.now() / 260 + z.id) * 0.25;
+      }
       const hand = v.g.getObjectByName('hand');
       if (hand) hand.rotation.y -= dt * (z.kind === 'stasis' ? 1.2 : z.kind === 'maelstrom' ? 2.5 : 4);
       const timer = v.g.getObjectByName('timer') as THREE.Mesh | undefined;
@@ -200,6 +212,33 @@ export class EffectsView {
       const glowRing = ringShape(0.6, 0.08, mat(0xa98bff, 0.7));
       glowRing.position.y = 0.04;
       g.add(shaft, tip, glowRing);
+    } else if (z.kind === 'standard' || z.kind === 'banner') {
+      // Gerrit's standard (E) or one of his old banners (R): a pole with a cloth in his team's colour and a
+      // faint ring showing where Hold the Ground applies. It flies in from him (see syncZones), then stands.
+      const big = z.kind === 'standard';
+      const flag = new THREE.Group();
+      flag.name = 'flag';
+      const wood = new THREE.MeshStandardMaterial({ color: big ? 0x5b3a1e : 0x6e6a62, roughness: 0.8 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, big ? 2.6 : 2.0, 6), wood);
+      pole.position.y = big ? 1.3 : 1.0;
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 6), new THREE.MeshStandardMaterial({ color: 0xc9a24a, metalness: 0.7, roughness: 0.35 }));
+      cap.position.y = (big ? 2.6 : 2.0) + 0.1;
+      const clothMat = new THREE.MeshStandardMaterial({ color: team, side: THREE.DoubleSide, roughness: 0.7, transparent: !big, opacity: big ? 1 : 0.75 });
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(big ? 0.9 : 0.6, big ? 1.1 : 0.8, 6, 1), clothMat);
+      cloth.name = 'cloth';
+      cloth.position.set((big ? 0.9 : 0.6) / 2 + 0.05, (big ? 2.6 : 2.0) - (big ? 0.6 : 0.45), 0);
+      const emblem = new THREE.Mesh(new THREE.CircleGeometry(big ? 0.2 : 0.14, 12), new THREE.MeshBasicMaterial({ color: 0xe8cf7a, side: THREE.DoubleSide }));
+      emblem.position.set(0, 0, 0.01);
+      cloth.add(emblem);
+      flag.add(pole, cap, cloth);
+      const ring = ringShape(big ? 0.75 : 0.55, 0.08, mat(team, 0.7));
+      ring.position.y = 0.04;
+      g.add(flag, ring);
+      if (big) {
+        const hold = ringShape(4, 0.06, mat(0xc9a24a, 0.22)); // Hold the Ground's reach
+        hold.position.y = 0.03;
+        g.add(hold);
+      }
     } else if (z.kind === 'honey') {
       // A glossy amber puddle with a few darker drips.
       const puddle = ringShape(z.radius, z.radius, mat(0xf2a516, 0.55));
@@ -387,6 +426,21 @@ export class EffectsView {
         add(r, 0.4, (k) => {
           fade(r, 0.95)(k);
           r.scale.setScalar(1.6 - k * 0.7);
+        });
+        break;
+      }
+      case 'thrust': {
+        // Halberd Thrust: a bright streak along the line, fading forward.
+        const g = new THREE.Group();
+        g.rotation.y = -(fx.dir ?? 0);
+        const streak = lineShape(fx.radius ?? 6, 0.5, basic(0xf3e2a0, 0.8));
+        const core = lineShape(fx.radius ?? 6, 0.16, basic(0xffffff, 0.95));
+        core.position.y = 0.01;
+        g.add(streak, core);
+        add(g, 0.3, (k) => {
+          fade(streak, 0.8)(k);
+          fade(core, 0.95)(k);
+          g.scale.set(0.6 + 0.4 * Math.min(1, k * 3), 1, 1 - k * 0.6);
         });
         break;
       }
