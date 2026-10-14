@@ -1005,6 +1005,7 @@ describe('Pip & Thistle', () => {
     w.dealDamage(enemy, me, toad.hp + overflow);
     expect(riding(me)).toBe(false);
     expect(panicking(w, toad)).toBe(true);
+    expect(w.status(me, 'haste')).toBeUndefined(); // thrown off, not hopping off: no speed
     expect(w.isTargetable(toad)).toBe(false);
     near(me.maxHp - me.hp, overflow, 1);
     expect(abilitiesOf(me)[0].name).toBe('Pebble Burst');
@@ -1026,6 +1027,7 @@ describe('Pip & Thistle', () => {
     cast(2, -3); // Hop Off
     run(w, 0.5);
     expect(riding(me)).toBe(false);
+    expect(w.status(me, 'haste')?.value).toBe(PIP_TUNING.SWAP.haste); // a willing dismount: quicker on his feet
     expect(me.projectileSpeed).toBeGreaterThan(0);
     expect(w.isTargetable(toad)).toBe(true);
     expect(me.champ!.abilities[0].readyAt).toBeLessThanOrEqual(w.tick); // Pebble Burst is ready
@@ -1098,7 +1100,7 @@ describe('Pip & Thistle', () => {
   });
 
   it('Big Leap knocks up everything where it lands, riding or with Thistle alone', () => {
-    const { w, me, toad, cast } = pip();
+    const { w, me, toad, cast, ctl } = pip();
     const foe = dummy(w, 5);
     cast(3, 5);
     run(w, 1.2);
@@ -1109,6 +1111,7 @@ describe('Pip & Thistle', () => {
     // On foot, Thistle jumps alone and Pip stays put.
     run(w, 2);
     cast(2, -3);
+    ctl.queue.push({ type: 'stop' }); // (he'd otherwise go back to chasing the dummy he was hitting)
     run(w, 0.5);
     const pipAt = { ...me.pos };
     me.champ!.abilities[3].readyAt = 0;
@@ -1117,8 +1120,10 @@ describe('Pip & Thistle', () => {
     run(w, 1.2);
     expect(lost(foe)).toBeGreaterThan(before + 100);
     expect(w.isStunned(foe)).toBe(true);
-    near(me.pos.x, pipAt.x, 1); // (units nudge apart a little)
+    // Thistle went; Pip didn't (he only drifts a little as units nudge apart).
     near(toad.pos.x, foe.pos.x, 2.5);
+    expect(Math.abs(me.pos.x - pipAt.x)).toBeLessThan(2);
+    expect(Math.abs(me.pos.x - foe.pos.x)).toBeGreaterThan(Math.abs(toad.pos.x - foe.pos.x) + 1);
   });
 
   it("only Pip's death counts, and both come back fresh", () => {

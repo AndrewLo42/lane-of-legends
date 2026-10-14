@@ -19,7 +19,7 @@ const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 
 const HOP = { base: [60, 95, 130, 165, 200], ad: 0.4, cost: 40, cd: [11, 10, 9, 8, 7], range: 4.5, speed: 15, radius: 1.8, slow: 0.25, slowFor: 1 };
 const PEBBLES = { base: [40, 60, 80, 100, 120], ad: 0.3, cost: 35, cd: [6, 5.5, 5, 4.5, 4], range: 5.5, width: 0.5, speed: 26, spread: 0.22, repeat: 0.5 };
 const PUFF = { cost: 40, cd: [14, 13, 12, 11, 10], range: 4, radius: 2.5, guard: 0.4, slow: 0.3, seconds: 3, pulse: 0.5, reach: 8 };
-const SWAP = { cd: [6, 5.5, 5, 4.5, 4], vault: 3.5, vaultSpeed: 18, saddleReach: 7, saddleSpeed: 18 };
+const SWAP = { cd: [6, 5.5, 5, 4.5, 4], haste: 0.2, hasteFor: 2, vault: 3.5, vaultSpeed: 18, saddleReach: 7, saddleSpeed: 18 };
 const LEAP = { base: [160, 280], ad: 0.7, cost: 100, cd: [90, 75], range: 7, radius: 2.2, castTime: 0.25, flight: 0.7, stun: 0.8 };
 
 interface PipData {
@@ -229,11 +229,15 @@ const RIDING_ABILITIES: Kit['abilities'] = [
     castTime: 0,
     aim: { shape: 'dash', range: SWAP.vault },
     describe: () =>
-      `Pip vaults off Thistle up to ${SWAP.vault} units toward the cursor and fights on foot: a ranged slingshot, while ` +
+      `Pip vaults off Thistle up to ${SWAP.vault} units toward the cursor, landing with ${SWAP.haste * 100}% movement speed ` +
+      `for ${SWAP.hasteFor}s, and fights on foot: a ranged slingshot, while ` +
       `Thistle stays behind to guard him. Q and W change, and each set keeps its own cooldowns.`,
     cast: ({ world, self, at: aim }) => {
       setForm(world, self, false);
-      world.dash(self, toward(self.pos, aim, SWAP.vault), SWAP.vaultSpeed);
+      // Getting off by choice (not thrown off by a panic) puts a spring in his step.
+      world.dash(self, toward(self.pos, aim, SWAP.vault), SWAP.vaultSpeed, undefined, () =>
+        world.addStatus(self, { kind: 'haste', value: SWAP.haste, sourceId: self.id, seconds: SWAP.hasteFor }),
+      );
     },
   },
   bigLeap,
