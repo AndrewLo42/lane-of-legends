@@ -12,7 +12,7 @@ export type Team = 'blue' | 'red';
 /** `pet`: a champion's companion unit (Pip's Thistle), fighting alongside but not a champion. */
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'pet';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit' | 'lumen';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -178,7 +178,7 @@ export interface PetState {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue' | 'candle';
 
 export interface Missile {
   id: number;
@@ -209,7 +209,7 @@ export interface Missile {
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear' | 'standard' | 'banner';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear' | 'standard' | 'banner' | 'sanctuary';
   team: Team;
   ownerId: number;
   pos: Vec2;

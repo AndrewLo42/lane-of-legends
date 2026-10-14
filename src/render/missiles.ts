@@ -272,6 +272,14 @@ export function buildMissile(m: Missile): MissileLook {
       add(blade, glow(0xe6c86b, 0.6));
       return { height: 1.2, chain: true };
     },
+    // Lumen's Candleflame (and her attacks): a warm teardrop of flame with a glow.
+    candle: () => {
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8).scale(1.7, 1, 1), basic(0xffd27a));
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), basic(0xffffff));
+      core.position.x = 0.06;
+      add(flame, core, glow(0xffa630, 1.3));
+      return { height: 1.2, trail: { color: 0xffb347, width: 0.3, life: 0.2 }, animate: (t) => flame.scale.set(1 + Math.sin(t * 40) * 0.12, 1, 1) };
+    },
     tongue: () => {
       // Thistle's Gulp: a sticky, bulbous pink tip; the stretch back to his mouth is a `Tongue`.
       const tip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10).scale(1.15, 0.8, 1), lit(0xe56f86, { roughness: 0.35 }));

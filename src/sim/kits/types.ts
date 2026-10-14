@@ -102,6 +102,8 @@ export interface Kit {
   damageMult?: (world: World, self: Unit, target: Unit) => number;
   /** Melee or ranged, for champion select's filters; by default from the attack reach (under 3 is melee). */
   reach?: 'melee' | 'ranged';
+  /** A second meter the HUD shows under the mana bar (Lumen's Devotion). */
+  meter?: { label: string; max: number; value: (self: Unit) => number };
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */

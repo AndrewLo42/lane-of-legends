@@ -55,3 +55,47 @@ The opponent's choice is whether to burn down the toad or dive past him onto the
 - **Open questions:**
   - Should Pip be stronger on foot?
   - Should Thistle be able to die for good in a fight, rather than only panicking?
+
+## Vesper, the Veiled
+
+**Status:** a concept we liked, shelved while we build others. Not workshopped in detail yet.
+
+**Pitch.** A masked stage magician who fights with misdirection. Fragile; she wins by making you swing at the wrong target.
+
+- **Passive, Encore:** after reappearing from stealth, her next attack or ability crits for bonus damage.
+- **Q, Card Fan:** a narrow cone of three cards; several cards on the same target stack bonus damage.
+- **W, Vanish:** invisible for 2s, leaving a decoy where she stood that repeats her last command (keeps walking, or "attacks" her target for no damage). Taking damage ends the stealth early.
+- **E, Switcheroo:** swap places with her decoy (within range): the escape, or the ambush.
+- **R, Grand Illusion:** three decoys burst out around her and scatter; she's invisible for 1.5s among them, and her first hit out of it roots for 1s.
+
+**The duel:** guess which Vesper is real; guess wrong and she swaps in behind you.
+
+**Counterplay:** short stealth that damage breaks, revealed near towers, decoys die in one hit (area damage clears them).
+
+**Notes for building it:**
+- Invisibility: enemies can't target her and their clients don't draw her. Online, the server must leave her position out of the opponent's snapshots, or players could cheat.
+- Decoys: pet-like units with no brain (like Thistle without the riding).
+- The bot has to guess which one is real.
+- Model: a BlenderKit humanoid with a cape and mask; decoys reuse it, ghostly.
+- **Open question:** should decoys deal any damage, or be pure illusions?
+
+## Kestrel, the Twin Fang
+
+**Status:** a concept we liked, shelved while we build others. Not workshopped in detail yet.
+
+**Pitch.** A duelist with two weapons and no mana: the highest skill ceiling on the roster.
+
+- **Passive, Flow:** switching stance within 2s of casting an ability empowers the next ability in the new stance (a cross-stance combo).
+- **Spear stance** (reach 3, slower, harder hits): Q Lunge Thrust (a long line stab), W Sweep (a cone that knocks back), E Vault (a short pole-vault).
+- **Twin dagger stance** (melee, fast attacks): Q Flurry (several quick strikes on one target), W Parry (block the next hit; counter if one lands within 1s), E Shadow Step (a short dash that resets on a kill).
+- **R, Swap Stance:** a 3s cooldown; it ranks up at 6 and 11, improving his stats in both stances instead of unlocking a big ultimate.
+
+**The duel:** poke with spear reach, then swap in for a dagger all-in, with Flow bonuses between swaps.
+
+**Counterplay:** his stance is readable (you see which weapon he holds), and he has no ultimate burst.
+
+**Notes for building it:**
+- Pip's two-ability-set system (`otherForm`, each form keeping its own Q/W cooldowns) already does most of the work; Parry is a new status.
+- The bot needs a combo plan.
+- Model: a BlenderKit humanoid with two weapon props that swap visibility.
+- **Open question:** keep R as just the stance swap, or give him a real ultimate and move the swap to a passive cooldown?

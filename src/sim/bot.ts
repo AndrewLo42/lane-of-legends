@@ -5,6 +5,7 @@ import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, nearStandard, standardOnLine, standardsOf } from './kits/gerrit';
+import { LUMEN_TUNING, devotion } from './kits/lumen';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -112,6 +113,7 @@ export class BotController implements Controller {
       sable: { play: this.sable, escape: this.sableEscape },
       pip: { play: this.pip, escape: this.pipEscape },
       gerrit: { play: this.gerrit, escape: this.gerritEscape },
+      lumen: { play: this.lumen, escape: this.lumenEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -838,6 +840,60 @@ export class BotController implements Controller {
     const flag = standardOnLine(world, self, self.pos, toward(self.pos, home, Q.length));
     if (ready(0) && flag && dist(flag.pos, home) < dist(self.pos, home)) return cast(0, flag.pos);
     if (ready(2) && ready(0)) return cast(2, toward(self.pos, home, Math.min(E.range, Q.length) - 0.5));
+    if (ready(1) && near(3)) return cast(1, self.pos);
+    return null;
+  }
+
+  // ---------- Lumen ----------
+
+  /**
+   * Poke with Candleflame (it heals her), lay Sanctuary under the trade, dash through them with Warm
+   * Embrace when winning (or away when losing), keep melee champions at arm's length, and cash Devotion
+   * in for Sunrise when it decides the fight (otherwise sit on a full meter: Radiant).
+   */
+  private lumen(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim } = ctx;
+    const { Q, W, E, R, DEVOTION } = LUMEN_TUNING;
+    const mana = self.champ!.mana / self.champ!.maxMana;
+    if (foe) {
+      const hp = self.hp / self.maxHp;
+      const foeHp = foe.hp / foe.maxHp;
+      const d = gap(self, foe);
+      const winning = foeHp < 0.55 || hp > foeHp;
+      const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 4).length;
+      const safe = !unsafe(foe.pos) && (wave < 4 || foeHp < 0.35);
+      const fighting = d < 4 || foe.attackTarget === self.id;
+      if (ready(3) && devotion(self) >= DEVOTION.sunrise && near(R.radius - 0.5) && (foeHp < 0.5 || hp < 0.45 || (winning && fighting))) return cast(3, self.pos);
+      if (ready(1) && fighting && dist(self.pos, foe.pos) < W.range + 1) {
+        const mid = d < W.radius * 1.4 ? { x: (self.pos.x + foe.pos.x) / 2, y: (self.pos.y + foe.pos.y) / 2 } : self.pos;
+        return cast(1, mid);
+      }
+      if (ready(2) && winning && safe && d > 1 && d < E.range - 0.8 && foeHp < 0.6) return cast(2, toward(self.pos, foe.pos, E.range));
+      if (ready(0) && near(Q.range - 0.5) && mana > 0.25) {
+        const p = aim(foe, Q.speed);
+        if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+      }
+      // Ranged: keep melee champions off her.
+      if (foe.range < 3 && d < 2.2) {
+        const back = self.team === 'blue' ? -1 : 1;
+        const out = { x: self.pos.x + back * 3, y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+    }
+    // Last-hit with Candleflame: each kill heals her (and feeds Devotion).
+    if (ready(0) && mana > 0.3) {
+      const kill = world.units.find(
+        (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && u.hp < ctx.dmg(0) && dist(u.pos, self.pos) < Q.range - 0.5 &&
+          gap(self, u) > self.range * 0.6 && !unsafe(u.pos) && !minionInTheWay(world, self, u.pos, Q.width, u),
+      );
+      if (kill) return cast(0, kill.pos);
+    }
+    return null;
+  }
+
+  private lumenEscape({ self, foe, near, ready }: Ctx): Command | null {
+    if (!foe) return null;
+    if (ready(2) && near(5)) return cast(2, toward(self.pos, spawnPoint(self.team), LUMEN_TUNING.E.range));
     if (ready(1) && near(3)) return cast(1, self.pos);
     return null;
   }

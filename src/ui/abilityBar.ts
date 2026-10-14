@@ -39,6 +39,9 @@ export class AbilityBar {
   private mana: HTMLDivElement | null;
   private manaText: HTMLSpanElement | null;
   private xp: HTMLDivElement;
+  /** A kit's second meter (Lumen's Devotion), if it has one. */
+  private meter: HTMLDivElement | null;
+  private meterText: HTMLSpanElement | null;
   private level: HTMLSpanElement;
   private tip = document.getElementById('tip')!;
   private tipFor: number | null = null;
@@ -72,6 +75,7 @@ export class AbilityBar {
         </div>
         <div class="bar hp"><div></div><span></span></div>
         ${kit.resource === 'health' ? '' : `<div class="bar mana${kit.resource === 'bees' ? ' bees' : ''}"><div></div><span></span></div>`}
+        ${kit.meter ? '<div class="bar meter"><div></div><span></span></div>' : ''}
         <div class="bar xp"><div></div></div>
       </div>`;
     const q = <T extends Element>(sel: string, el: ParentNode = this.root) => el.querySelector(sel) as T;
@@ -80,6 +84,8 @@ export class AbilityBar {
     this.mana = this.root.querySelector<HTMLDivElement>('.mana > div');
     this.manaText = this.root.querySelector<HTMLSpanElement>('.mana > span');
     this.xp = q('.xp > div');
+    this.meter = this.root.querySelector<HTMLDivElement>('.meter > div');
+    this.meterText = this.root.querySelector<HTMLSpanElement>('.meter > span');
     this.level = q('.portrait .lvl');
     this.root.querySelectorAll<HTMLDivElement>('.slot:not(.passive):not(.spell)').forEach((root, i) => {
       const plus = q<HTMLButtonElement>('.plus', root);
@@ -117,6 +123,12 @@ export class AbilityBar {
       this.manaText.textContent = kit.resource === 'bees'
         ? `🐝 ${Math.floor(c.mana)} / ${Math.floor(c.maxMana)}`
         : `${Math.floor(c.mana)} / ${Math.round(c.maxMana)}`;
+    }
+    if (kit.meter && this.meter && this.meterText) {
+      const v = kit.meter.value(me);
+      this.meter.style.width = `${(100 * v) / kit.meter.max}%`;
+      this.meterText.textContent = `${kit.meter.label} ${Math.floor(v)} / ${kit.meter.max}`;
+      this.meter.parentElement!.classList.toggle('full', v >= kit.meter.max);
     }
     this.xp.style.width = c.level >= 11 ? '100%' : `${(100 * c.xp) / xpToNext(c.level)}%`;
 
