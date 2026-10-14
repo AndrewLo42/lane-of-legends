@@ -1086,9 +1086,13 @@ describe('Pip & Thistle', () => {
     cast(2, -3);
     run(w, 0.5);
     const foe = dummy(w, me.pos.x + 6);
+    toad.hp = toad.maxHp * 0.5;
+    const hurt = toad.hp;
     cast(1, me.pos.x + 3);
     run(w, 0.5);
     expect(w.status(toad, 'guard')).toBeTruthy();
+    run(w, 3);
+    near(toad.hp - hurt, PIP_TUNING.PUFF.heal + toad.maxHp * PIP_TUNING.PUFF.healPct, 2); // healed a little over the puff
     const nearFoe = dist2(toad.pos, foe.pos) <= PIP_TUNING.PUFF.radius + foe.radius;
     if (nearFoe) expect(w.status(foe, 'slow')).toBeTruthy();
     // An enemy skillshot at Pip through Thistle stops on Thistle.

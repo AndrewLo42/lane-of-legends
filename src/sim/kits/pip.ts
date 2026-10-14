@@ -18,7 +18,7 @@ const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85 };
 const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 6, 5], range: 5.5, width: 0.9, speed: 24, minion: 1.5, heal: 40, healPct: 0.06, yank: 2.5 };
 const HOP = { base: [60, 95, 130, 165, 200], ad: 0.4, cost: 40, cd: [11, 10, 9, 8, 7], range: 4.5, speed: 15, radius: 1.8, slow: 0.25, slowFor: 1 };
 const PEBBLES = { base: [40, 60, 80, 100, 120], ad: 0.3, cost: 35, cd: [6, 5.5, 5, 4.5, 4], range: 5.5, width: 0.5, speed: 26, spread: 0.22, repeat: 0.5 };
-const PUFF = { cost: 40, cd: [14, 13, 12, 11, 10], range: 4, radius: 2.5, guard: 0.4, slow: 0.3, seconds: 3, pulse: 0.5, reach: 8 };
+const PUFF = { cost: 40, cd: [14, 13, 12, 11, 10], range: 4, radius: 2.5, guard: 0.4, slow: 0.3, seconds: 3, pulse: 0.5, reach: 8, heal: 30, healPct: 0.06 };
 const SWAP = { cd: [6, 5.5, 5, 4.5, 4], haste: 0.2, hasteFor: 2, vault: 3.5, vaultSpeed: 18, saddleReach: 7, saddleSpeed: 18 };
 const LEAP = { base: [160, 280], ad: 0.7, cost: 100, cd: [90, 75], range: 7, radius: 2.2, castTime: 0.25, flight: 0.7, stun: 0.8 };
 
@@ -284,7 +284,8 @@ const FOOT_ABILITIES: Kit['abilities'] = [
     available: (world, self) => thistleReady(world, self) && dist(thistleOf(world, self)!.pos, self.pos) <= PUFF.reach,
     describe: () =>
       `Thistle hops to a spot within ${PUFF.range} units of Pip and puffs up for ${PUFF.seconds}s: he takes ` +
-      `${PUFF.guard * 100}% less damage and slows enemies within ${PUFF.radius} units of him by ${PUFF.slow * 100}%. ` +
+      `${PUFF.guard * 100}% less damage, heals ${PUFF.heal} + ${PUFF.healPct * 100}% of his max health over the duration, ` +
+      `and slows enemies within ${PUFF.radius} units of him by ${PUFF.slow * 100}%. ` +
       `Stand him in the way: skillshots stop on him.`,
     cast: ({ world, self, at: aim }) => {
       const t = thistleOf(world, self);
@@ -292,9 +293,11 @@ const FOOT_ABILITIES: Kit['abilities'] = [
       const to = dist(self.pos, aim) <= PUFF.range ? { ...aim } : toward(self.pos, aim, PUFF.range);
       world.pull(t, to, 14);
       world.addStatus(t, { kind: 'guard', value: PUFF.guard, sourceId: self.id, seconds: PUFF.seconds });
+      const pulses = Math.round(PUFF.seconds / PUFF.pulse);
       for (let s = 0; s < PUFF.seconds; s += PUFF.pulse) {
         world.after(s, () => {
           if (panicking(world, t) || t.pet?.mounted) return;
+          world.heal(t, (PUFF.heal + t.maxHp * PUFF.healPct) / pulses);
           for (const e of world.enemiesInCircle(self.team, t.pos, PUFF.radius)) {
             world.addStatus(e, { kind: 'slow', value: PUFF.slow, sourceId: self.id, seconds: PUFF.pulse + 0.1 });
           }
