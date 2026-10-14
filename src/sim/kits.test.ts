@@ -998,11 +998,12 @@ describe('Pip & Thistle', () => {
   it("riding, damage hits Thistle first; when he breaks he panics, throws Pip off and the rest carries over", () => {
     const { w, me, toad } = pip();
     const enemy = dummy(w, 30);
+    const { soak } = PIP_TUNING.THISTLE;
     w.dealDamage(enemy, me, 100);
     expect(me.hp).toBe(me.maxHp);
-    near(toad.maxHp - toad.hp, 100, 1);
+    near(toad.maxHp - toad.hp, 100 * soak, 1); // thick-skinned: he takes less of it
     const overflow = 50;
-    w.dealDamage(enemy, me, toad.hp + overflow);
+    w.dealDamage(enemy, me, toad.hp / soak + overflow);
     expect(riding(me)).toBe(false);
     expect(panicking(w, toad)).toBe(true);
     expect(w.status(me, 'haste')).toBeUndefined(); // thrown off, not hopping off: no speed
@@ -1015,7 +1016,8 @@ describe('Pip & Thistle', () => {
     expect(w.castBlocker(me, 1)).toBe('unavailable');
     run(w, PIP_TUNING.THISTLE.panic + 0.5);
     expect(panicking(w, toad)).toBe(false);
-    near(toad.hp, toad.maxHp * PIP_TUNING.THISTLE.comeBack, 2);
+    // Back with at least half health (he fled to the fountain, which tops him up from there).
+    expect(toad.hp).toBeGreaterThanOrEqual(toad.maxHp * PIP_TUNING.THISTLE.comeBack - 1);
   });
 
   it('Hop Off and Saddle Up switch forms, and each form keeps its own Q and W cooldowns', () => {
@@ -1087,6 +1089,7 @@ describe('Pip & Thistle', () => {
     run(w, 0.5);
     const foe = dummy(w, me.pos.x + 6);
     toad.hp = toad.maxHp * 0.5;
+    toad.lastHurtTick = w.tick + 1e6; // keep his out-of-combat regeneration out of it
     const hurt = toad.hp;
     cast(1, me.pos.x + 3);
     run(w, 0.5);
@@ -1130,10 +1133,20 @@ describe('Pip & Thistle', () => {
     expect(Math.abs(me.pos.x - foe.pos.x)).toBeGreaterThan(Math.abs(toad.pos.x - foe.pos.x) + 1);
   });
 
+  it('Thistle regenerates out of combat', () => {
+    const { w, toad } = pip();
+    toad.hp = toad.maxHp * 0.5;
+    toad.lastHurtTick = w.tick;
+    run(w, PIP_TUNING.THISTLE.calm - 0.5);
+    near(toad.hp, toad.maxHp * 0.5, 1); // still catching his breath
+    run(w, 2);
+    expect(toad.hp).toBeGreaterThan(toad.maxHp * 0.5 + toad.maxHp * PIP_TUNING.THISTLE.regen);
+  });
+
   it("only Pip's death counts, and both come back fresh", () => {
     const { w, me, toad } = pip();
     const enemy = dummy(w, 30);
-    w.dealDamage(enemy, me, toad.hp + me.hp + 10);
+    w.dealDamage(enemy, me, toad.hp / PIP_TUNING.THISTLE.soak + me.hp + 10);
     expect(me.dead).toBe(true);
     expect(enemy.champ!.kills).toBe(1);
     run(w, 30);

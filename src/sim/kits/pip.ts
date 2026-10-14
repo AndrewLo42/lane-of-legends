@@ -1,6 +1,7 @@
 import { spawnPoint } from '../lane';
+import { FOUNTAIN } from '../stats';
 import type { Unit, Vec2 } from '../types';
-import { dirTo, dist, ticks, toward } from '../util';
+import { DT, dirTo, dist, ticks, toward } from '../util';
 import { enemyOf, type World } from '../world';
 import { at, champsAndMinions } from './common';
 import type { AbilityDef, Kit } from './types';
@@ -12,7 +13,7 @@ import type { AbilityDef, Kit } from './types';
  */
 
 /** Thistle: his health and bite (both grow with Pip's level), how far he strays, and how long he panics. */
-const THISTLE = { hp: 560, hpPerLevel: 75, damage: 32, damagePerLevel: 2.5, range: 1.2, attackInterval: 1.1, windup: 0.2, speed: 6.6, radius: 0.85, leash: 7, guardAhead: 1.4, panic: 12, comeBack: 0.5 };
+const THISTLE = { hp: 650, hpPerLevel: 85, soak: 0.8, damage: 32, damagePerLevel: 2.5, range: 1.2, attackInterval: 1.1, windup: 0.2, speed: 6.6, radius: 0.85, leash: 7, guardAhead: 1.4, panic: 12, comeBack: 0.5, calm: 4, regen: 0.02 };
 /** Riding: melee reach, a little faster, and harder hits (the toad's tongue). */
 const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85 };
 const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 6, 5], range: 5.5, width: 0.9, speed: 24, minion: 1.5, heal: 40, healPct: 0.06, yank: 2.5 };
@@ -347,9 +348,11 @@ export const PIP: Kit = {
     name: 'Best Friends',
     icon: '🤝',
     describe: (self) =>
-      `Thistle has his own health (${Math.round(thistleMaxHp(self))} at this level). While Pip rides him, damage hits Thistle first. ` +
+      `Thistle has his own health (${Math.round(thistleMaxHp(self))} at this level). While Pip rides him, damage hits Thistle first, ` +
+      `and he takes only ${THISTLE.soak * 100}% of it. ` +
       `At 0 health Thistle panics: he throws Pip off and bounds home, coming back after ${THISTLE.panic}s with ` +
-      `${THISTLE.comeBack * 100}% health. On foot, Thistle bites whatever Pip attacks, stops skillshots, and minions and towers ` +
+      `${THISTLE.comeBack * 100}% health. He regenerates ${THISTLE.regen * 100}% of his health per second after ${THISTLE.calm}s ` +
+      `without being hit, and heals at the fountain. On foot, Thistle bites whatever Pip attacks, stops skillshots, and minions and towers ` +
       `go for him before Pip. Only Pip's death counts.`,
   },
   levelOrder: [3, 0, 1, 2],
@@ -359,10 +362,11 @@ export const PIP: Kit = {
   soak: (world, self, amount) => {
     const t = thistleOf(world, self);
     if (!riding(self) || !t || t.hp <= 0 || panicking(world, t)) return amount;
-    const take = Math.min(amount, t.hp);
-    t.hp -= take;
+    // Thick-skinned: hits he takes for Pip land at THISTLE.soak.
+    const take = Math.min(amount, t.hp / THISTLE.soak);
+    t.hp -= take * THISTLE.soak;
     t.lastHurtTick = world.tick;
-    if (t.hp <= 0) panic(world, self, t);
+    if (t.hp <= 0.01) panic(world, self, t);
     return amount - take;
   },
   onPetDown: (world, self, pet) => panic(world, self, pet),
@@ -388,6 +392,12 @@ export const PIP: Kit = {
       t.maxHp = max;
     }
     t.damage = THISTLE.damage + THISTLE.damagePerLevel * (self.champ!.level - 1);
+    // He catches his breath out of combat, and the fountain patches him up like anyone else.
+    if (t.hp > 0 && !panicking(world, t)) {
+      const calm = world.tick - t.lastHurtTick >= ticks(THISTLE.calm);
+      const home = dist(t.pos, spawnPoint(self.team)) <= FOUNTAIN.radius;
+      world.heal(t, t.maxHp * ((calm ? THISTLE.regen : 0) + (home ? FOUNTAIN.healPerSec : 0)) * DT);
+    }
     if (d.died) {
       // Back from the fountain together, both fresh.
       d.died = false;

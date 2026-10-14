@@ -3,6 +3,7 @@ import { abilitiesOf, kitOf } from './kits';
 import { holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
+import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -108,15 +109,18 @@ export class BotController implements Controller {
       aurelle: { play: this.aurelle, escape: this.aurelleEscape },
       gormund: { play: this.gormund, escape: this.gormundEscape },
       sable: { play: this.sable, escape: this.sableEscape },
-      pip: { play: this.none, escape: this.none }, // experimental: bots never play Pip & Thistle yet
+      pip: { play: this.pip, escape: this.pipEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
     // Gormund fights on lower (Fury) and only needs to get back to most of his health: Thick Hide
     // regenerates it in lane.
     const tanky = self.champ!.kit === 'gormund';
-    if (self.hp < self.maxHp * (tanky ? 0.22 : 0.3)) this.retreating = true;
-    if (self.hp > self.maxHp * (tanky ? 0.65 : 0.9)) this.retreating = false;
+    // Pip: while he rides, Thistle's health takes the hits, so judge by both.
+    const toad = self.champ!.kit === 'pip' && riding(self) ? thistleOf(world, self) : undefined;
+    const health = toad ? (self.hp + toad.hp) / (self.maxHp + toad.maxHp) : self.hp / self.maxHp;
+    if (health < (tanky ? 0.22 : 0.3)) this.retreating = true;
+    if (health > (tanky ? 0.65 : 0.9)) this.retreating = false;
     if (this.retreating) {
       // Gormund doesn't need the fountain: once nobody is hitting him, he stands still and regenerates.
       const chased = world.units.some((u) => !u.dead && u.team !== self.team && u.attackTarget === self.id);
@@ -145,11 +149,6 @@ export class BotController implements Controller {
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
     return { type: 'move', to: spot };
-  }
-
-  /** A champion with no kit-specific play: plain trading and farming. */
-  private none(): Command | null {
-    return null;
   }
 
   // ---------- dodging ----------
@@ -639,6 +638,102 @@ export class BotController implements Controller {
   private sableEscape({ self, near, ready }: Ctx): Command | null {
     if (ready(2) && near(4)) return cast(2, spawnPoint(self.team)); // Drift away
     if (ready(1) && near(2.5)) return cast(1, self.pos); // slow the chaser
+    return null;
+  }
+
+  // ---------- Pip & Thistle ----------
+
+  /**
+   * Riding: engage with Big Leap, Hop and Gulp when the trade is good, and Gulp minions to feed a
+   * hurt Thistle. When Thistle runs low mid-fight, hop off backwards and poke from behind him. On foot:
+   * puff Thistle up between Pip and the enemy, poke with pebbles, keep away from melee, and saddle back
+   * up once Thistle has his health back. While Thistle panics, Pip plays it safe.
+   */
+  private pip(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim, aimAfter } = ctx;
+    const { GULP, HOP, PEBBLES, PUFF, LEAP } = PIP_TUNING;
+    const toad = thistleOf(world, self);
+    const toadHp = toad && !panicking(world, toad) ? toad.hp / toad.maxHp : 0;
+    const back = self.team === 'blue' ? -1 : 1;
+    const hp = self.hp / self.maxHp;
+
+    if (riding(self)) {
+      if (foe) {
+        const foeHp = foe.hp / foe.maxHp;
+        const d = gap(self, foe);
+        // Thistle is the health bar that matters while riding: count both.
+        const ours = (self.hp + (toad?.hp ?? 0)) / (self.maxHp + (toad?.maxHp ?? 0));
+        const winning = foeHp < 0.5 || ours > foeHp - 0.05;
+        const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
+        const safe = !unsafe(foe.pos) && (wave < 3 || foeHp < 0.3);
+        // Thistle's wearing thin and they're not about to drop: step out of their reach so he can recover.
+        if (toadHp < 0.33 && foeHp > 0.35 && near(foe.range + 3)) {
+          const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2.5), y: self.pos.y };
+          if (!unsafe(out)) return { type: 'move', to: out };
+        }
+        if (ready(3) && near(LEAP.range - 0.5) && winning && safe) return cast(3, aimAfter(foe, LEAP.castTime + LEAP.flight));
+        if (ready(0) && near(GULP.range - 0.5) && winning && !unsafe(foe.pos)) {
+          const p = aim(foe, GULP.speed);
+          if (!minionInTheWay(world, self, p, GULP.width)) return cast(0, p);
+        }
+        if (ready(1) && d > 1.5 && d < HOP.range && winning && safe) return cast(1, aimAfter(foe, d / HOP.speed));
+        if (near(2.5) && winning && safe) return { type: 'attack', target: foe.id };
+        // Poked from out of reach and not winning: back off out of their range.
+        if (foe.attackTarget === self.id && d > self.range + 0.5 && !winning) {
+          const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2), y: self.pos.y };
+          if (!unsafe(out)) return { type: 'move', to: out };
+        }
+      }
+      // Feed a hurt Thistle: Gulp a minion it would finish.
+      if (ready(0) && toadHp < 0.85 && self.champ!.mana > self.champ!.maxMana * 0.3) {
+        const gulp = ctx.dmg(0) * GULP.minion;
+        const snack = world.units.find(
+          (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && u.hp < gulp && dist(u.pos, self.pos) < GULP.range - 0.3 &&
+            !unsafe(u.pos) && !minionInTheWay(world, self, u.pos, GULP.width, u),
+        );
+        if (snack) return cast(0, snack.pos);
+      }
+      return null;
+    }
+
+    // ---- on foot ----
+    // Riding is the stronger form: climb back on as soon as Thistle has calmed down.
+    if (toad && toadHp >= PIP_TUNING.THISTLE.comeBack - 0.05 && ready(2)) return cast(2, toad.pos);
+    if (!foe) return null;
+    const foeHp = foe.hp / foe.maxHp;
+    const d = gap(self, foe);
+    const melee = foe.range < 3;
+    // Thistle is panicking: Pip alone is fragile. Stay out of reach and poke only from safety.
+    if (!toadHp) {
+      const reach = foe.range + foe.radius + self.radius + 2.5;
+      if (d < reach) {
+        const out = { x: self.pos.x + back * 3, y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+      if (ready(0) && d < PEBBLES.range - 0.5 && d > reach - 1) return cast(0, aim(foe, PEBBLES.speed));
+      return null;
+    }
+    // Thistle between us: puff him up in their path.
+    if (ready(1) && near(PUFF.range + 3)) return cast(1, toward(self.pos, foe.pos, Math.min(PUFF.range, dist(self.pos, foe.pos) * 0.6)));
+    if (ready(3) && toad && dist(toad.pos, foe.pos) < LEAP.range && (foeHp < 0.6 || hp > foeHp) && !unsafe(foe.pos)) {
+      return cast(3, aimAfter(foe, LEAP.castTime + LEAP.flight));
+    }
+    if (ready(0) && d < PEBBLES.range - 0.3) return cast(0, aim(foe, PEBBLES.speed));
+    // Keep melee champions at slingshot range, behind Thistle.
+    if (melee && d < 2.5) {
+      const out = { x: self.pos.x + back * 3, y: self.pos.y };
+      if (!unsafe(out)) return { type: 'move', to: out };
+    }
+    if (d < self.range && hp > 0.4 && !unsafe(foe.pos)) return { type: 'attack', target: foe.id };
+    return null;
+  }
+
+  private pipEscape({ self, foe, near, ready }: Ctx): Command | null {
+    const { HOP, PUFF } = PIP_TUNING;
+    if (!foe) return null;
+    if (riding(self) && ready(1) && near(5)) return cast(1, toward(self.pos, spawnPoint(self.team), HOP.range)); // hop away
+    // Puff Thistle up in their path while Pip runs.
+    if (!riding(self) && ready(1) && near(PUFF.range + 2)) return cast(1, toward(self.pos, foe.pos, Math.min(PUFF.range, dist(self.pos, foe.pos) * 0.6)));
     return null;
   }
 
