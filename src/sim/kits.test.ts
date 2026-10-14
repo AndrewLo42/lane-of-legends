@@ -7,6 +7,7 @@ import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, fury } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
+import { GERRIT_TUNING, leapOf, standardsOf } from './kits/gerrit';
 import { abilitiesOf } from './kits';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
@@ -1158,3 +1159,173 @@ describe('Pip & Thistle', () => {
 });
 
 const dist2 = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+describe('Gerrit', () => {
+  const { FLIGHT, Q, E, R } = GERRIT_TUNING;
+
+  it('plants his standard after a short flight; a new one replaces it, and it expires', () => {
+    const { w, me, cast } = setup('gerrit');
+    const foe = dummy(w, 5);
+    cast(2, 5);
+    expect(standardsOf(w, me)).toHaveLength(0); // still in the air
+    run(w, FLIGHT + 0.15);
+    expect(standardsOf(w, me)).toHaveLength(1);
+    expect(lost(foe)).toBeGreaterThan(30);
+    expect(w.status(foe, 'slow')).toBeTruthy();
+    me.champ!.abilities[2].readyAt = 0;
+    cast(2, -4);
+    run(w, FLIGHT + 0.15);
+    const flags = standardsOf(w, me);
+    expect(flags).toHaveLength(1);
+    near(flags[0].pos.x, -4, 0.2);
+    run(w, E.lasts + 0.5);
+    expect(standardsOf(w, me)).toHaveLength(0);
+  });
+
+  it('thrusts without moving when no standard is on the line', () => {
+    const { w, me, cast } = setup('gerrit');
+    const foe = dummy(w, 3);
+    cast(0, 6);
+    run(w, Q.windup + 0.1);
+    expect(lost(foe)).toBeGreaterThan(60);
+    expect(w.isStunned(foe)).toBe(false);
+    near(me.pos.x, 0, 0.3);
+  });
+
+  it("is pulled to a standard on the line, knocking up who he passes (once every few seconds); the standard stays", () => {
+    const { w, me, cast } = setup('gerrit');
+    cast(2, 5);
+    run(w, FLIGHT + 0.2);
+    const foe = dummy(w, 2.5);
+    me.champ!.abilities[2].readyAt = 0;
+    cast(0, 6);
+    run(w, Q.windup + 0.05);
+    expect(w.isStunned(foe)).toBe(true);
+    run(w, 0.5);
+    near(me.pos.x, 5, 0.8);
+    expect(standardsOf(w, me)).toHaveLength(1);
+    // Straight back through: the standard isn't on that line, so no pull and no knock-up.
+    run(w, Q.knockup + 0.1);
+    me.champ!.abilities[0].readyAt = 0;
+    cast(0, -6);
+    run(w, Q.windup + 0.05);
+    expect(w.isStunned(foe)).toBe(false);
+  });
+
+  it('only knocks each enemy up once every couple of seconds', () => {
+    const { w, me, cast } = setup('gerrit');
+    cast(2, 5);
+    run(w, FLIGHT + 0.2);
+    const foe = dummy(w, 2.5);
+    cast(0, 6);
+    run(w, Q.windup + 0.05);
+    expect(w.isStunned(foe)).toBe(true);
+    run(w, 0.8);
+    // Put both back and thrust again right away.
+    me.pos = { x: 0, y: 0 };
+    foe.pos = { x: 2.5, y: 0 };
+    me.champ!.abilities[0].readyAt = 0;
+    cast(0, 6);
+    run(w, Q.windup + 0.05);
+    expect(w.isStunned(foe)).toBe(false);
+  });
+
+  it('holds the ground near his standards: less damage taken, faster attacks', () => {
+    const { w, me, cast } = setup('gerrit');
+    run(w, 0.1);
+    expect(w.status(me, 'guard')).toBeUndefined();
+    cast(2, 2);
+    run(w, FLIGHT + 0.2);
+    expect(w.status(me, 'guard')?.value).toBe(GERRIT_TUNING.HOLD.guard);
+    expect(w.status(me, 'frenzy')?.value).toBe(GERRIT_TUNING.HOLD.attackSpeed);
+  });
+
+  it('Bulwark shields and slows champions who hit him; the recast trades the shield for a point-blank root', () => {
+    const { w, me, cast } = setup('gerrit');
+    const foe = dummy(w, 1.5);
+    cast(1, 0);
+    expect(me.statuses.some((s) => s.kind === 'shield')).toBe(true);
+    w.dealDamage(foe, me, 10, { attack: true });
+    expect(w.status(foe, 'slow')).toBeTruthy();
+    const far = dummy(w, 6);
+    cast(1, 0); // recast
+    expect(me.statuses.some((s) => s.kind === 'shield')).toBe(false);
+    expect(w.isRooted(foe)).toBe(true);
+    expect(w.isRooted(far)).toBe(false);
+  });
+
+  it("Bulwark's recast goes away when the shield breaks", () => {
+    const { w, me, cast } = setup('gerrit');
+    const foe = dummy(w, 1.5);
+    cast(1, 0);
+    w.dealDamage(foe, me, 5000);
+    w.step();
+    cast(1, 0); // nothing to recast: it's on cooldown now
+    expect(w.isRooted(foe)).toBe(false);
+  });
+
+  it('Fallen Standards leaps onto the target, plants banners behind them and refreshes his thrust', () => {
+    const { w, me, cast } = setup('gerrit');
+    const foe = dummy(w, 5);
+    me.champ!.abilities[0].readyAt = w.tick + 999;
+    cast(3, 5);
+    run(w, 0.15);
+    expect(leapOf(me)).toBeTruthy();
+    run(w, R.flight + 0.3);
+    expect(leapOf(me)).toBeUndefined();
+    near(me.pos.x, 5 - foe.radius - me.radius * 0.6, 0.5);
+    expect(lost(foe)).toBeGreaterThan(100);
+    expect(me.champ!.abilities[0].readyAt).toBeLessThanOrEqual(w.tick);
+    run(w, FLIGHT + 0.1);
+    const banners = standardsOf(w, me).filter((z) => z.kind === 'banner');
+    expect(banners).toHaveLength(R.banners);
+    for (const b of banners) expect(b.pos.x).toBeGreaterThan(foe.pos.x + 1); // behind the target, away from him
+    // The middle banner is right in the escape path: a thrust through the target pulls him past them.
+    cast(0, 12);
+    run(w, Q.windup + 0.6);
+    expect(me.pos.x).toBeGreaterThan(foe.pos.x);
+    // Walking past a banner is slow going.
+    expect(w.status(foe, 'slow')).toBeTruthy();
+  });
+
+  it("bots step off the line between Gerrit and his standard while his thrust is up", () => {
+    const { w, me, cast } = setup('gerrit');
+    me.range = 0;
+    cast(2, 6);
+    run(w, FLIGHT + 0.2);
+    const bot = w.spawnChampion('red', 'arlo', new BotController(1));
+    bot.pos = { x: 3, y: 0 };
+    bot.moveTarget = null;
+    const off = () => Math.abs(bot.pos.y) > Q.width / 2 + bot.radius;
+    for (let i = 0; i < TICK_HZ && !off(); i++) w.step();
+    expect(off()).toBe(true);
+    // With the thrust on a long cooldown, the line isn't a threat.
+    me.champ!.abilities[0].readyAt = w.tick + TICK_HZ * 10;
+    const calm = w.spawnChampion('red', 'arlo', new BotController(1));
+    calm.pos = { x: 3, y: 0 };
+    calm.moveTarget = null;
+    w.step();
+    const goal = calm.moveTarget as { x: number; y: number } | null; // (the bot may have set it during the step)
+    expect(goal == null || Math.abs(goal.y) < 0.5).toBe(true);
+  });
+
+  it('a standard thrown at full range is always within reach of the thrust', () => {
+    const { w, me, cast } = setup('gerrit');
+    cast(2, 50); // well past the toss range: it lands at the edge
+    run(w, FLIGHT + 0.2);
+    const flag = standardsOf(w, me)[0];
+    near(flag.pos.x, E.range, 0.05);
+    cast(0, 50);
+    run(w, Q.windup + 0.6);
+    near(me.pos.x, flag.pos.x, 0.8);
+  });
+
+  it('needs an enemy champion in range for the leap', () => {
+    const { w, me, cast } = setup('gerrit');
+    dummy(w, 15);
+    cast(3, 15);
+    run(w, 0.3);
+    expect(me.champ!.abilities[3].readyAt).toBe(0);
+    near(me.pos.x, 0, 0.1);
+  });
+});

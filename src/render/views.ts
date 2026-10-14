@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
+import { leapOf } from '../sim/kits/gerrit';
 import { panicking, riding, thistleOf } from '../sim/kits/pip';
 import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
@@ -21,7 +22,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'pet') return { name: 'pet_thistle', height: THISTLE_HEIGHT };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -282,6 +283,15 @@ export class WorldView {
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
       if (u.kind === 'pet') this.hopVisuals(u, v, dt);
+      if (u.champ?.kit === 'gerrit' && !u.dead) {
+        // Fallen Standards: the leap arcs through the air.
+        const leap = leapOf(u);
+        if (leap) {
+          const total = Math.max(0.01, Math.hypot(leap.to.x - leap.from.x, leap.to.y - leap.from.y));
+          const k = 1 - Math.min(1, Math.hypot(leap.to.x - u.pos.x, leap.to.y - u.pos.y) / total);
+          v.obj.position.y = Math.sin(Math.PI * k) * Math.min(2.4, 0.6 + total * 0.3);
+        }
+      }
       if (u.champ?.kit === 'pip' && !u.dead && riding(u)) {
         // Up on Thistle's back, riding his hops.
         const toad = this.units.get(thistleOf(this.world, u)?.id ?? -1)?.hop;

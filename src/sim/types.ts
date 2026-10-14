@@ -12,7 +12,7 @@ export type Team = 'blue' | 'red';
 /** `pet`: a champion's companion unit (Pip's Thistle), fighting alongside but not a champion. */
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'pet';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -209,7 +209,7 @@ export interface Missile {
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear' | 'standard' | 'banner';
   team: Team;
   ownerId: number;
   pos: Vec2;
@@ -269,7 +269,7 @@ export interface ChampionKill {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind' | 'thrust';
   pos: Vec2;
   dir?: number;
   radius?: number;
