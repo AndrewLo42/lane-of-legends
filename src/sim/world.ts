@@ -757,6 +757,7 @@ export class World {
     const effective = Math.min(amount, Math.max(0, target.hp) + shield);
     this.hits.push({
       seq: ++this.hitSeq, tick: this.tick, sourceId: src?.id ?? null, sourceKind: src?.kind ?? null, targetId: target.id,
+      targetKind: target.kind, at: { ...target.pos },
       amount, effective, attack: !!from.attack, proc: !!from.proc, slot: from.slot,
     });
     if (target.champ) {

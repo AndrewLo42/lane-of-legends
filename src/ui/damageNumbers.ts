@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Hit } from '../sim/types';
 import type { World } from '../sim/world';
 import { BAR_HEIGHT, type WorldView } from '../render/views';
 
@@ -25,8 +26,8 @@ export class DamageNumbers {
   private root = document.createElement('div');
   private floaters: Floater[] = [];
   private seen = 0;
-  /** Damage over time building up per target: amount and seconds since the first tick. */
-  private dots = new Map<number, { amount: number; age: number }>();
+  /** Damage over time building up per target: amount, seconds since the first tick, and the latest hit. */
+  private dots = new Map<number, { amount: number; age: number; hit: Hit }>();
   private v = new THREE.Vector3();
 
   constructor(private world: World, private view: WorldView, private meId: number) {
@@ -41,17 +42,18 @@ export class DamageNumbers {
       this.seen = h.seq;
       if (h.sourceId !== this.meId || h.amount < 0.5) continue;
       if (h.proc && !h.attack) {
-        const d = this.dots.get(h.targetId) ?? { amount: 0, age: 0 };
+        const d = this.dots.get(h.targetId) ?? { amount: 0, age: 0, hit: h };
         d.amount += h.amount;
+        d.hit = h;
         this.dots.set(h.targetId, d);
       } else {
-        this.spawn(h.targetId, h.amount, h.attack ? 'attack' : 'ability');
+        this.spawn(h, h.amount, h.attack ? 'attack' : 'ability');
       }
     }
     for (const [id, d] of this.dots) {
       d.age += dt;
       if (d.age < DOT_FLUSH) continue;
-      if (d.amount >= 1) this.spawn(id, d.amount, 'dot');
+      if (d.amount >= 1) this.spawn(d.hit, d.amount, 'dot');
       this.dots.delete(id);
     }
 
@@ -71,15 +73,14 @@ export class DamageNumbers {
     });
   }
 
-  private spawn(targetId: number, amount: number, kind: Kind) {
-    const target = this.world.get(targetId);
-    const pos = this.view.positionOf(targetId);
-    if (!target || !pos) return;
+  /** A number over the hit's target: where it's drawn now, or where it stood if the hit killed it (minions leave the world). */
+  private spawn(hit: Hit, amount: number, kind: Kind) {
+    const pos = this.view.positionOf(hit.targetId) ?? { x: hit.at.x, z: hit.at.y };
     const el = document.createElement('div');
-    el.className = `dmg ${kind}${target.kind === 'champion' ? ' champ' : ''}`;
+    el.className = `dmg ${kind}${hit.targetKind === 'champion' ? ' champ' : ''}`;
     el.textContent = String(Math.round(amount));
     this.root.appendChild(el);
-    const at = new THREE.Vector3(pos.x, BAR_HEIGHT[target.kind] + 0.6, pos.z); // just above the health bar
+    const at = new THREE.Vector3(pos.x, BAR_HEIGHT[hit.targetKind] + 0.6, pos.z); // just above the health bar
     this.floaters.push({ el, at, age: 0, dx: (Math.random() * 2 - 1) * 18 });
   }
 

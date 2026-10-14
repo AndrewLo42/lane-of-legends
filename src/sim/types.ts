@@ -231,6 +231,9 @@ export interface Hit {
   /** The source's kind, kept because dead minions leave the world. */
   sourceKind: UnitKind | null;
   targetId: number;
+  /** The target's kind and where it stood, kept because a minion killed by the hit leaves the world. */
+  targetKind: UnitKind;
+  at: Vec2;
   /** Damage dealt, including anything a shield absorbed. */
   amount: number;
   /** The part that counted: overkill on the killing blow left out (for recaps). */
