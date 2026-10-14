@@ -22,7 +22,8 @@ export const MODELS = {
   champ_aurelle: 'Aurelle.glb',
   champ_gormund: 'Gormund.glb',
   champ_sable: 'Sable.glb',
-  champ_pip: 'Pip.glb', // Thistle (a pet) is still a placeholder
+  champ_pip: 'Pip.glb',
+  pet_thistle: 'Thistle.glb', // a static mesh: views.ts hops and squashes it in code
 } as const;
 export type ModelName = keyof typeof MODELS;
 

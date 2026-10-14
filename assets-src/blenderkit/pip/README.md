@@ -16,7 +16,10 @@ How he was built (in `pip_work.blend`, kept out of git like the other raw source
    in the right hand. The right fist was curled in Blender (skin only, so the slingshot isn't bent); the left fist is
    curled by `import_meshy.py` (`fists`).
 6. Decimated to ~14k triangles (eyes, eyebrows and props kept).
+7. Eyes: the original shaders (a diffuse iris, and a see-through cornea mixed by a mask) don't survive glTF, so the
+   eyes exported closed-looking. The shell's see-through faces (black in the sclera mask) were cut out so the iris
+   shows through a real hole, the sclera became a plain textured material, and the iris a solid dark brown.
 
-Thistle has no model yet (a placeholder toad drawn in code).
+Thistle is a separate model: see `../thistle/`.
 
 Rebuild the game asset: `Blender -b --python tools/blender/import_meshy.py -- assets-src/blenderkit/pip/import.json`

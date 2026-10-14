@@ -184,7 +184,7 @@ const RIDING_ABILITIES: Kit['abilities'] = [
       `${GULP.heal} + ${GULP.healPct * 100}% of his max health. The enemy champion is yanked ${GULP.yank} units in.`,
     cast: ({ world, self, at: aim, rank }) => {
       world.fireLine(self, {
-        style: 'hook', dir: dirTo(self.pos, aim), speed: GULP.speed, range: GULP.range, width: GULP.width, canHit: champsAndMinions,
+        style: 'tongue', dir: dirTo(self.pos, aim), speed: GULP.speed, range: GULP.range, width: GULP.width, canHit: champsAndMinions,
         onHit: (t) => {
           const dmg = RIDING_ABILITIES[0].damage!(rank, self);
           if (t.kind === 'minion') {

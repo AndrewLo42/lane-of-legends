@@ -19,6 +19,8 @@ export interface MissileLook {
   animate?: (t: number) => void;
   /** Draw a chain from the thrower's hand to the missile. */
   chain?: boolean;
+  /** Draw a tongue from the thrower's toad's mouth to the missile (Pip's Gulp), snapping back when it lands. */
+  tongue?: boolean;
 }
 
 let glowTexture: THREE.Texture | null = null;
@@ -270,6 +272,14 @@ export function buildMissile(m: Missile): MissileLook {
       add(blade, glow(0xe6c86b, 0.6));
       return { height: 1.2, chain: true };
     },
+    tongue: () => {
+      // Thistle's Gulp: a sticky, bulbous pink tip; the stretch back to his mouth is a `Tongue`.
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10).scale(1.15, 0.8, 1), lit(0xe56f86, { roughness: 0.35 }));
+      const groove = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8).scale(1, 0.5, 0.35), lit(0xb84a63, { roughness: 0.5 }));
+      groove.position.set(0.05, 0.12, 0);
+      add(tip, groove);
+      return { height: TONGUE_HEIGHT, tongue: true };
+    },
   };
   const look = looks[m.style]();
   // Solid things cast shadows; light (additive or see-through) doesn't.
@@ -402,6 +412,59 @@ export class Trail {
     this.mesh.removeFromParent();
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
+  }
+}
+
+/** Height of Thistle's mouth (and so of his tongue) above the ground, in the game's metres. */
+export const TONGUE_HEIGHT = 0.55;
+const tongueGeo = new THREE.CylinderGeometry(0.06, 0.11, 1, 10, 1, true).rotateZ(-Math.PI / 2).translate(0.5, 0, 0); // along +x, 0..1, thick end at the mouth
+const tongueMat = new THREE.MeshStandardMaterial({ color: 0xe56f86, roughness: 0.35 });
+
+/**
+ * Thistle's tongue: a fleshy strand from his mouth to the flying tip, a little thicker at the mouth.
+ * When the tip lands it snaps back in (`retract`), so the tongue doesn't just vanish.
+ */
+export class Tongue {
+  readonly mesh = new THREE.Mesh(tongueGeo, tongueMat);
+  private from = new THREE.Vector3();
+  private to = new THREE.Vector3();
+  /** Seconds left in the snap back (null while the tip is still out). */
+  private back: number | null = null;
+  private static readonly SNAP = 0.14;
+
+  constructor() {
+    this.mesh.castShadow = true;
+  }
+
+  update(from: THREE.Vector3, to: THREE.Vector3) {
+    this.from.copy(from);
+    this.to.copy(to);
+    this.place(1);
+  }
+
+  /** Start snapping back; then call `step` each frame until it returns false. */
+  retract() {
+    this.back = Tongue.SNAP;
+  }
+
+  step(dt: number) {
+    if (this.back == null) return false;
+    this.back -= dt;
+    if (this.back <= 0) return false;
+    this.place(this.back / Tongue.SNAP);
+    return true;
+  }
+
+  private place(k: number) {
+    const d = this.to.clone().sub(this.from);
+    const len = Math.max(0.01, d.length() * k);
+    this.mesh.position.copy(this.from);
+    this.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.normalize());
+    this.mesh.scale.set(len, 1, 1);
+  }
+
+  dispose() {
+    this.mesh.removeFromParent();
   }
 }
 
