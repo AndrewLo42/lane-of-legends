@@ -1,6 +1,6 @@
 import type { DuelRecap } from '../sim/recap';
 import type { DuelRules, WinReason } from '../sim/rules';
-import type { ChampionKill, Command, Fx, Hit, KitId, Missile, SummonerId, Team, Telegraph, Unit, Zone } from '../sim/types';
+import type { AugmentId, ChampionKill, Command, Fx, Hit, KitId, Missile, SummonerId, Team, Telegraph, Unit, Zone } from '../sim/types';
 import type { World } from '../sim/world';
 
 /**
@@ -21,7 +21,12 @@ export interface LobbyPlayer {
   kit: KitId;
   summoners: [SummonerId, SummonerId];
   ready: boolean;
+  /** While relics are being picked: whether they've chosen theirs (not which). */
+  picked?: boolean;
 }
+
+/** With relics on, how long players have to choose one before it's picked for them. */
+export const RELIC_SECONDS = 20;
 
 /**
  * Players don't send create or join: they connect to `/room/new` or `/room/CODE`, and the room answers
@@ -31,13 +36,20 @@ export interface LobbyPlayer {
 export type ClientMsg =
   | { t: 'pick'; kit: KitId; summoners: [SummonerId, SummonerId] }
   | { t: 'ready'; ready: boolean }
+  /** Turn relics on or off for the room (either player; unreadies both). */
+  | { t: 'relics'; on: boolean }
+  /** Your choice from the relic offer. */
+  | { t: 'relic'; id: AugmentId }
   /** `seq` increases with every batch; snapshots acknowledge the last one applied. */
   | { t: 'cmds'; seq: number; cmds: Command[] };
 
 export type ServerMsg =
   /** Your seat in the room: the token that lets you back into a duel after a drop. Sent on joining. */
   | { t: 'seat'; token: string }
-  | { t: 'lobby'; code: string; you: Team; players: LobbyPlayer[] }
+  /** `relics`: each player picks 1 of 3 random relics before the duel; `picking`: that's happening now. */
+  | { t: 'lobby'; code: string; you: Team; players: LobbyPlayer[]; relics: boolean; picking: boolean }
+  /** Relics are on and both players are ready: your three to choose from. */
+  | { t: 'relicOffer'; offer: AugmentId[]; seconds: number }
   | { t: 'start'; seed: number; rules: DuelRules; you: number; foe: number; snap: Snapshot }
   | { t: 'snap'; snap: Snapshot }
   /** You're back in the duel after a drop: the duel's setup (as in `start`) and the whole world as it is now. */

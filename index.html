@@ -317,6 +317,13 @@
       #screen .itemcard .price.short { color: #ff8a80; }
       #screen .itemcard:hover:not(:disabled) { border-color: #f2c14e; }
       #screen .itemcard:disabled { cursor: default; opacity: 0.55; transform: none; }
+      /* Online relic choice: the chosen card stays lit, the others fade. */
+      #screen .itemcard.on:disabled { opacity: 1; border-color: #f2c14e; box-shadow: 0 0 18px #f2c14e55; }
+      #screen .itemcard.dim:disabled { opacity: 0.35; }
+      #screen .relictoggle { display: flex; align-items: center; gap: 10px; margin: 10px auto 0; max-width: 520px; padding: 8px 12px;
+        border: 1px solid #ffffff22; border-radius: 10px; background: #151922; cursor: pointer; text-align: left; }
+      #screen .relictoggle input { width: 18px; height: 18px; accent-color: #f2c14e; cursor: pointer; flex: none; }
+      #screen .relictoggle small { opacity: 0.7; }
       #screen .itemcard.sold { opacity: 0.3; }
       /* Online lobby */
       #screen .netentry { display: flex; flex-direction: column; align-items: center; gap: 14px; }

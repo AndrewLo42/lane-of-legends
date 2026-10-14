@@ -465,7 +465,16 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
   return new Promise((resolve) => {
     let error = '';
     let spells: SpellPair = [...DEFAULT_SUMMONERS];
+    /** Relics on and both ready: the three on offer, when the choice runs out, and what you chose. */
+    let offer: AugmentId[] | null = null;
+    let deadline = 0;
+    let chosen: AugmentId | null = null;
+    const clock = setInterval(() => {
+      const c = el.querySelector('.relicclock');
+      if (c) c.textContent = String(Math.max(0, Math.ceil((deadline - performance.now()) / 1000)));
+    }, 250);
     const finish = (r: StartMsg | null) => {
+      clearInterval(clock);
       el.removeEventListener('click', onClick);
       el.removeEventListener('keydown', onKey);
       net.onMessage = () => {};
@@ -503,19 +512,39 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
             <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span></button>`).join('')}
         </div>
         <div class="spellpick"></div>
+        <label class="relictoggle"><input type="checkbox" data-net="relics" ${lobby.relics ? 'checked' : ''}>
+          <span><b>Relics</b> <small>each player chooses 1 of 3 random relics when the duel starts</small></span></label>
         <div class="actions">
           <button class="go" data-net="ready" ${them ? '' : 'disabled'}>${me.ready ? 'Not ready' : 'Ready'}</button>
           <button class="link" data-net="leave">Leave room</button></div>
         ${error ? `<p class="neterr">${error}</p>` : ''}`;
     };
 
+    /** Relics on: choose one of the three before the duel starts. */
+    const relicPick = () => {
+      const lobby = net.lobby!;
+      const them = lobby.players.find((p) => p.team !== lobby.you);
+      const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+      return `
+        <div class="floorhead"><small>Online · Room ${lobby.code} · relics</small><h1>Choose a relic</h1></div>
+        <div class="cards">${offer!.map((id) => {
+          const it = ITEMS[id];
+          return `<button class="card itemcard${chosen === id ? ' on' : chosen ? ' dim' : ''}" data-relic="${id}" ${chosen ? 'disabled' : ''}>
+            <div class="icon">${it.icon}</div><div class="name">${it.name}</div><p>${it.describe}</p></button>`;
+        }).join('')}</div>
+        <p class="hint">${chosen ? 'Chosen. ' : `<b class="relicclock">${left}</b>s to choose, or one is picked for you. `}
+          Your opponent: ${them?.picked ? 'chosen' : 'choosing…'}</p>
+        <div class="actions"><button class="link" data-net="leave">Leave room</button></div>`;
+    };
+
     const el = show('');
     el.classList.add('online');
     const render = () => {
       const fresh = !el.querySelector('.roomcode') !== !net.lobby; // switched between entry and room
-      el.innerHTML = net.lobby ? room() : entry();
+      const picking = !!net.lobby?.picking && !!offer;
+      el.innerHTML = !net.lobby ? entry() : picking ? relicPick() : room();
       if (fresh) el.scrollTop = 0;
-      if (!net.lobby) return;
+      if (!net.lobby || picking) return;
       const me = net.lobby.players.find((p) => p.team === net.lobby!.you)!;
       const sample = new World(1).spawnChampion('blue', me.kit, { think: () => [] });
       spellPicker(el.querySelector('.spellpick')!, spells, sample, (p) => {
@@ -527,6 +556,12 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
     net.onMessage = (msg) => {
       if (msg.t === 'lobby') {
         error = '';
+        if (!msg.picking) offer = chosen = null;
+        render();
+      } else if (msg.t === 'relicOffer') {
+        offer = msg.offer;
+        deadline = performance.now() + msg.seconds * 1000;
+        chosen = null;
         render();
       } else if (msg.t === 'error') {
         error = msg.message;
@@ -557,7 +592,14 @@ export function onlineLobby(net: NetClient): Promise<StartMsg | null> {
       const t = e.target as HTMLElement;
       const kit = t.closest<HTMLElement>('[data-kit]')?.dataset.kit as KitId | undefined;
       if (kit && net.lobby) return net.send({ t: 'pick', kit, summoners: spells });
+      const relic = t.closest<HTMLElement>('[data-relic]')?.dataset.relic;
+      if (relic && offer && !chosen) {
+        chosen = relic;
+        net.send({ t: 'relic', id: relic });
+        return render();
+      }
       const action = t.closest<HTMLElement>('[data-net]')?.dataset.net;
+      if (action === 'relics') return net.send({ t: 'relics', on: (t as HTMLInputElement).checked });
       if (action === 'create') net.enter(null);
       else if (action === 'join') join();
       else if (action === 'ready' && net.lobby) {

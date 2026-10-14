@@ -3,12 +3,13 @@
  * Durable Object (worker/index.ts) holds exactly one. Players pick and ready up in the lobby, then the
  * room runs an authoritative 1v1 duel stepped at 30 Hz with a snapshot to each player every tick.
  */
-import { SEAT_GRACE, newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
+import { RELIC_SECONDS, SEAT_GRACE, newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
+import { STARTER_ITEMS } from '../src/sim/items';
 import { KIT_IDS } from '../src/sim/kits';
 import { duelRecap } from '../src/sim/recap';
 import { DUEL_RULES } from '../src/sim/rules';
 import { SIGNATURE_SUMMONERS, SUMMONER_IDS } from '../src/sim/summoners';
-import type { Command, Controller, KitId, SummonerId, Team, Unit } from '../src/sim/types';
+import type { AugmentId, Command, Controller, KitId, SummonerId, Team, Unit } from '../src/sim/types';
 import { DT } from '../src/sim/util';
 import { World } from '../src/sim/world';
 
@@ -39,7 +40,19 @@ interface Player extends LobbyPlayer {
   cursor: SnapCursor;
   /** Mid-duel drop: when their held seat runs out (performance.now() ms), or null while connected. */
   goneUntil: number | null;
+  /** With relics on: the three offered before the duel, and the one chosen. */
+  offer: AugmentId[];
+  relic: AugmentId | null;
 }
+
+const shuffled = <T>(xs: readonly T[]) => {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they read as 1 and 0)
 export const newCode = () => Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
@@ -50,6 +63,9 @@ export class Room {
   private world: World | null = null;
   private seed = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** Room setting: each player picks a relic before every duel. And the pick in progress, if any. */
+  private relics = false;
+  private picking: ReturnType<typeof setTimeout> | null = null;
 
   /** `onEmpty`: the last player has gone (including a held seat running out), so the host can drop the room. */
   constructor(readonly code: string, private onEmpty: () => void = () => {}) {}
@@ -73,7 +89,7 @@ export class Room {
     const team: Team = this.players.some((p) => p.team === 'blue') ? 'red' : 'blue';
     const kit: KitId = team === 'blue' ? 'arlo' : 'tock';
     const token = crypto.randomUUID();
-    this.players.push({ socket, token, team, kit, summoners: SIGNATURE_SUMMONERS[kit], ready: false, controller: new NetController(), cursor: newCursor(), goneUntil: null });
+    this.players.push({ socket, token, team, kit, summoners: SIGNATURE_SUMMONERS[kit], ready: false, controller: new NetController(), cursor: newCursor(), goneUntil: null, offer: [], relic: null });
     send(socket, { t: 'seat', token });
     this.lobbyUpdate();
   }
@@ -107,16 +123,30 @@ export class Room {
     if (!me || !msg || typeof msg !== 'object') return;
     switch (msg.t) {
       case 'pick':
-        if (this.world || !KIT_IDS.includes(msg.kit) || !validSpells(msg.summoners)) return;
+        if (this.world || this.picking || !KIT_IDS.includes(msg.kit) || !validSpells(msg.summoners)) return;
         me.kit = msg.kit;
         me.summoners = msg.summoners;
         me.ready = false;
         return this.lobbyUpdate();
       case 'ready':
-        if (this.world) return;
+        if (this.world || this.picking) return;
         me.ready = !!msg.ready;
         this.lobbyUpdate();
-        if (this.players.length === 2 && this.players.every((p) => p.ready)) this.startDuel();
+        if (this.players.length === 2 && this.players.every((p) => p.ready)) {
+          if (this.relics) this.offerRelics();
+          else this.startDuel();
+        }
+        return;
+      case 'relics':
+        if (this.world || this.picking) return;
+        this.relics = !!msg.on;
+        for (const p of this.players) p.ready = false;
+        return this.lobbyUpdate();
+      case 'relic':
+        if (!this.picking || me.relic || !me.offer.includes(msg.id)) return;
+        me.relic = msg.id;
+        if (this.players.every((p) => p.relic)) this.startDuel();
+        else this.lobbyUpdate();
         return;
       case 'cmds':
         // Only ever their own champion, and only commands the sim understands.
@@ -140,7 +170,27 @@ export class Room {
       this.peerUpdate();
       return;
     }
+    if (this.picking) {
+      // Someone left while choosing relics: back to the lobby.
+      clearTimeout(this.picking);
+      this.picking = null;
+      for (const o of this.players) o.ready = false;
+    }
     this.remove(p);
+    this.lobbyUpdate();
+  }
+
+  /** Relics on and both ready: each player gets three to choose from, and a random one if time runs out. */
+  private offerRelics() {
+    for (const p of this.players) {
+      p.offer = shuffled(STARTER_ITEMS).slice(0, 3);
+      p.relic = null;
+      send(p.socket, { t: 'relicOffer', offer: p.offer, seconds: RELIC_SECONDS });
+    }
+    this.picking = setTimeout(() => {
+      for (const p of this.players) p.relic ??= p.offer[Math.floor(Math.random() * p.offer.length)];
+      this.startDuel();
+    }, RELIC_SECONDS * 1000);
     this.lobbyUpdate();
   }
 
@@ -161,18 +211,23 @@ export class Room {
   }
 
   private lobbyUpdate() {
-    const players = this.players.map(({ team, kit, summoners, ready }) => ({ team, kit, summoners, ready }));
-    for (const p of this.players) send(p.socket, { t: 'lobby', code: this.code, you: p.team, players });
+    const picking = !!this.picking;
+    const players = this.players.map(({ team, kit, summoners, ready, relic }) => ({ team, kit, summoners, ready, ...(picking ? { picked: !!relic } : {}) }));
+    for (const p of this.players) send(p.socket, { t: 'lobby', code: this.code, you: p.team, players, relics: this.relics, picking });
   }
 
   private startDuel() {
+    if (this.picking) clearTimeout(this.picking);
+    this.picking = null;
     const seed = Math.floor(Math.random() * 1e9);
     const rules = { ...DUEL_RULES };
     this.seed = seed;
     const world = (this.world = new World(seed, rules));
     for (const p of this.players) {
       p.controller = new NetController(); // fresh queue and command acks for each duel
-      p.unit = world.spawnChampion(p.team, p.kit, p.controller, { summoners: p.summoners });
+      p.unit = world.spawnChampion(p.team, p.kit, p.controller, { summoners: p.summoners, items: this.relics && p.relic ? [p.relic] : [] });
+      p.offer = [];
+      p.relic = null;
       p.cursor = newCursor();
     }
     for (const p of this.players) {
