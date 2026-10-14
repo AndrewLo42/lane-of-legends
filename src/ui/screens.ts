@@ -2,6 +2,7 @@ import { portraitHtml } from '../render/portraits';
 import { FLOORS, cantBuy, runSummoners, shopStock, validSummoners, type FloorPlan, type Meta, type RunState } from '../run/run';
 import { AUGMENTS } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
+import { openHowToPlay } from './howToPlay';
 import { BOT_KIT_IDS, KITS, KIT_IDS } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
 import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
@@ -164,7 +165,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   const el = show(`
     <div class="selecthead"><h1>Lane League</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-      <div class="homelinks"><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button>
+      <div class="homelinks"><button class="link watch" data-help>❔ How to play</button><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button>
         <label class="exptoggle" title="Champions without a model yet, as placeholders. Bots never play them."><input type="checkbox" data-experimental${experimental ? ' checked' : ''}> 🧪 Experimental champions</label></div></div>
     <div class="roster">
       ${KIT_IDS.map((id) => `
@@ -223,6 +224,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       if (t.closest('[data-start]')) done();
       if (t.closest('[data-watch]')) finish('watch');
       if (t.closest('[data-online]')) finish('online');
+      if (t.closest('[data-help]')) openHowToPlay();
     };
     const onDouble = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest('[data-kit]')) done();
