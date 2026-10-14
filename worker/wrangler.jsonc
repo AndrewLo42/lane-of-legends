@@ -1,9 +1,11 @@
 {
-  // Lane League PvP server on Cloudflare Workers + Durable Objects (see worker/index.ts).
+  // Lane League on Cloudflare: the game (the built dist/ folder, as static assets) and its PvP server
+  // (Workers + Durable Objects, see worker/index.ts) at one address. `npm run deploy` builds and deploys both.
   "$schema": "../node_modules/wrangler/config-schema.json",
-  "name": "lane-league-pvp",
+  "name": "lane-league",
   "main": "index.ts",
   "compatibility_date": "2026-09-27",
+  "assets": { "directory": "../dist", "run_worker_first": ["/room/*", "/health"] },
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "RoomObject" }]
   },

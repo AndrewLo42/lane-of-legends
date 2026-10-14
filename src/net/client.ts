@@ -2,12 +2,15 @@ import { PVP_PORT, type ClientMsg, type ServerMsg } from './protocol';
 
 /**
  * Where the PvP server is: `?server=wss://…` in the URL, else VITE_PVP_SERVER at build time, else
- * the machine serving the game (LAN play: whoever runs `npm run dev` also runs `npm run server`).
+ * in development the machine serving the game (LAN play: whoever runs `npm run dev` also runs
+ * `npm run server`), and in a build the site itself (the Cloudflare Worker serves both).
  */
 export function serverUrl() {
   const fromUrl = new URLSearchParams(location.search).get('server');
   const fromBuild = import.meta.env.VITE_PVP_SERVER as string | undefined;
-  return (fromUrl ?? fromBuild ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${PVP_PORT}`).replace(/\/+$/, '');
+  const ws = location.protocol === 'https:' ? 'wss' : 'ws';
+  const here = import.meta.env.DEV ? `${ws}://${location.hostname}:${PVP_PORT}` : `${ws}://${location.host}`;
+  return (fromUrl ?? fromBuild ?? here).replace(/\/+$/, '');
 }
 
 /**

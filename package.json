@@ -12,7 +12,7 @@
     "meshy": "node --experimental-strip-types --no-warnings tools/meshy/cli.ts",
     "server": "vite-node server/main.ts",
     "server:cf": "wrangler dev -c worker/wrangler.jsonc",
-    "deploy:server": "wrangler deploy -c worker/wrangler.jsonc"
+    "deploy": "npm run build && wrangler deploy -c worker/wrangler.jsonc"
   },
   "dependencies": {
     "lil-gui": "^0.20.0",
