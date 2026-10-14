@@ -1,4 +1,12 @@
 import { kitOf } from './kits';
+import type { Kit } from './kits/types';
+
+/** An ability slot's name, both forms' for a champion with two ability sets (Pip: "Gulp / Pebble Burst"). */
+function slotLabel(kit: Kit, slot: number) {
+  const a = kit.abilities[slot];
+  const b = kit.otherForm?.abilities[slot];
+  return { name: b && b.name !== a.name ? `${a.name} / ${b.name}` : a.name, icon: a.icon };
+}
 import type { KitId, Unit } from './types';
 import { TICK_HZ } from './util';
 import type { World } from './world';
@@ -46,9 +54,11 @@ function rows(world: World, target: Unit, from?: Unit): RecapRow[] {
       if (!src?.champ) continue;
       const kit = kitOf(src);
       if (t.category === 'attack') row = { label: 'Attacks', icon: '⚔', kind: 'attack' };
+      else if (t.category === 'pet') row = { label: 'Thistle', icon: '🐸', kind: 'attack' };
       else if (t.category.startsWith('slot')) {
         const slot = Number(t.category.slice(4));
-        row = { label: kit.abilities[slot].name, key: KEYS[slot], icon: kit.abilities[slot].icon, kind: 'ability' };
+        const l = slotLabel(kit, slot);
+        row = { label: l.name, key: KEYS[slot], icon: l.icon, kind: 'ability' };
       } else row = { label: 'Passives, items & burns', icon: '✦', kind: 'effect' };
       if (!from) row = { ...row, label: `${kit.name} · ${row.label}` };
     } else {
@@ -68,10 +78,15 @@ function rows(world: World, target: Unit, from?: Unit): RecapRow[] {
 /** A recap row for one hit's source: whose ability (or attacks), or minions / towers. */
 export function rowForHit(world: World, h: { sourceId: number | null; sourceKind: string | null; attack: boolean; slot?: number }): Omit<RecapRow, 'amount'> {
   const src = world.get(h.sourceId);
+  const owner = src?.pet ? world.get(src.pet.ownerId) : undefined;
+  if (owner?.champ) return { label: `${kitOf(owner).name} · Thistle`, icon: '🐸', kind: 'attack' };
   if (src?.champ) {
     const kit = kitOf(src);
     if (h.attack) return { label: `${kit.name} · Attacks`, icon: '⚔', kind: 'attack' };
-    if (h.slot != null) return { label: `${kit.name} · ${kit.abilities[h.slot].name}`, key: KEYS[h.slot], icon: kit.abilities[h.slot].icon, kind: 'ability' };
+    if (h.slot != null) {
+      const l = slotLabel(kit, h.slot);
+      return { label: `${kit.name} · ${l.name}`, key: KEYS[h.slot], icon: l.icon, kind: 'ability' };
+    }
     return { label: `${kit.name} · Passives, items & burns`, icon: '✦', kind: 'effect' };
   }
   const kind = src?.kind ?? h.sourceKind;

@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
+import { panicking, riding, thistleOf } from '../sim/kits/pip';
 import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
 import { RIGS } from './rigs';
 import { KITS } from '../sim/kits';
-import { Chain, Trail, buildMissile, type MissileLook } from './missiles';
+import { Chain, TONGUE_HEIGHT, Tongue, Trail, buildMissile, type MissileLook } from './missiles';
 import { TEAM_COLOR, placeholderFor } from './scene';
 
 /** Unit → Meshy model and its in-game height (metres); placeholders are used when none is loaded. */
@@ -17,9 +18,10 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   // Champions are oversized next to structures, as in League, so they read from the MOBA camera.
   // Tock is a big clockwork knight, Gormund a hulking minotaur; Mabel a small mouse.
   if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
+  if (u.kind === 'pet') return { name: 'pet_thistle', height: THISTLE_HEIGHT };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -73,6 +75,8 @@ interface UnitView {
   lastCastSeen?: number;
   /** Seconds since a champion died (null while alive). */
   deadFor?: number | null;
+  /** Thistle's code-driven hop: cycle phase, this frame's lift and squash, and an attack lunge timer. */
+  hop?: { phase: number; lift: number; squash: number; lunge: number };
 }
 
 interface MissileView {
@@ -81,6 +85,7 @@ interface MissileView {
   look: MissileLook;
   trail?: Trail;
   chain?: Chain;
+  tongue?: Tongue;
   /** Seconds since it was thrown (spins, wing flaps). */
   age: number;
 }
@@ -88,11 +93,16 @@ interface MissileView {
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 /** Height of a unit's health bar anchor above its feet. */
-export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6 };
+export const BAR_HEIGHT: Record<Unit['kind'], number> = { champion: 3.0, minion: 1.6, tower: 7.6, nexus: 6.6, pet: 1.9 };
 
 const FROZEN = new THREE.Color(0xd8fffb);
 /** Champions that float instead of walking, and how high (Aurelle). */
 const FLOAT_HEIGHT: Partial<Record<KitId, number>> = { aurelle: 0.35 };
+/** Thistle's model height, and where his saddle sits (Pip stands on it while riding, like a tiny surfer). */
+const THISTLE_HEIGHT = 1.25;
+const RIDE_HEIGHT = THISTLE_HEIGHT * 0.873;
+/** Thistle's hops: per second while walking (faster while panicking), how high, and how hard he squashes. */
+const HOP = { rate: 2.2, panicRate: 3.4, height: 0.28, squash: 0.14 };
 /** How fast a floater's idle plays while she glides (1 = normal). */
 const GLIDE_IDLE_SPEED = 0.3;
 
@@ -107,6 +117,8 @@ export class WorldView {
   private missiles = new Map<number, MissileView>();
   /** Trails of missiles that just landed, fading out. */
   private fadingTrails: Trail[] = [];
+  /** Tongues snapping back after their tip landed. */
+  private retracting: Tongue[] = [];
 
   constructor(private scene: THREE.Scene, private world: World) {
     this.sync();
@@ -175,7 +187,9 @@ export class WorldView {
       if (trail) this.scene.add(trail.mesh);
       const chain = look.chain ? new Chain() : undefined;
       if (chain) this.scene.add(chain.group);
-      this.missiles.set(m.id, { obj, prev: { ...m.pos }, look, trail, chain, age: 0 });
+      const tongue = look.tongue ? new Tongue() : undefined;
+      if (tongue) this.scene.add(tongue.mesh);
+      this.missiles.set(m.id, { obj, prev: { ...m.pos }, look, trail, chain, tongue, age: 0 });
     }
     for (const [id, v] of this.missiles) {
       if (liveMissiles.has(id)) continue;
@@ -193,6 +207,10 @@ export class WorldView {
     });
     for (const { m } of v.look.mats) m.dispose();
     v.chain?.dispose();
+    if (v.tongue) {
+      v.tongue.retract();
+      this.retracting.push(v.tongue);
+    }
     if (v.trail) this.fadingTrails.push(v.trail); // let the ribbon fade out behind where it landed
   }
 
@@ -263,6 +281,12 @@ export class WorldView {
       // Floaters (Aurelle) hover off the ground with a slow bob and glide instead of running.
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
+      if (u.kind === 'pet') this.hopVisuals(u, v, dt);
+      if (u.champ?.kit === 'pip' && !u.dead && riding(u)) {
+        // Up on Thistle's back, riding his hops.
+        const toad = this.units.get(thistleOf(this.world, u)?.id ?? -1)?.hop;
+        v.obj.position.y = RIDE_HEIGHT * (toad?.squash ?? 1) + (toad?.lift ?? 0);
+      }
       if (u.champ?.kit === 'aurelle') this.aurelleVisuals(u, v);
       if (u.champ?.kit === 'gormund') {
         // Labyrinth Rage: swell up over a fifth of a second, shrink back when it ends.
@@ -276,9 +300,11 @@ export class WorldView {
         const moving = !u.dead && Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
         // Library cycles are paced for a ~1.8 m human (walk ≈ 3.2 m/s, run ≈ 5.8 m/s); match the unit's pace.
         const gait = v.anim.has('Run') ? 'Run' : 'Walk';
+        // Pip riding Thistle stands on his back and lets the toad do the walking.
+        const riderIdle = u.champ?.kit === 'pip' && riding(u);
         const glides = hover != null; // floaters keep their idle pose while they move, slowed right down so its
         // hand gestures come round rarely and she reads as calmly gliding
-        v.anim.setBase(moving && !glides ? gait : 'Idle', moving ? (glides ? GLIDE_IDLE_SPEED : u.speed / (gait === 'Run' ? 5.8 : 3.2)) : 1);
+        v.anim.setBase(moving && !glides && !riderIdle ? gait : 'Idle', moving ? (glides ? GLIDE_IDLE_SPEED : u.speed / (gait === 'Run' ? 5.8 : 3.2)) : 1);
         const cast = u.champ?.lastCast;
         if (cast && cast.tick !== v.lastCastSeen && !u.dead) {
           v.lastCastSeen = cast.tick;
@@ -339,6 +365,19 @@ export class WorldView {
         v.look.animate?.(v.age);
       }
       v.trail?.update(v.obj.position, dt);
+      if (v.tongue) {
+        // From the mouth of the thrower's toad (Pip's Thistle) to the tip.
+        const toad = this.world.units.find((u) => u.pet?.ownerId === m.sourceId);
+        const tv = toad && this.units.get(toad.id);
+        const base = tv ? tv.obj.position.clone() : this.units.get(m.sourceId)?.obj.position.clone() ?? v.obj.position.clone();
+        const face = toad ? toad.facing : Math.atan2(m.dir.y, m.dir.x);
+        const reach = 0.95 * (tv?.obj.scale.x ?? 1);
+        const mouth = base.add(new THREE.Vector3(Math.cos(face) * reach, 0, Math.sin(face) * reach)).setY(base.y + TONGUE_HEIGHT * (tv?.obj.scale.y ?? 1));
+        // The tip sets off from Pip's centre: until it has passed the mouth, show it at the mouth.
+        const out = v.obj.position.clone().sub(mouth);
+        if (out.x * Math.cos(face) + out.z * Math.sin(face) < 0) v.obj.position.set(mouth.x, v.obj.position.y, mouth.z);
+        v.tongue.update(mouth, v.obj.position);
+      }
       if (v.chain) {
         // From the thrower's hand (or chest height on placeholder figures) to the hook.
         const src = this.units.get(m.sourceId);
@@ -347,6 +386,11 @@ export class WorldView {
         v.chain.update(from, v.obj.position);
       }
     }
+    this.retracting = this.retracting.filter((t) => {
+      if (t.step(dt)) return true;
+      t.dispose();
+      return false;
+    });
     this.fadingTrails = this.fadingTrails.filter((t) => {
       if (t.update(null, dt)) return true;
       t.dispose();
@@ -514,6 +558,45 @@ export class WorldView {
     }
   }
 
+  /**
+   * Thistle has no skeleton: he hops while moving (lift and squash-and-stretch), breathes while still,
+   * lunges when he bites, and trembles while he panics.
+   */
+  private hopVisuals(u: Unit, v: UnitView, dt: number) {
+    const h = (v.hop ??= { phase: 0, lift: 0, squash: 1, lunge: 0 });
+    const moving = Math.hypot(u.pos.x - v.prev.x, u.pos.y - v.prev.y) > 1e-3;
+    const scared = panicking(this.world, u);
+    if (u.lastAttackTick !== v.lastAttackSeen) {
+      v.lastAttackSeen = u.lastAttackTick;
+      h.lunge = 0.25;
+    }
+    h.lunge = Math.max(0, h.lunge - dt);
+    if (moving) {
+      h.phase += dt * (scared ? HOP.panicRate : HOP.rate);
+    } else if (h.phase % 1 !== 0) {
+      // Finish the hop in progress, then sit.
+      const next = Math.ceil(h.phase);
+      h.phase = Math.min(next, h.phase + dt * HOP.rate);
+    }
+    const s = Math.abs(Math.sin(Math.PI * h.phase)); // 0 on the ground, 1 at the top of a hop
+    const breathe = moving ? 0 : Math.sin(performance.now() / 380 + u.id) * 0.025;
+    const land = moving ? Math.pow(1 - s, 6) : 0; // a squash right as he lands
+    const lunge = h.lunge > 0 ? Math.sin((h.lunge / 0.25) * Math.PI) : 0;
+    h.lift = HOP.height * s;
+    h.squash = 1 + HOP.squash * s - HOP.squash * land + breathe - 0.08 * lunge;
+    const wide = 1 / Math.sqrt(h.squash);
+    v.obj.scale.set(wide, h.squash, wide);
+    v.obj.position.y += h.lift;
+    if (lunge) {
+      v.obj.position.x += Math.cos(u.facing) * 0.25 * lunge;
+      v.obj.position.z += Math.sin(u.facing) * 0.25 * lunge;
+    }
+    if (scared) {
+      v.obj.position.x += (Math.random() - 0.5) * 0.06;
+      v.obj.position.z += (Math.random() - 0.5) * 0.06;
+    }
+  }
+
   /** Shield bubble, a ring of water while rooted, circling stars while stunned, and summoner spell effects. */
   private statusVisuals(u: Unit, v: UnitView, dt: number) {
     const shielded = u.statuses.some((s) => s.kind === 'shield');
@@ -596,6 +679,8 @@ export class WorldView {
     for (const v of this.missiles.values()) this.removeMissile(v);
     for (const t of this.fadingTrails) t.dispose();
     this.fadingTrails = [];
+    for (const t of this.retracting) t.dispose();
+    this.retracting = [];
     this.units.clear();
     this.missiles.clear();
   }

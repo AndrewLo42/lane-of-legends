@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import { combineMods, perksOf } from './augments';
-import { KITS, kitOf } from './kits';
+import { KITS, abilitiesOf, kitOf } from './kits';
 import { hiveMinionMult } from './kits/mabel';
 import type { CastCtx } from './kits/types';
 import { LANE, clampToLane, sideX, spawnPoint } from './lane';
@@ -117,9 +117,13 @@ export class World {
     return this.units.filter((u) => u.kind === 'champion');
   }
 
-  /** Towers are protected by the tower in front of them, the nexus by every tower. */
+  /**
+   * Towers are protected by the tower in front of them, the nexus by every tower. A pet can't be
+   * targeted while it carries its owner or while it's broken and fleeing.
+   */
   isTargetable(u: Unit) {
     if (u.dead) return false;
+    if (u.pet) return !u.pet.mounted && this.tick >= u.pet.panicUntil;
     const own = this.units.filter((o) => o.team === u.team && o.kind === 'tower' && !o.dead);
     if (u.kind === 'nexus') return own.length === 0;
     if (u.kind === 'tower') return !own.some((o) => Math.abs(o.pos.x) < Math.abs(u.pos.x));
@@ -216,7 +220,7 @@ export class World {
     if (!c || u.dead) return 'busy';
     if (this.isBusy(u)) return 'busy';
     const st = c.abilities[slot];
-    const def = kitOf(u).abilities[slot];
+    const def = abilitiesOf(u)[slot];
     if (def.aim.shape === 'dash' && this.isRooted(u)) return 'rooted';
     if (st.rank === 0) return 'rank';
     if (def.recast && this.tick < st.recastUntil) return null;
@@ -235,9 +239,9 @@ export class World {
     if (blocker) return;
     const c = u.champ!;
     const st = c.abilities[slot];
-    const targeted = kitOf(u).abilities[slot].target;
+    const targeted = abilitiesOf(u)[slot].target;
     if (targeted && !(this.tick < st.recastUntil) && !targeted(this, u, at)) return; // nothing to click on
-    const def = kitOf(u).abilities[slot];
+    const def = abilitiesOf(u)[slot];
     const recast = !!def.recast && this.tick < st.recastUntil;
     let paid = 0;
     if (recast) {
@@ -272,7 +276,7 @@ export class World {
   }
 
   private resolveCast(ctx: CastCtx, slot: Slot) {
-    const def = kitOf(ctx.self).abilities[slot];
+    const def = abilitiesOf(ctx.self)[slot];
     if (ctx.recast) def.recast!(ctx);
     else def.cast(ctx);
   }
@@ -315,7 +319,7 @@ export class World {
     const c = u.champ;
     if (!c || c.skillPoints <= 0) return false;
     const rank = c.abilities[slot].rank;
-    if (rank >= kitOf(u).abilities[slot].maxRank) return false;
+    if (rank >= abilitiesOf(u)[slot].maxRank) return false;
     if (slot === 3) return rank < (c.level >= 11 ? 2 : c.level >= 6 ? 1 : 0);
     return rank < Math.ceil(c.level / 2);
   }
@@ -474,13 +478,18 @@ export class World {
     return ticks(u.attackInterval / (1 + bonus));
   }
 
-  /** Enemies of `team` (minions and champions) overlapping a circle. */
+  /** A unit area abilities can hit: a minion, a champion, or a pet that's in the fight. */
+  private fighter(u: Unit, team: Team) {
+    return !u.dead && u.team !== team && (u.kind === 'minion' || u.kind === 'champion' || (u.kind === 'pet' && this.isTargetable(u)));
+  }
+
+  /** Enemies of `team` (minions, champions and pets) overlapping a circle. */
   enemiesInCircle(team: Team, c: Vec2, r: number) {
-    return this.units.filter((u) => !u.dead && u.team !== team && (u.kind === 'minion' || u.kind === 'champion') && dist(u.pos, c) <= r + u.radius);
+    return this.units.filter((u) => this.fighter(u, team) && dist(u.pos, c) <= r + u.radius);
   }
 
   enemiesInCone(team: Team, origin: Vec2, dir: number, radius: number, angle: number) {
-    return this.units.filter((u) => !u.dead && u.team !== team && (u.kind === 'minion' || u.kind === 'champion') && inCone(origin, dir, radius, angle, u.pos, u.radius));
+    return this.units.filter((u) => this.fighter(u, team) && inCone(origin, dir, radius, angle, u.pos, u.radius));
   }
 
   /** Teleport up to `max` toward `to`, staying out of walls and structures. */
@@ -537,7 +546,7 @@ export class World {
     this.missiles.push({
       id: this.nextId++, team: src.team, sourceId: src.id, style: o.style, pos: { ...(o.from ?? src.pos) }, speed: o.speed, targetId: null,
       dir: o.dir, range: o.range, travelled: 0, width: o.width, pierce: !!o.pierce,
-      canHit: o.canHit ?? ((u) => u.kind === 'minion' || u.kind === 'champion'), hit: [], onHit: o.onHit, onEnd: o.onEnd, frozenBy: null,
+      canHit: o.canHit ?? ((u) => u.kind === 'minion' || u.kind === 'champion' || u.kind === 'pet'), hit: [], onHit: o.onHit, onEnd: o.onEnd, frozenBy: null,
     });
   }
 
@@ -576,6 +585,14 @@ export class World {
     return m;
   }
 
+  /** A champion's companion unit (Pip's Thistle). It has no brain of its own: the owner's kit moves it. */
+  spawnPet(owner: Unit, s: BaseStats, mounted: boolean): Unit {
+    const p = this.spawn('pet', owner.team, owner.pos, s);
+    p.pet = { ownerId: owner.id, mounted, panicUntil: 0 };
+    p.facing = owner.facing;
+    return p;
+  }
+
   // ---------- target selection ----------
 
   private nearest(from: Unit, within: number, pred: (u: Unit) => boolean) {
@@ -589,13 +606,14 @@ export class World {
     return best;
   }
 
-  /** Keep the current target while it stays valid and close; otherwise minion > structure > champion. */
+  /** Keep the current target while it stays valid and close; otherwise minion > structure > pet > champion. */
   private minionBrain(m: Unit) {
     const cur = this.get(m.attackTarget);
     if (!this.canAttack(m, cur) || gap(m, cur) > MINION_AGGRO + 2) {
       const t =
         this.nearest(m, MINION_AGGRO, (u) => u.kind === 'minion') ??
         this.nearest(m, MINION_AGGRO, (u) => u.kind === 'tower' || u.kind === 'nexus') ??
+        this.nearest(m, MINION_AGGRO, (u) => u.kind === 'pet') ??
         this.nearest(m, MINION_AGGRO, (u) => u.kind === 'champion');
       m.attackTarget = t?.id ?? null;
       if (!t) m.windup = 0;
@@ -604,18 +622,24 @@ export class World {
     m.moveTarget = m.attackTarget == null ? { x: sideX(enemyOf(m.team), LANE.nexusX), y: m.laneY } : null;
   }
 
-  /** Keep the current target while in range; otherwise nearest minion, then nearest champion. */
+  /** Keep the current target while in range; otherwise nearest minion, then pet, then champion. */
   private towerBrain(t: Unit) {
     const cur = this.get(t.attackTarget);
     if (this.canAttack(t, cur) && gap(t, cur) <= t.range) return;
-    const next = this.nearest(t, t.range, (u) => u.kind === 'minion') ?? this.nearest(t, t.range, (u) => u.kind === 'champion');
+    const next =
+      this.nearest(t, t.range, (u) => u.kind === 'minion') ??
+      this.nearest(t, t.range, (u) => u.kind === 'pet') ??
+      this.nearest(t, t.range, (u) => u.kind === 'champion');
     t.attackTarget = next?.id ?? null;
     t.windup = 0;
   }
 
   /** An idle champion attacks whatever wanders into range, preferring minions (so it doesn't pull tower aggro by accident). */
   private autoAcquire(c: Unit) {
-    const t = this.nearest(c, c.range, (u) => u.kind === 'minion') ?? this.nearest(c, c.range, (u) => u.kind === 'champion');
+    const t =
+      this.nearest(c, c.range, (u) => u.kind === 'minion') ??
+      this.nearest(c, c.range, (u) => u.kind === 'pet') ??
+      this.nearest(c, c.range, (u) => u.kind === 'champion');
     if (t) c.attackTarget = t.id;
   }
 
@@ -741,6 +765,7 @@ export class World {
   /** Apply damage (after augment and rule multipliers) and fire kit and augment hooks. Returns damage dealt. */
   dealDamage(src: Unit | null, target: Unit, amount: number, from: DamageSource = {}): number {
     if (target.dead || amount <= 0) return 0;
+    if (target.pet && !target.pet.mounted && !this.isTargetable(target)) return 0; // a broken pet is out of the fight
     if (src?.kind === 'minion') amount *= hiveMinionMult(this, src);
     if (src?.champ) {
       amount *= 1 + src.champ.mods.dmgAmp;
@@ -749,10 +774,10 @@ export class World {
     }
     if (target.champ) {
       amount *= target.champ.mods.takenMult;
-      const guard = target.statuses.reduce((g, st) => (st.kind === 'guard' && st.until > this.tick ? Math.max(g, st.value) : g), 0);
-      amount *= 1 - guard;
       if (src?.kind === 'tower') amount *= target.champ.mods.towerTakenMult;
     }
+    const guard = target.statuses.reduce((g, st) => (st.kind === 'guard' && st.until > this.tick ? Math.max(g, st.value) : g), 0);
+    amount *= 1 - guard;
     const shield = target.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);
     const effective = Math.min(amount, Math.max(0, target.hp) + shield);
     this.hits.push({
@@ -761,8 +786,11 @@ export class World {
       amount, effective, attack: !!from.attack, proc: !!from.proc, slot: from.slot,
     });
     if (target.champ) {
-      const cat = !src?.champ ? '' : from.attack ? 'attack' : from.slot != null ? `slot${from.slot}` : 'effect';
-      const key = `${target.id}|${src?.champ ? `c${src.id}` : src?.kind ?? 'none'}|${cat}`;
+      // A pet's damage is its owner's, filed under 'pet'.
+      const owner = src?.pet ? this.get(src.pet.ownerId) : undefined;
+      const cat = owner ? 'pet' : !src?.champ ? '' : from.attack ? 'attack' : from.slot != null ? `slot${from.slot}` : 'effect';
+      const by = owner ?? src;
+      const key = `${target.id}|${by?.champ ? `c${by.id}` : by?.kind ?? 'none'}|${cat}`;
       this.damageTotals.set(key, (this.damageTotals.get(key) ?? 0) + effective);
     }
     // Shields soak damage first (oldest first); an emptied shield expires this tick.
@@ -773,6 +801,7 @@ export class World {
       amount -= take;
       if (sh.value <= 0) sh.until = this.tick;
     }
+    if (target.champ && amount > 0) amount = kitOf(target).soak?.(this, target, amount) ?? amount;
     target.hp -= amount;
     target.lastHurtTick = this.tick;
     if (src?.kind === 'champion' && target.kind === 'champion') this.callForHelp(src, target);
@@ -818,13 +847,22 @@ export class World {
   }
 
   private kill(u: Unit, killer: Unit | null) {
+    if (u.pet) {
+      // Pets don't die: their owner's kit decides (Thistle panics and flees).
+      u.hp = 0;
+      const owner = this.get(u.pet.ownerId);
+      if (owner?.champ) kitOf(owner).onPetDown?.(this, owner, u);
+      return;
+    }
     u.hp = 0;
     u.dead = true;
     u.attackTarget = null;
     u.moveTarget = null;
     u.windup = 0;
     const { xpMult, goldMult } = this.rules;
-    let byChampion = killer?.champ && killer.team !== u.team ? killer : null;
+    // A pet's kills are its owner's (gold, CS, XP).
+    const credited = killer?.pet ? this.get(killer.pet.ownerId) ?? null : killer;
+    let byChampion = credited?.champ && credited.team !== u.team ? credited : null;
     // A minion no champion finished off can still be claimed (Mabel's Pollinated: stung or honeyed).
     if (!byChampion && u.kind === 'minion') {
       byChampion = this.champions().find((c) => !c.dead && c.team !== u.team && kitOf(c).claimsMinion?.(this, c, u)) ?? null;
@@ -832,7 +870,7 @@ export class World {
     u.statuses = [];
     if (byChampion) {
       byChampion.gold += Math.round(
-        (u.kind === 'champion' ? CHAMPION_BOUNTY : u.kind === 'minion' ? MINIONS[u.role!].bounty * goldMult : STRUCTURES[u.kind].bounty),
+        (u.kind === 'champion' ? CHAMPION_BOUNTY : u.kind === 'minion' ? MINIONS[u.role!].bounty * goldMult : u.kind === 'pet' ? 0 : STRUCTURES[u.kind].bounty),
       );
       if (u.kind === 'minion') byChampion.champ!.cs++;
       kitOf(byChampion).onKill?.(this, byChampion, u);
@@ -942,7 +980,7 @@ export class World {
    */
   private steer(u: Unit, dir: Vec2): Vec2 {
     for (const s of this.units) {
-      if (s === u || s.dead || (s.speed > 0 && s.moveTarget && s.windup === 0 && !this.isBusy(s))) continue;
+      if (s === u || s.dead || s.pet?.mounted || (s.speed > 0 && s.moveTarget && s.windup === 0 && !this.isBusy(s))) continue;
       const ox = s.pos.x - u.pos.x;
       const oy = s.pos.y - u.pos.y;
       const d = Math.hypot(ox, oy);
@@ -975,7 +1013,7 @@ export class World {
 
   /** Soft circle separation between mobile units so waves spread out instead of stacking. Dashing units pass through. */
   private separate() {
-    const mobile = this.units.filter((u) => !u.dead && u.speed > 0 && !u.champ?.dash);
+    const mobile = this.units.filter((u) => !u.dead && u.speed > 0 && !u.champ?.dash && !u.pet?.mounted);
     for (let i = 0; i < mobile.length; i++) {
       for (let j = i + 1; j < mobile.length; j++) {
         const a = mobile[i];

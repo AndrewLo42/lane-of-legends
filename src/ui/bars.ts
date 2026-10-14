@@ -3,7 +3,7 @@ import type { Unit } from '../sim/types';
 import type { World } from '../sim/world';
 import { BAR_HEIGHT, type WorldView } from '../render/views';
 
-const WIDTH: Record<Unit['kind'], number> = { champion: 74, minion: 34, tower: 96, nexus: 120 };
+const WIDTH: Record<Unit['kind'], number> = { champion: 74, minion: 34, tower: 96, nexus: 120, pet: 56 };
 
 interface Bar {
   el: HTMLDivElement;
@@ -34,11 +34,13 @@ export class HealthBars {
       let bar = this.bars.get(u.id);
       if (!bar) bar = this.create(u);
 
-      this.v.set(pos.x, BAR_HEIGHT[u.kind], pos.z).project(camera);
+      // A ridden pet's bar tucks under its rider's; a broken (fleeing) pet shows none.
+      const mounted = !!u.pet?.mounted;
+      this.v.set(pos.x, mounted ? BAR_HEIGHT.champion : BAR_HEIGHT[u.kind], pos.z).project(camera);
       const x = (this.v.x * 0.5 + 0.5) * innerWidth;
-      const y = (-this.v.y * 0.5 + 0.5) * innerHeight;
+      const y = (-this.v.y * 0.5 + 0.5) * innerHeight + (mounted ? 22 : 0);
       bar.el.style.transform = `translate(${x - WIDTH[u.kind] / 2}px, ${y}px)`;
-      bar.el.style.display = this.v.z > 1 ? 'none' : '';
+      bar.el.style.display = this.v.z > 1 || (u.pet && !mounted && !this.world.isTargetable(u)) ? 'none' : '';
       // Shields show as a white segment after the health. If health plus shield would overflow the
       // bar, the whole bar rescales to fit both (as in League), so a full-health shield still shows.
       const shield = u.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);
@@ -72,7 +74,7 @@ export class HealthBars {
 
   private create(u: Unit) {
     const el = document.createElement('div');
-    const side = u.id === this.meId ? 'me' : u.team === this.myTeam ? 'ally' : 'enemy';
+    const side = u.id === this.meId || u.pet?.ownerId === this.meId ? 'me' : u.team === this.myTeam ? 'ally' : 'enemy';
     el.className = `hb ${u.kind} ${side}`;
     el.style.width = `${WIDTH[u.kind]}px`;
     const fill = document.createElement('div');

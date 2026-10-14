@@ -6,6 +6,8 @@ import { MABEL_TUNING } from './kits/mabel';
 import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
 import { GORMUND_TUNING, fury } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
+import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
+import { abilitiesOf } from './kits';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
 import { World, xpToNext } from './world';
@@ -951,14 +953,14 @@ describe('experimental champions', () => {
     const models = Object.keys(import.meta.glob('../../public/assets/meshy/*.glb'));
     expect(models.length).toBeGreaterThan(0);
     for (const kit of Object.values(KITS)) {
-      const model = models.some((m) => m.endsWith(`/${kit.name}.glb`));
+      const model = models.some((m) => m.toLowerCase().endsWith(`/${kit.id}.glb`)); // Arlo.glb, Pip.glb (Pip & Thistle)
       expect({ kit: kit.id, experimental: !!kit.experimental }).toEqual({ kit: kit.id, experimental: !model });
     }
   });
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable'], ['pip', 'arlo'], ['gormund', 'pip']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });
@@ -972,3 +974,187 @@ describe('bots', () => {
     });
   }
 });
+
+describe('Pip & Thistle', () => {
+  /** Pip riding Thistle in mid-lane (Thistle arrives on the first tick). */
+  function pip(rank = 1) {
+    const s = setup('pip', rank);
+    s.w.step();
+    const toad = thistleOf(s.w, s.me)!;
+    return { ...s, toad };
+  }
+
+  it('starts riding Thistle: melee, Thistle untargetable under him, the riding abilities', () => {
+    const { w, me, toad } = pip();
+    expect(riding(me)).toBe(true);
+    expect(toad.kind).toBe('pet');
+    expect(w.isTargetable(toad)).toBe(false);
+    expect(me.projectileSpeed).toBe(0);
+    expect(abilitiesOf(me)[0].name).toBe('Gulp');
+    run(w, 1);
+    expect(toad.pos).toEqual(me.pos);
+  });
+
+  it("riding, damage hits Thistle first; when he breaks he panics, throws Pip off and the rest carries over", () => {
+    const { w, me, toad } = pip();
+    const enemy = dummy(w, 30);
+    const { soak } = PIP_TUNING.THISTLE;
+    w.dealDamage(enemy, me, 100);
+    expect(me.hp).toBe(me.maxHp);
+    near(toad.maxHp - toad.hp, 100 * soak, 1); // thick-skinned: he takes less of it
+    const overflow = 50;
+    w.dealDamage(enemy, me, toad.hp / soak + overflow);
+    expect(riding(me)).toBe(false);
+    expect(panicking(w, toad)).toBe(true);
+    expect(w.status(me, 'haste')).toBeUndefined(); // thrown off, not hopping off: no speed
+    expect(w.isTargetable(toad)).toBe(false);
+    near(me.maxHp - me.hp, overflow, 1);
+    expect(abilitiesOf(me)[0].name).toBe('Pebble Burst');
+    // Saddle Up and Puff Up wait until he calms down (once Pip has landed from his tumble).
+    run(w, 0.5);
+    expect(w.castBlocker(me, 2)).toBe('unavailable');
+    expect(w.castBlocker(me, 1)).toBe('unavailable');
+    run(w, PIP_TUNING.THISTLE.panic + 0.5);
+    expect(panicking(w, toad)).toBe(false);
+    // Back with at least half health (he fled to the fountain, which tops him up from there).
+    expect(toad.hp).toBeGreaterThanOrEqual(toad.maxHp * PIP_TUNING.THISTLE.comeBack - 1);
+  });
+
+  it('Hop Off and Saddle Up switch forms, and each form keeps its own Q and W cooldowns', () => {
+    const { w, me, toad, cast } = pip();
+    me.champ!.abilities[2].rank = 1;
+    cast(0, 5); // Gulp on cooldown
+    const gulpReady = me.champ!.abilities[0].readyAt;
+    expect(gulpReady).toBeGreaterThan(w.tick);
+    cast(2, -3); // Hop Off
+    run(w, 0.5);
+    expect(riding(me)).toBe(false);
+    expect(w.status(me, 'haste')?.value).toBe(PIP_TUNING.SWAP.haste); // a willing dismount: quicker on his feet
+    expect(me.projectileSpeed).toBeGreaterThan(0);
+    expect(w.isTargetable(toad)).toBe(true);
+    expect(me.champ!.abilities[0].readyAt).toBeLessThanOrEqual(w.tick); // Pebble Burst is ready
+    me.champ!.abilities[2].readyAt = 0;
+    cast(2, me.pos.x);
+    run(w, 1);
+    expect(riding(me)).toBe(true);
+    expect(me.champ!.abilities[0].readyAt).toBe(gulpReady); // Gulp's cooldown came back with him
+  });
+
+  it('on foot, Thistle bites what Pip attacks, and minions and towers go for him before Pip', () => {
+    const { w, me, toad, cast } = pip();
+    cast(2, -3);
+    run(w, 0.5);
+    const m = w.spawnMinion('red', 'melee', { x: me.pos.x + 3, y: 0 });
+    m.damage = 0;
+    me.range = 5;
+    w.step();
+    // Pip auto-acquires the minion; Thistle joins in.
+    run(w, 1);
+    expect(toad.attackTarget).toBe(m.id);
+    // A fresh enemy minion picks Thistle over Pip.
+    const m2 = w.spawnMinion('red', 'melee', { x: toad.pos.x + 2, y: toad.pos.y });
+    w.units.filter((u) => u.kind === 'minion' && u.team === 'blue').forEach((u) => (u.dead = true));
+    w.step();
+    expect(m2.attackTarget).toBe(toad.id);
+  });
+
+  it("Thistle's kills are Pip's, and Gulp swallows a minion it finishes", () => {
+    const { w, me, toad, cast, ctl } = pip();
+    const m = w.spawnMinion('red', 'melee', { x: 3, y: 0 });
+    m.hp = 20;
+    toad.hp = toad.maxHp * 0.5;
+    const before = toad.hp;
+    cast(0, 3);
+    run(w, 0.5);
+    expect(me.champ!.cs).toBe(1);
+    expect(toad.hp).toBeGreaterThan(before);
+    // On foot: Thistle's last hit counts for Pip.
+    cast(2, -3);
+    run(w, 0.5);
+    const m2 = w.spawnMinion('red', 'caster', { x: toad.pos.x + 1.5, y: toad.pos.y });
+    m2.hp = 1;
+    m2.damage = 0;
+    // Pip attacks it for nothing (so the last hit is Thistle's), and Thistle joins in.
+    me.range = 5;
+    me.damage = 0;
+    ctl.queue.push({ type: 'attack', target: m2.id });
+    run(w, 2);
+    expect(m2.dead || !w.units.includes(m2)).toBe(true);
+    expect(me.champ!.cs).toBe(2);
+  });
+
+  it('Puff Up guards Thistle and slows enemies near him; skillshots stop on him', () => {
+    const { w, me, toad, cast } = pip();
+    cast(2, -3);
+    run(w, 0.5);
+    const foe = dummy(w, me.pos.x + 6);
+    toad.hp = toad.maxHp * 0.5;
+    toad.lastHurtTick = w.tick + 1e6; // keep his out-of-combat regeneration out of it
+    const hurt = toad.hp;
+    cast(1, me.pos.x + 3);
+    run(w, 0.5);
+    expect(w.status(toad, 'guard')).toBeTruthy();
+    run(w, 3);
+    near(toad.hp - hurt, PIP_TUNING.PUFF.heal + toad.maxHp * PIP_TUNING.PUFF.healPct, 2); // healed a little over the puff
+    const nearFoe = dist2(toad.pos, foe.pos) <= PIP_TUNING.PUFF.radius + foe.radius;
+    if (nearFoe) expect(w.status(foe, 'slow')).toBeTruthy();
+    // An enemy skillshot at Pip through Thistle stops on Thistle.
+    const hitIds: number[] = [];
+    toad.pos = { x: me.pos.x + 2, y: me.pos.y };
+    w.fireLine(foe, { style: 'auto', dir: { x: -1, y: 0 }, speed: 30, range: 12, width: 0.5, from: { x: me.pos.x + 5, y: me.pos.y }, onHit: (t) => { hitIds.push(t.id); } });
+    run(w, 0.5);
+    expect(hitIds).toEqual([toad.id]);
+  });
+
+  it('Big Leap knocks up everything where it lands, riding or with Thistle alone', () => {
+    const { w, me, toad, cast, ctl } = pip();
+    const foe = dummy(w, 5);
+    cast(3, 5);
+    run(w, 1.2);
+    expect(lost(foe)).toBeGreaterThan(100);
+    expect(w.isStunned(foe)).toBe(true);
+    near(me.pos.x, 5, 2.5); // Pip rode along
+
+    // On foot, Thistle jumps alone and Pip stays put.
+    run(w, 2);
+    cast(2, -3);
+    ctl.queue.push({ type: 'stop' }); // (he'd otherwise go back to chasing the dummy he was hitting)
+    run(w, 0.5);
+    const pipAt = { ...me.pos };
+    me.champ!.abilities[3].readyAt = 0;
+    const before = lost(foe);
+    cast(3, foe.pos.x);
+    run(w, 1.2);
+    expect(lost(foe)).toBeGreaterThan(before + 100);
+    expect(w.isStunned(foe)).toBe(true);
+    // Thistle went; Pip didn't (he only drifts a little as units nudge apart).
+    near(toad.pos.x, foe.pos.x, 2.5);
+    expect(Math.abs(me.pos.x - pipAt.x)).toBeLessThan(2);
+    expect(Math.abs(me.pos.x - foe.pos.x)).toBeGreaterThan(Math.abs(toad.pos.x - foe.pos.x) + 1);
+  });
+
+  it('Thistle regenerates out of combat', () => {
+    const { w, toad } = pip();
+    toad.hp = toad.maxHp * 0.5;
+    toad.lastHurtTick = w.tick;
+    run(w, PIP_TUNING.THISTLE.calm - 0.5);
+    near(toad.hp, toad.maxHp * 0.5, 1); // still catching his breath
+    run(w, 2);
+    expect(toad.hp).toBeGreaterThan(toad.maxHp * 0.5 + toad.maxHp * PIP_TUNING.THISTLE.regen);
+  });
+
+  it("only Pip's death counts, and both come back fresh", () => {
+    const { w, me, toad } = pip();
+    const enemy = dummy(w, 30);
+    w.dealDamage(enemy, me, toad.hp / PIP_TUNING.THISTLE.soak + me.hp + 10);
+    expect(me.dead).toBe(true);
+    expect(enemy.champ!.kills).toBe(1);
+    run(w, 30);
+    expect(me.dead).toBe(false);
+    w.step();
+    expect(riding(me)).toBe(true);
+    expect(toad.hp).toBe(toad.maxHp);
+  });
+});
+
+const dist2 = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
