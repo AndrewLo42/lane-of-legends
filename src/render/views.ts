@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
 import { leapOf } from '../sim/kits/gerrit';
+import { radiant, sunrise } from '../sim/kits/lumen';
 import { panicking, riding, thistleOf } from '../sim/kits/pip';
 import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
@@ -22,7 +23,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'pet') return { name: 'pet_thistle', height: THISTLE_HEIGHT };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7, lumen: 2.4 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -76,6 +77,9 @@ interface UnitView {
   lastCastSeen?: number;
   /** Seconds since a champion died (null while alive). */
   deadFor?: number | null;
+  /** Lumen: her halo (brighter while Radiant) and the burning sun of Sunrise. */
+  halo?: THREE.Mesh;
+  sun?: THREE.Group;
   /** Thistle's code-driven hop: cycle phase, this frame's lift and squash, and an attack lunge timer. */
   hop?: { phase: number; lift: number; squash: number; lunge: number };
 }
@@ -283,6 +287,7 @@ export class WorldView {
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
       if (u.kind === 'pet') this.hopVisuals(u, v, dt);
+      if (u.champ?.kit === 'lumen') this.lumenVisuals(u, v);
       if (u.champ?.kit === 'gerrit' && !u.dead) {
         // Fallen Standards: the leap arcs through the air.
         const leap = leapOf(u);
@@ -565,6 +570,36 @@ export class WorldView {
         const b = caster.obj.position;
         v.tether.geometry.setFromPoints([new THREE.Vector3(a.x, 1.1, a.z), new THREE.Vector3(b.x, 1.1, b.z)]);
       }
+    }
+  }
+
+  /** Lumen's halo over her head (it blazes while she's Radiant) and the burning sun around her during Sunrise. */
+  private lumenVisuals(u: Unit, v: UnitView) {
+    if (!v.halo) {
+      v.halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 8, 28), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.8 }));
+      v.halo.rotation.x = Math.PI / 2;
+      v.halo.position.y = (CHAMP_HEIGHT.lumen ?? 2.5) + 0.25;
+      v.obj.add(v.halo);
+    }
+    const blaze = radiant(u);
+    const halo = v.halo.material as THREE.MeshBasicMaterial;
+    halo.color.set(blaze ? 0xffffff : 0xffe08a);
+    v.halo.scale.setScalar(blaze ? 1.25 + Math.sin(performance.now() / 150) * 0.08 : 1);
+    v.halo.visible = !u.dead;
+    const on = !u.dead && sunrise(this.world, u);
+    if (on && !v.sun) {
+      v.sun = new THREE.Group();
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(3, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffb53a, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
+      ball.position.y = 1.2;
+      const rim = new THREE.Mesh(new THREE.RingGeometry(2.85, 3, 48), new THREE.MeshBasicMaterial({ color: 0xffd46a, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+      rim.rotation.x = -Math.PI / 2;
+      rim.position.y = 0.06;
+      v.sun.add(ball, rim);
+      v.obj.add(v.sun);
+    }
+    if (v.sun) {
+      v.sun.visible = on;
+      if (on) v.sun.scale.setScalar(1 + Math.sin(performance.now() / 120) * 0.03);
     }
   }
 

@@ -8,6 +8,7 @@ import { GORMUND_TUNING, fury } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, leapOf, standardsOf } from './kits/gerrit';
+import { LUMEN_TUNING, devotion, lumenHeal, radiant, sunrise } from './kits/lumen';
 import { abilitiesOf } from './kits';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
@@ -1327,5 +1328,102 @@ describe('Gerrit', () => {
     run(w, 0.3);
     expect(me.champ!.abilities[3].readyAt).toBe(0);
     near(me.pos.x, 0, 0.1);
+  });
+});
+
+describe('Lumen', () => {
+  const { DEVOTION, GLOW, RADIANT, R } = LUMEN_TUNING;
+  const setDevotion = (u: Unit, n: number) => ((u.champ!.data as { devotion?: number }).devotion = n);
+
+  it('Candleflame heals her for part of the hit and fills Devotion', () => {
+    const { w, me, cast } = setup('lumen');
+    me.hp = me.maxHp * 0.5;
+    const foe = dummy(w, 4);
+    const before = me.hp;
+    cast(0, 4);
+    run(w, 0.6);
+    expect(lost(foe)).toBeGreaterThan(80);
+    expect(me.hp).toBeGreaterThan(before + 20);
+    expect(devotion(me)).toBeGreaterThan(0);
+  });
+
+  it('caps her healing: past a few percent of her health a second, healing becomes Devotion instead', () => {
+    const { w, me } = setup('lumen');
+    me.hp = me.maxHp * 0.2;
+    const before = me.hp;
+    lumenHeal(w, me, me.maxHp); // a huge heal at once
+    near(me.hp - before, me.maxHp * DEVOTION.capPerSec, 1);
+    expect(devotion(me)).toBeGreaterThan(50);
+  });
+
+  it('Afterglow: healing past full health becomes a shield, up to a cap', () => {
+    const { w, me } = setup('lumen');
+    for (let i = 0; i < 40; i++) {
+      lumenHeal(w, me, me.maxHp * 0.03);
+      w.step();
+    }
+    const shield = me.statuses.filter((st) => st.kind === 'shield').reduce((t, st) => t + st.value, 0);
+    expect(shield).toBeGreaterThan(0);
+    expect(shield).toBeLessThanOrEqual(me.maxHp * GLOW.cap + 0.01);
+  });
+
+  it('at full Devotion she is Radiant: more damage and a little speed', () => {
+    const { w, me } = setup('lumen');
+    const foe = dummy(w, 3);
+    w.dealDamage(me, foe, 100);
+    const plain = lost(foe);
+    setDevotion(me, DEVOTION.max);
+    w.step();
+    expect(radiant(me)).toBe(true);
+    expect(w.status(me, 'haste')?.value).toBe(RADIANT.haste);
+    const before = lost(foe);
+    w.dealDamage(me, foe, 100);
+    near(lost(foe) - before, plain * (1 + RADIANT.damage), 3);
+  });
+
+  it('Sanctuary heals her inside and burns and slows enemies in it', () => {
+    const { w, me, cast } = setup('lumen');
+    me.hp = me.maxHp * 0.5;
+    const foe = dummy(w, 1);
+    const before = me.hp;
+    cast(1, 0.5);
+    run(w, 1.5);
+    expect(me.hp).toBeGreaterThan(before + 20);
+    expect(lost(foe)).toBeGreaterThan(20);
+    expect(w.status(foe, 'slow')).toBeTruthy();
+  });
+
+  it('Warm Embrace shields her and burns whoever she dashes through', () => {
+    const { w, me, cast } = setup('lumen');
+    const foe = dummy(w, 2);
+    cast(2, 4);
+    expect(me.statuses.some((st) => st.kind === 'shield')).toBe(true);
+    run(w, 0.5);
+    expect(foe.statuses.some((st) => st.kind === 'burn')).toBe(true);
+    run(w, 2);
+    expect(lost(foe)).toBeGreaterThan(40);
+  });
+
+  it(`Sunrise needs ${50} Devotion, spends it all, and lasts longer the more she had`, () => {
+    const { w, me, cast } = setup('lumen');
+    const foe = dummy(w, 2);
+    setDevotion(me, DEVOTION.sunrise - 1);
+    expect(w.castBlocker(me, 3)).toBe('unavailable');
+    setDevotion(me, DEVOTION.max);
+    cast(3, 0);
+    run(w, 0.3);
+    expect(sunrise(w, me)).toBe(true);
+    expect(devotion(me)).toBeLessThan(5);
+    run(w, R.base + R.bonus - 0.6);
+    expect(sunrise(w, me)).toBe(true); // a full meter: the longest sun
+    run(w, 0.6);
+    expect(sunrise(w, me)).toBe(false);
+    expect(lost(foe)).toBeGreaterThan(200);
+    // From the minimum, it's the shortest.
+    me.champ!.abilities[3].readyAt = 0;
+    setDevotion(me, DEVOTION.sunrise);
+    cast(3, 0);
+    run(w, R.base + 0.3);
+    expect(sunrise(w, me)).toBe(false);
   });
 });

@@ -153,6 +153,25 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
+  if (u.champ!.kit === 'lumen') {
+    // Lumen: a candle-saint in long cream robes with a team-coloured stole, a soft face, and a lit candle in her hands.
+    const cloth = new THREE.MeshStandardMaterial({ color: 0xf1e6cf, roughness: 0.85, flatShading: true });
+    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.8, 10), cloth);
+    robe.position.y = 0.9;
+    const stole = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.5), teamMat);
+    stole.position.set(0.22, 1.1, 0);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf0d2b6 }));
+    head.position.y = 2.0;
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), cloth);
+    hood.position.y = 2.03;
+    hood.rotation.z = 0.3;
+    const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.32, 8), new THREE.MeshStandardMaterial({ color: 0xfff6e0 }));
+    wax.position.set(0.45, 1.25, 0);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0xffa020, emissiveIntensity: 2 }));
+    flame.position.set(0.45, 1.5, 0);
+    g.add(robe, stole, head, hood, wax, flame);
+    return g;
+  }
   if (u.champ!.kit === 'gerrit') {
     // Gerrit: a broad old knight in dented plate with a team-coloured tabard, a helm with a plume, and a halberd.
     const plate = new THREE.MeshStandardMaterial({ color: 0x8d8f94, metalness: 0.65, roughness: 0.4, flatShading: true });

@@ -239,6 +239,24 @@ export class EffectsView {
         hold.position.y = 0.03;
         g.add(hold);
       }
+    } else if (z.kind === 'sanctuary') {
+      // Lumen's Sanctuary: a soft gold floor with a bright rim, a slowly turning rune, and pillars of light.
+      const floor = ringShape(z.radius, z.radius, mat(0xffe6a0, 0.18));
+      floor.position.y = 0.03;
+      const rim = ringShape(z.radius, 0.14, mat(0xffd46a, 0.85));
+      rim.position.y = 0.04;
+      const hand = new THREE.Group();
+      hand.name = 'hand';
+      hand.position.y = 0.05;
+      const rune = flat(new THREE.Mesh(new THREE.RingGeometry(z.radius * 0.55, z.radius * 0.62, 6), mat(0xfff1c2, 0.6)));
+      hand.add(rune);
+      g.add(floor, rim, hand);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 1.6, 6, 1, true), mat(0xffe39a, 0.35));
+        pillar.position.set(Math.cos(a) * z.radius * 0.9, 0.8, Math.sin(a) * z.radius * 0.9);
+        g.add(pillar);
+      }
     } else if (z.kind === 'honey') {
       // A glossy amber puddle with a few darker drips.
       const puddle = ringShape(z.radius, z.radius, mat(0xf2a516, 0.55));

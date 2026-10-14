@@ -100,6 +100,8 @@ export interface Kit {
   attackRangeBonus?: (world: World, self: Unit, target: Unit) => number;
   /** Multiplier on all damage we deal right now (Gormund's Fury). */
   damageMult?: (world: World, self: Unit, target: Unit) => number;
+  /** A second meter the HUD shows under the mana bar (Lumen's Devotion). */
+  meter?: { label: string; max: number; value: (self: Unit) => number };
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */
