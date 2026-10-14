@@ -3,7 +3,7 @@ import { FLOORS, cantBuy, runSummoners, shopStock, validSummoners, type FloorPla
 import { AUGMENTS } from '../sim/augments';
 import { CONSUMABLES, ITEMS, MAX_ITEMS } from '../sim/items';
 import { openHowToPlay } from './howToPlay';
-import { BOT_KIT_IDS, KITS, KIT_IDS } from '../sim/kits';
+import { BOT_KIT_IDS, KITS, KIT_IDS, reachOf } from '../sim/kits';
 import type { WinReason } from '../sim/rules';
 import { DEFAULT_SUMMONERS, SUMMONERS, SUMMONER_IDS } from '../sim/summoners';
 import type { AugmentId, KitId, SummonerId, Unit } from '../sim/types';
@@ -67,7 +67,8 @@ const SPELL_KEYS = ['D', 'F'];
 /**
  * Two slots (D, F) over a grid of every spell. Clicking a spell puts it in the highlighted slot and
  * moves the highlight to the other one; picking the spell that's already in the other slot swaps
- * them. Lives inside `host`, re-rendering itself; `onChange` gets each new pair.
+ * them. Lives inside `host`, re-rendering itself; `onChange` gets each new pair. Returns `edit(slot)` to
+ * highlight a slot (and re-measure, for a picker that was hidden while it first drew).
  */
 function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange: (p: SpellPair) => void) {
   let active = 0;
@@ -131,6 +132,13 @@ function spellPicker(host: HTMLElement, pair: SpellPair, sample: Unit, onChange:
     }
   });
   render();
+  return {
+    edit(slot: number) {
+      active = slot;
+      shown = pair[slot];
+      render();
+    },
+  };
 }
 
 // ---------- champion select ----------
@@ -162,67 +170,146 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     /* storage unavailable: start on the first champion */
   }
 
+  /** Champion select's filters: melee/ranged (or all), and a name search. */
+  let reach: 'all' | 'melee' | 'ranged' = 'all';
+  let query = '';
+  /** The right panel's tab, and its hero skill picker. */
+  let tab: 'abilities' | 'skills' = 'abilities';
+  let picker: ReturnType<typeof spellPicker> | null = null;
+  const showTab = (t: typeof tab) => {
+    tab = t;
+    info.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+    info.querySelectorAll<HTMLElement>('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t));
+  };
   const el = show(`
-    <div class="selecthead"><h1>Lane League</h1>
+    <header class="selectbar">
+      <h1>Lane League</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-      <div class="homelinks"><button class="link watch" data-help>❔ How to play</button><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button>
-        <label class="exptoggle" title="Champions without a model yet, as placeholders. Bots never play them."><input type="checkbox" data-experimental${experimental ? ' checked' : ''}> 🧪 Experimental champions</label></div></div>
-    <div class="roster">
-      ${KIT_IDS.map((id) => `
-        <button class="pick${KITS[id].experimental ? ' experimental' : ''}" data-kit="${id}" style="--accent:${KITS[id].color}"
-          title="${KITS[id].name}${KITS[id].experimental ? ' (experimental: no model yet, bots never pick them)' : ''}">
-          <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
-        </button>`).join('')}
+      <nav class="homelinks"><button class="link watch" data-help>❔ How to play</button><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button></nav>
+    </header>
+    <div class="selectmain">
+      <aside class="rosterpanel">
+        <div class="filters">
+          <button class="chip on" data-reach="all">All</button><button class="chip" data-reach="melee">Melee</button><button class="chip" data-reach="ranged">Ranged</button>
+          <button class="chip exp${experimental ? ' on' : ''}" data-experimental title="Experimental champions: no model yet, they play as placeholders. Bots never play them.">🧪</button>
+        </div>
+        <input class="search" type="search" placeholder="Search champions" autocomplete="off" spellcheck="false">
+        <div class="roster">
+          ${KIT_IDS.map((id) => `
+            <button class="pick${KITS[id].experimental ? ' experimental' : ''}" data-kit="${id}" style="--accent:${KITS[id].color}"
+              title="${KITS[id].name}, ${KITS[id].title}${KITS[id].experimental ? ' (experimental: no model yet, bots never pick them)' : ''}">
+              <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
+            </button>`).join('')}
+          <p class="none">No champions match.</p>
+        </div>
+      </aside>
+      <div class="stagegap"></div>
+      <section class="champinfo"></section>
     </div>
-    <div class="selectmain"><div class="stagegap"></div><div class="champinfo"></div></div>
-    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}←/→ to browse · Enter to start ·
+    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Arrow keys to browse · Enter to start ·
       Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
   el.classList.add('select');
-  el.classList.toggle('show-experimental', experimental);
   const info = el.querySelector<HTMLElement>('.champinfo')!;
-  const roster = () => KIT_IDS.filter((k) => experimental || !KITS[k].experimental);
+  const search = el.querySelector<HTMLInputElement>('.search')!;
+  /** Who the filters let through, in roster order. */
+  const roster = () =>
+    KIT_IDS.filter((k) => (experimental || !KITS[k].experimental) && (reach === 'all' || reachOf(k) === reach) &&
+      (!query || `${KITS[k].name} ${KITS[k].title}`.toLowerCase().includes(query)));
+  const applyFilters = () => {
+    const shown = new Set(roster());
+    el.querySelectorAll<HTMLElement>('.pick').forEach((b) => (b.hidden = !shown.has(b.dataset.kit as KitId)));
+    el.querySelector<HTMLElement>('.roster .none')!.hidden = shown.size > 0;
+    el.querySelectorAll<HTMLElement>('[data-reach]').forEach((c) => c.classList.toggle('on', c.dataset.reach === reach));
+    el.querySelector('[data-experimental]')!.classList.toggle('on', experimental);
+    if (shown.size && !shown.has(current)) select(roster()[0]);
+  };
+  /** How many portraits a grid row holds (arrow up/down move by a row). */
+  const columns = () => {
+    const picks = [...el.querySelectorAll<HTMLElement>('.pick:not([hidden])')];
+    if (picks.length < 2) return 1;
+    const top = picks[0].offsetTop;
+    const n = picks.findIndex((p) => p.offsetTop !== top);
+    return n < 0 ? picks.length : n;
+  };
 
   const select = (kit: KitId) => {
     current = kit;
     onFocus(kit);
     el.querySelectorAll<HTMLElement>('.pick').forEach((b) => b.classList.toggle('on', b.dataset.kit === kit));
+    el.querySelector<HTMLElement>(`.pick[data-kit="${kit}"]`)?.scrollIntoView({ block: 'nearest' });
     const k = KITS[kit];
     // Ability numbers come from a real level-1 champion in a throwaway world.
     const sample = new World(1).spawnChampion('blue', kit, { think: () => [] });
     const best = meta.best[kit];
+    const row = (a: { icon: string; name: string }, tag: string, text: string) => `<li><i>${a.icon}</i><div><b>${a.name}</b> ${tag}<p>${text}</p></div></li>`;
     info.style.setProperty('--accent', k.color);
     info.innerHTML = `
-      <div class="name">${k.name} <span>${k.title}</span></div>
-      <p class="blurb">${k.blurb}</p>
-      <ul class="abilities">
-        <li><i>${k.passive.icon}</i><div><b>${k.passive.name}</b> <small>Passive</small><p>${k.passive.describe(sample)}</p></div></li>
-        ${k.abilities.map((a, s) => `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`).join('')}
-      </ul>
-      ${k.otherForm ? `<h4>${k.otherForm.label}</h4><ul class="abilities">
-        ${k.otherForm.abilities.map((a, s) => (a === k.abilities[s] ? '' : `<li><i>${a.icon}</i><div><b>${a.name}</b> <kbd>${KEYS[s]}</kbd><p>${a.describe(1, sample)}</p></div></li>`)).join('')}
-      </ul>` : ''}
-      <h4>Hero skills <small>swappable in the shop between floors</small></h4>
-      <div class="spellpick"></div>
-      <div class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</div>
-      <div class="actions"><button class="go" data-start>Start run as ${k.name}</button></div>`;
-    spellPicker(info.querySelector('.spellpick')!, spells, sample, (p) => (spells = p));
+      <div class="infohead">
+        <div class="name">${k.name} <span>${k.title}</span></div>
+        <div class="tags"><span>${reachOf(kit) === 'melee' ? 'Melee' : 'Ranged'}</span>${k.experimental ? '<span class="exp">🧪 Experimental</span>' : ''}<span class="best">${best ? `Best: floor ${best} of ${FLOORS.length}` : 'Not played yet'}</span></div>
+        <p class="blurb">${k.blurb}</p>
+        <div class="tabs"><button class="tab${tab === 'abilities' ? ' on' : ''}" data-tab="abilities">Abilities</button><button class="tab${tab === 'skills' ? ' on' : ''}" data-tab="skills">Hero skills</button></div>
+      </div>
+      <div class="infobody">
+        <div class="tabpane" data-pane="abilities"${tab === 'abilities' ? '' : ' hidden'}>
+          <ul class="abilities">
+            ${row(k.passive, '<small>Passive</small>', k.passive.describe(sample))}
+            ${k.abilities.map((a, s) => row(a, `<kbd>${KEYS[s]}</kbd>`, a.describe(1, sample))).join('')}
+          </ul>
+          ${k.otherForm ? `<h4>${k.otherForm.label}</h4><ul class="abilities">
+            ${k.otherForm.abilities.map((a, s) => (a === k.abilities[s] ? '' : row(a, `<kbd>${KEYS[s]}</kbd>`, a.describe(1, sample)))).join('')}
+          </ul>` : ''}
+        </div>
+        <div class="tabpane" data-pane="skills"${tab === 'skills' ? '' : ' hidden'}>
+          <p class="panehint">Two hero skills on <kbd>D</kbd> and <kbd>F</kbd>, swappable for free in the shop between floors.</p>
+          <div class="spellpick"></div>
+        </div>
+      </div>
+      <div class="actions"><div class="chosen"></div><button class="go" data-start title="Start a run as ${k.name}">Start run</button></div>`;
+    // Your hero skills, always in view by Start: click one to change it (opens the Hero skills tab on that slot).
+    const chosen = () =>
+      (info.querySelector('.chosen')!.innerHTML = spells
+        .map((id, i) => `<button class="skillbtn" data-edit-skill="${i}" title="Change your ${SPELL_KEYS[i]} hero skill"><kbd>${SPELL_KEYS[i]}</kbd><i>${SUMMONERS[id].icon}</i>${SUMMONERS[id].name}</button>`)
+        .join(''));
+    chosen();
+    picker = spellPicker(info.querySelector('.spellpick')!, spells, sample, (p) => {
+      spells = p;
+      chosen();
+    });
   };
+  search.addEventListener('input', () => {
+    query = search.value.trim().toLowerCase();
+    applyFilters();
+  });
 
   const kit = await new Promise<KitId | 'watch' | 'online'>((resolve) => {
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       const pick = t.closest<HTMLElement>('[data-kit]');
       if (pick) select(pick.dataset.kit as KitId);
-      const toggle = t.closest<HTMLInputElement>('[data-experimental]');
-      if (toggle) {
-        experimental = toggle.checked;
-        el.classList.toggle('show-experimental', experimental);
+      const chip = t.closest<HTMLElement>('[data-reach]');
+      if (chip) {
+        reach = chip.dataset.reach as typeof reach;
+        applyFilters();
+      }
+      const tabBtn = t.closest<HTMLElement>('[data-tab]');
+      if (tabBtn) {
+        showTab(tabBtn.dataset.tab as typeof tab);
+        if (tab === 'skills') picker?.edit(0);
+      }
+      const skillBtn = t.closest<HTMLElement>('[data-edit-skill]');
+      if (skillBtn) {
+        showTab('skills');
+        picker?.edit(Number(skillBtn.dataset.editSkill));
+      }
+      if (t.closest('[data-experimental]')) {
+        experimental = !experimental;
         try {
           localStorage.setItem(EXPERIMENTAL, experimental ? '1' : '0');
         } catch {
           /* ignore */
         }
-        if (!roster().includes(current)) select(roster()[0]);
+        applyFilters();
       }
       if (t.closest('[data-start]')) done();
       if (t.closest('[data-watch]')) finish('watch');
@@ -235,9 +322,13 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest?.('input')) return;
       const ids = roster();
-      const i = ids.indexOf(current);
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') select(ids[(i + 1) % ids.length]);
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') select(ids[(i - 1 + ids.length) % ids.length]);
+      if (!ids.length) return;
+      const i = Math.max(0, ids.indexOf(current));
+      const step = (n: number) => select(ids[(i + n + ids.length * 4) % ids.length]);
+      if (e.key === 'ArrowRight') step(1);
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowDown') step(columns());
+      else if (e.key === 'ArrowUp') step(-columns());
       else if (e.key === 'Enter') {
         // A focused button (the last spell clicked) would otherwise take the Enter as a click too.
         e.preventDefault();
@@ -257,8 +348,9 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     el.addEventListener('dblclick', onDouble);
     addEventListener('keydown', onKey);
     select(current);
+    applyFilters();
   });
-  el.classList.remove('select', 'show-experimental');
+  el.classList.remove('select');
   hide();
   if (kit === 'watch') return { mode: 'watch' };
   if (kit === 'online') return { mode: 'online' };

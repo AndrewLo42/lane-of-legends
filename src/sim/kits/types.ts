@@ -100,6 +100,8 @@ export interface Kit {
   attackRangeBonus?: (world: World, self: Unit, target: Unit) => number;
   /** Multiplier on all damage we deal right now (Gormund's Fury). */
   damageMult?: (world: World, self: Unit, target: Unit) => number;
+  /** Melee or ranged, for champion select's filters; by default from the attack reach (under 3 is melee). */
+  reach?: 'melee' | 'ranged';
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */

@@ -124,7 +124,12 @@
       #spectate button { font: inherit; color: #e8e6df; background: #ffffff10; border: 1px solid #ffffff2a; border-radius: 5px; padding: 2px 9px; cursor: pointer; }
       #spectate button.on { border-color: #ffd76a; color: #ffd76a; }
       #abilities.spectating .plus { display: none !important; }
-      #screen .selecthead .watch { margin-top: 6px; opacity: 0.75; font-size: 13px; }
+      /* The home screen's top-bar options: proper buttons, Play online picked out in gold. */
+      #screen .selectbar .watch { opacity: 1; text-decoration: none; padding: 7px 14px; border-radius: 9px; border: 1px solid #ffffff2e;
+        background: #ffffff10; font-size: 14px; font-weight: 600; white-space: nowrap; transition: background 0.15s, border-color 0.15s, transform 0.15s; }
+      #screen .selectbar .watch:hover { background: #ffffff1c; border-color: #ffffff55; transform: translateY(-1px); }
+      #screen .selectbar .watch[data-online] { border-color: #ffd76a99; color: #ffd76a; background: #3a2f1066; }
+      #screen .selectbar .watch[data-online]:hover { border-color: #ffd76a; background: #3a2f10aa; }
       #screen .botrow { display: flex; flex-direction: column; align-items: center; gap: 6px; }
       #screen .botrow > small { opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
       #screen .botrow.blue > small { color: #7fb3ff; }
@@ -217,34 +222,54 @@
       #screen li { display: flex; gap: 8px; align-items: center; font-size: 13px; }
       #screen li i { font-style: normal; width: 22px; text-align: center; color: var(--accent); font-size: 16px; }
       #screen li small { margin-left: auto; opacity: 0.5; }
-      /* Champion select over the 3D stage: title on top, cards along the bottom */
-      /* Champion select: portraits on top, the 3D stage shows through on the left, the kit panel on the right. */
-      #screen.select { background: linear-gradient(90deg, #0b0d1200 0%, #0b0d1200 45%, #0b0d12c0 70%), linear-gradient(#0b0d12cc 0%, #0b0d1200 25%);
-        justify-content: flex-start; gap: 14px; padding: 20px 0 14px; }
-      #screen .selecthead { text-align: center; }
-      #screen .selecthead h1 { margin-bottom: 10px; }
-      #screen .selecthead .sub { margin: 0; }
-      #screen .roster { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 0 16px; max-width: 900px; }
-      #screen .pick { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 76px; padding: 6px 2px; background: none;
-        border: 0; border-radius: 10px; cursor: pointer; opacity: 0.6; transition: opacity 0.15s, transform 0.15s; }
-      #screen .pick:hover { opacity: 0.9; transform: translateY(-2px); }
-      #screen .pick.on { opacity: 1; background: #ffffff0d; }
-      #screen .pick .mini-portrait { width: 58px; height: 58px; border-width: 2px; font-size: 26px; }
-      #screen .pick.on .mini-portrait { box-shadow: 0 0 0 2px #0b0d12, 0 0 0 4px var(--accent), 0 0 18px var(--accent); }
-      #screen .pick .pname { font-size: 12px; font-weight: 600; color: var(--accent); }
-      /* Experimental champions (no model yet): hidden unless the toggle is on, and tagged with a flask. */
-      #screen.select .pick.experimental { display: none; position: relative; }
-      #screen.select.show-experimental .pick.experimental { display: flex; }
-      #screen .pick.experimental::after { content: '🧪'; position: absolute; top: 2px; right: 6px; font-size: 14px; }
-      #screen .homelinks { display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 6px; }
+      /* Champion select: a bar on top; a filterable portrait grid on the left, the 3D stage in the middle, the kit on the right. */
+      #screen.select { background: linear-gradient(90deg, #0b0d12d0 0%, #0b0d1200 26%, #0b0d1200 58%, #0b0d12c8 76%), linear-gradient(#0b0d12cc 0%, #0b0d1200 16%);
+        justify-content: flex-start; gap: 10px; padding: 14px 20px 8px; overflow: hidden; }
+      #screen .selectbar { box-sizing: border-box; width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 18px; }
+      #screen .selectbar h1 { margin: 0; font-size: 24px; }
+      #screen .selectbar .sub { margin: 0; text-align: left; font-size: 13px; padding: 0; }
+      #screen .homelinks { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
       #screen .homelinks .watch { margin-top: 0; }
-      #screen .exptoggle { display: flex; align-items: center; gap: 5px; font-size: 13px; opacity: 0.75; cursor: pointer; user-select: none; }
-      #screen .exptoggle input { margin: 0; accent-color: #c9a5ff; }
-      #screen .selectmain { box-sizing: border-box; flex: 1; width: 100%; max-width: 1200px; display: flex; align-items: center; gap: 24px; padding: 0 24px; min-height: 0; }
-      #screen .selectmain .stagegap { flex: 1; min-height: 40vh; }
-      #screen .champinfo { box-sizing: border-box; width: min(420px, 100%); background: #151922e6; border: 1px solid #ffffff1f; border-radius: 12px; padding: 16px 18px;
-        display: flex; flex-direction: column; gap: 10px; }
+      #screen .selectmain { box-sizing: border-box; flex: 1; width: 100%; display: flex; gap: 20px; min-height: 0; align-items: stretch; }
+      #screen .rosterpanel { box-sizing: border-box; flex: none; width: 276px; display: flex; flex-direction: column; gap: 8px; min-height: 0;
+        padding: 12px; background: #151922e0; border: 1px solid #ffffff1f; border-radius: 12px; }
+      #screen .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+      #screen .chip { padding: 4px 11px; border-radius: 14px; border: 1px solid #ffffff26; background: #ffffff0a; cursor: pointer; font-size: 12px; opacity: 0.75; }
+      #screen .chip:hover { opacity: 1; }
+      #screen .chip.on { opacity: 1; border-color: #ffd76a; color: #ffd76a; background: #3a2f1066; }
+      #screen .chip.exp { margin-left: auto; }
+      #screen .chip.exp.on { border-color: #c9a5ff; color: #e3d2ff; background: #2e214866; }
+      #screen .search { box-sizing: border-box; width: 100%; padding: 6px 10px; border-radius: 8px; border: 1px solid #ffffff26; background: #0b0d12aa;
+        color: inherit; font: inherit; font-size: 13px; outline: none; }
+      #screen .search:focus { border-color: #ffd76a88; }
+      #screen .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 4px; overflow-y: auto; min-height: 0; align-content: start;
+        padding: 2px; margin: 0 -4px; }
+      #screen .roster .none { grid-column: 1 / -1; margin: 10px 0; font-size: 12px; opacity: 0.6; text-align: center; }
+      #screen .pick { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; background: none;
+        border: 0; border-radius: 10px; cursor: pointer; opacity: 0.62; transition: opacity 0.15s, background 0.15s; }
+      #screen .pick[hidden], #screen .roster .none[hidden] { display: none; }
+      #screen .pick:hover { opacity: 0.95; background: #ffffff08; }
+      #screen .pick.on { opacity: 1; background: #ffffff10; }
+      #screen .pick .mini-portrait { width: 48px; height: 48px; border-width: 2px; font-size: 22px; }
+      #screen .pick.on .mini-portrait { box-shadow: 0 0 0 2px #0b0d12, 0 0 0 4px var(--accent), 0 0 14px var(--accent); }
+      #screen .pick .pname { font-size: 11px; font-weight: 600; color: var(--accent); text-align: center; line-height: 1.15; }
+      /* Experimental champions (no model yet) carry a flask. */
+      #screen .pick.experimental::after { content: '🧪'; position: absolute; top: 2px; right: 4px; font-size: 12px; }
+      #screen .selectmain .stagegap { flex: 1; min-width: 0; }
+      #screen .champinfo { box-sizing: border-box; flex: none; width: min(410px, 100%); display: flex; flex-direction: column; min-height: 0;
+        background: #151922e8; border: 1px solid #ffffff1f; border-radius: 12px; overflow: hidden; }
+      #screen .champinfo .infohead { padding: 14px 18px 0; display: flex; flex-direction: column; gap: 7px; }
+      #screen .champinfo .tags { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+      #screen .champinfo .tags span { padding: 2px 8px; border-radius: 10px; background: #ffffff10; opacity: 0.85; }
+      #screen .champinfo .tags .exp { background: #2e214899; color: #e3d2ff; }
+      #screen .champinfo .tags .best { margin: 0; }
       #screen .champinfo .blurb { margin: 0; font-size: 13px; }
+      #screen .champinfo .tabs { display: flex; gap: 4px; border-bottom: 1px solid #ffffff1a; margin: 2px -18px 0; padding: 0 14px; }
+      #screen .champinfo .tab { padding: 7px 12px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; font-size: 13px; opacity: 0.65; }
+      #screen .champinfo .tab.on { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
+      #screen .champinfo .infobody { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 18px; }
+      #screen .champinfo .tabpane[hidden] { display: none; }
+      #screen .champinfo .panehint { margin: 0 0 10px; font-size: 12px; opacity: 0.7; }
       #screen .champinfo .abilities { gap: 9px; }
       #screen .champinfo .abilities li { align-items: flex-start; gap: 10px; }
       #screen .champinfo .abilities i { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px;
@@ -253,12 +278,15 @@
       #screen .champinfo .abilities small { margin-left: 4px; opacity: 0.5; font-size: 11px; }
       #screen .champinfo .abilities kbd { margin-left: 4px; font-size: 10px; background: #ffffff22; border-radius: 3px; padding: 0 4px; font-family: inherit; }
       #screen .champinfo .abilities p { margin: 2px 0 0; font-size: 12px; line-height: 1.4; opacity: 0.8; }
-      #screen .champinfo .best { margin: 0; }
-      /* Start stays in reach while the panel scrolls. */
-      #screen .champinfo .actions { justify-content: flex-end; position: sticky; bottom: -16px; margin: 0 -18px -16px; padding: 10px 18px 14px;
-        background: linear-gradient(#15192200, #151922f2 30%); }
-      #screen .champinfo .go { font-size: 16px; padding: 9px 22px; }
-      @media (min-width: 820px) { #screen .champinfo { max-height: calc(100vh - 230px); overflow-y: auto; } }
+      /* Start is pinned under the scrolling kit, so it never covers it. */
+      #screen .champinfo .actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 18px 12px;
+        border-top: 1px solid #ffffff1a; background: #12151cf2; }
+      #screen .champinfo .chosen { display: flex; gap: 6px; min-width: 0; }
+      #screen .champinfo .skillbtn { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 8px; border: 1px solid #ffffff26;
+        background: #ffffff0a; cursor: pointer; font-size: 12px; white-space: nowrap; }
+      #screen .champinfo .skillbtn:hover { border-color: #ffd76a; background: #3a2f1066; }
+      #screen .champinfo .skillbtn i { font-style: normal; font-size: 15px; }
+      #screen .champinfo .go { font-size: 16px; padding: 9px 22px; white-space: nowrap; flex: none; }
       #screen h4 { margin: 4px 0 -2px; font-size: 13px; font-weight: 600; }
       #screen h4 small { font-weight: 400; opacity: 0.55; font-size: 11px; margin-left: 4px; }
       /* Summoner spell picker: D/F slots over a grid of every spell. */
@@ -281,10 +309,17 @@
       #screen .spelldesc small { opacity: 0.6; }
       .aug.tier-spell { border-color: #9fd3ff88; color: #cfe8ff; }
       @media (max-width: 819px) {
-        #screen.select { background: linear-gradient(#0b0d12cc 0%, #0b0d1200 20%, #0b0d1200 45%, #0b0d12ee 60%); }
-        #screen .selectmain { flex: none; flex-direction: column; padding: 0 16px; }
-        #screen .selectmain .stagegap { min-height: 38vh; flex: none; width: 100%; }
+        /* Phones: everything stacks, and the portrait grid becomes one sideways-scrolling row. */
+        #screen.select { background: linear-gradient(#0b0d12cc 0%, #0b0d1200 30%, #0b0d1200 50%, #0b0d12ee 62%); overflow-y: auto; padding: 12px 16px 8px; }
+        #screen .selectbar { grid-template-columns: 1fr; text-align: center; }
+        #screen .selectbar .sub { text-align: center; }
+        #screen .homelinks { justify-content: center; flex-wrap: wrap; gap: 8px; }
+        #screen .selectmain { flex: none; flex-direction: column; gap: 12px; }
+        #screen .rosterpanel { width: 100%; }
+        #screen .roster { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 62px; overflow-x: auto; overflow-y: hidden; }
+        #screen .selectmain .stagegap { min-height: 36vh; flex: none; width: 100%; }
         #screen .champinfo { width: 100%; }
+        #screen .champinfo .infobody { max-height: none; overflow: visible; }
       }
       #screen .hint { font-size: 12px; opacity: 0.55; text-align: center; max-width: 640px; }
       #screen .sub { margin: -8px 0 0; opacity: 0.75; text-align: center; padding: 0 16px; }

@@ -92,15 +92,16 @@ export class SelectStage {
     const w = innerWidth;
     const h = innerHeight;
     this.camera.aspect = w / h;
-    // Wide screens: shift the view so the champion stands left of centre, clear of the info panel.
-    // Narrow screens stack the panel underneath: zoom out and stand the champion between the
-    // portraits and the panel.
+    // Wide screens: stand the champion in the gap between the portrait grid (left, ~300px with its margin)
+    // and the kit panel (right, ~430px): shift the view by half the difference, plus the podium's own
+    // lean to the right of the camera's centre (about 4.5% of the width).
+    // Narrow screens stack the panels: zoom out and stand the champion between the grid and the kit.
     if (w >= 820) {
       this.camera.zoom = 1;
-      this.camera.setViewOffset(w, h, w * 0.2, 0, w, h);
+      this.camera.setViewOffset(w, h, (430 - 300) / 2 + w * 0.045, -h * 0.03, w, h);
     } else {
       this.camera.zoom = 0.62;
-      this.camera.setViewOffset(w, h, 0, h * 0.08, w, h);
+      this.camera.setViewOffset(w, h, 0, -h * 0.1, w, h);
     }
     this.camera.updateProjectionMatrix();
   }

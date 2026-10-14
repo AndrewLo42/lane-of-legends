@@ -18,6 +18,9 @@ export const BOT_KIT_IDS = KIT_IDS.filter((k) => !KITS[k].experimental);
 
 export const kitOf = (u: Unit) => KITS[u.champ!.kit];
 
+/** Melee or ranged, for champion select's filters. */
+export const reachOf = (id: KitId) => KITS[id].reach ?? (KITS[id].stats.range < 3 ? 'melee' : 'ranged');
+
 /** The abilities a champion has right now (Pip's change when he gets off Thistle). */
 export function abilitiesOf(u: Unit): readonly [AbilityDef, AbilityDef, AbilityDef, AbilityDef] {
   const kit = kitOf(u);
