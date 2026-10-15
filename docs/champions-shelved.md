@@ -99,3 +99,48 @@ The opponent's choice is whether to burn down the toad or dive past him onto the
 - The bot needs a combo plan.
 - Model: a BlenderKit humanoid with two weapon props that swap visibility.
 - **Open question:** keep R as just the stance swap, or give him a real ultimate and move the swap to a passive cooldown?
+
+## Corvin, the Collector
+
+**Status:** a concept we liked, shelved while we build others. Not workshopped in detail yet. One of two ranged auto-attack hyper carry ideas (with Fennick); the roster has no true one yet (Arlo comes closest).
+
+**Pitch.** A crow-masked bounty hunter who takes a trophy from everything he kills. Weak early, a monster late: the roguelike run itself is his scaling.
+
+- **Passive, Trophies:** last hits give a feather, champion takedowns give five. Every 10 feathers: permanent bonus attack damage and a little range. **In a run, trophies carry over between duels**, so he's weak in duel 1 and a monster by duel 5. Online 1v1 is a single duel, so there they only scale within it.
+- **Q, Ricochet:** an empowered attack that bounces to a second target (farms waves, pokes over them).
+- **W, Snare:** a hidden trap that roots; his only peel.
+- **E, Reload Roll:** a short roll that resets his attack timer.
+- **R, Deadeye:** a long-range shot after a short channel; more damage the lower the target's health, and kills grant bonus trophies.
+
+**The duel:** survive, farm, outscale. The opponent has to punish him early.
+
+**Counterplay:** all-in him before the stacks add up; his only peel is a trap you can see coming.
+
+**Notes for building it:**
+- Trophies need to persist in the run state between duels (like relics and augments), plus a cap or diminishing returns so duel 5 isn't hopeless.
+- The bot needs kiting (attack, step back, attack), which no bot does well yet; other ranged champions would benefit too.
+- Model: a BlenderKit humanoid with a long coat, a crow mask and a crossbow or long rifle.
+- **Open question:** should feathers also come from relics or augments, or only from kills?
+
+## Fennick, the Tinker-Archer
+
+**Status:** built, experimental (placeholder model, no BlenderKit model yet). See `src/sim/kits/fennick.ts`. Changes from the sketch below: **Q Longshot** is press-and-hold (draws from 6 to 12 range over 1.25s; a full draw pierces, hits harder and carries his next arrow), **W Volley** fires all three arrows on his next attack and skips the quiver ahead one, **E Snare Shot** is a net arrow (slow, then a root if they're still in it) instead of a dash, since most of the roster already has movement, and **R Overcharge** adds a fading burst of move speed. The original sketch:
+
+**Pitch.** A gadgeteer whose quiver rotates through frost, fire and spark arrows. He wins by timing which arrow lands when it matters.
+
+- **Passive, Quiver:** each attack uses the next arrow in the rotation: frost slows, fire burns, spark chains to a nearby minion. The HUD shows which arrow is next.
+- **Q:** fires the next arrow, overcharged.
+- **W:** skips ahead in the rotation.
+- **E:** a dash that leaves a trail of the current element.
+- **R:** for a few seconds, every attack applies all three effects.
+
+**The duel:** count the rotation and line up frost for the chase, fire for the trade.
+
+**Counterplay:** the rotation is readable (the next arrow shows on his bow), so trade when a weak arrow is up.
+
+**Notes for building it:**
+- Uses only existing statuses (slow, burn), so it's the cheapest of the hyper carry ideas to build. The arrow indicator could reuse Lumen's meter bar or a small icon.
+- Spark's chain needs a short bounce helper (Corvin's Ricochet could share it).
+- The bot needs kiting, as with Corvin, plus a rule for skipping to the right arrow.
+- Model: a BlenderKit humanoid with goggles, a satchel and a mechanical bow; the arrow tips change color.
+- **Open question:** is the R too similar to the passive? An alternative is a turret that fires the current arrow type.

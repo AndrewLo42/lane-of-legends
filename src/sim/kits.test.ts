@@ -9,6 +9,7 @@ import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, leapOf, standardsOf } from './kits/gerrit';
 import { LUMEN_TUNING, devotion, lumenHeal, radiant, sunrise } from './kits/lumen';
+import { FENNICK_TUNING, drawing, nextArrow, overcharged } from './kits/fennick';
 import { abilitiesOf } from './kits';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
 import { TICK_HZ } from './util';
@@ -1425,5 +1426,134 @@ describe('Lumen', () => {
     cast(3, 0);
     run(w, R.base + 0.3);
     expect(sunrise(w, me)).toBe(false);
+  });
+});
+
+describe('Fennick', () => {
+  const { QUIVER, Q, W, E } = FENNICK_TUNING;
+  const release = (ctl: Script, w: World, x: number, y = 0) => {
+    ctl.queue.push({ type: 'release', slot: 0, at: { x, y } });
+    w.step();
+  };
+
+  it('his attacks turn through frost, fire and spark', () => {
+    const { w, me, ctl } = setup('fennick');
+    me.range = 5.5;
+    const foe = dummy(w, 4);
+    const other = w.spawnMinion('red', 'melee', { x: 5, y: 1 });
+    other.speed = 0;
+    other.damage = 0;
+    expect(nextArrow(me)).toBe('frost');
+    ctl.queue.push({ type: 'attack', target: foe.id });
+    // First arrow: frost slows.
+    for (let i = 0; i < 60 && !w.status(foe, 'slow'); i++) w.step();
+    expect(w.status(foe, 'slow')?.value).toBe(QUIVER.slow);
+    expect(nextArrow(me)).toBe('fire');
+    // Second: fire burns. Third: spark jumps to the minion beside them.
+    for (let i = 0; i < 60 && !foe.statuses.some((st) => st.kind === 'burn'); i++) w.step();
+    expect(foe.statuses.some((st) => st.kind === 'burn')).toBe(true);
+    for (let i = 0; i < 60 && other.hp === other.maxHp; i++) w.step();
+    expect(other.hp).toBeLessThan(other.maxHp);
+    expect(nextArrow(me)).toBe('frost');
+  });
+
+  it('Longshot draws while held, reaching further and hitting harder, and looses on release', () => {
+    // A quick tap: short reach.
+    const tap = setup('fennick');
+    const missed = dummy(tap.w, 10);
+    tap.cast(0, 10);
+    expect(drawing(tap.me)).toBe(true);
+    release(tap.ctl, tap.w, 10);
+    run(tap.w, 1);
+    expect(drawing(tap.me)).toBe(false);
+    expect(lost(missed)).toBe(0); // out of the short draw's reach
+    // A full draw reaches, goes through the near dummy, hits harder, and the cooldown starts from the release.
+    const { w, me, ctl, cast } = setup('fennick');
+    const far = dummy(w, 10);
+    const close = dummy(w, 3);
+    cast(0, 10);
+    run(w, Q.full + 0.1);
+    expect(w.status(me, 'slow')?.value).toBe(Q.drawSlow);
+    release(ctl, w, 10);
+    run(w, 1);
+    const full = Q.base[0] + Q.ad * me.damage;
+    expect(lost(close)).toBeGreaterThan(0);
+    expect(lost(far)).toBeGreaterThan(full * Q.fullMult - 10);
+    expect(me.champ!.abilities[0].readyAt - w.tick).toBeGreaterThan((Q.cd[0] - 1.2) * TICK_HZ);
+    expect(nextArrow(me)).toBe('fire'); // the full draw carried (and used up) the frost arrow
+    expect(w.status(far, 'slow')).toBeTruthy();
+  });
+
+  it("can't attack while drawing, and looses by itself after a while", () => {
+    const { w, me, ctl, cast } = setup('fennick');
+    me.range = 5.5;
+    const foe = dummy(w, 4);
+    cast(0, 4);
+    ctl.queue.push({ type: 'attack', target: foe.id });
+    run(w, 1);
+    expect(lost(foe)).toBe(0);
+    run(w, Q.timeout);
+    expect(drawing(me)).toBe(false);
+    expect(lost(foe)).toBeGreaterThan(0);
+  });
+
+  it('Volley: the next attack looses all three arrows, then the quiver skips ahead one', () => {
+    const { w, me, ctl, cast } = setup('fennick');
+    me.range = 5.5;
+    const foe = dummy(w, 4);
+    cast(1, 0);
+    ctl.queue.push({ type: 'attack', target: foe.id });
+    for (let i = 0; i < 30 && lost(foe) === 0; i++) w.step();
+    run(w, 0.4);
+    expect(w.status(foe, 'slow')).toBeTruthy();
+    expect(foe.statuses.some((st) => st.kind === 'burn')).toBe(true);
+    // Three arrows at reduced damage, plus the burn so far.
+    expect(lost(foe)).toBeGreaterThan(me.damage * W.mult * 3 - 10);
+    expect(nextArrow(me)).toBe('fire');
+  });
+
+  it('Snare Shot nets the target and roots them if they stay in it', () => {
+    const { w, cast } = setup('fennick');
+    const foe = dummy(w, 4);
+    cast(2, 4);
+    run(w, 0.4);
+    expect(lost(foe)).toBeGreaterThan(0);
+    expect(w.status(foe, 'slow')?.value).toBe(E.slow);
+    run(w, E.delay);
+    expect(w.status(foe, 'root')).toBeTruthy();
+  });
+
+  it('Snare Shot: walking out of the net in time avoids the root', () => {
+    const { w, cast } = setup('fennick');
+    const ctl = new Script();
+    const foe = w.spawnChampion('red', 'arlo', ctl);
+    foe.pos = { x: 4, y: 0 };
+    foe.damage = 0;
+    cast(2, 4);
+    run(w, 0.25);
+    ctl.queue.push({ type: 'move', to: { x: 4, y: 6 } });
+    run(w, E.delay + 0.2);
+    expect(w.status(foe, 'root')).toBeFalsy();
+  });
+
+  it('Overcharge: every attack carries all three arrows, and he speeds up, fading', () => {
+    const { w, me, ctl, cast } = setup('fennick');
+    me.range = 5.5;
+    const foe = dummy(w, 4);
+    const other = w.spawnMinion('red', 'melee', { x: 5, y: 1 });
+    other.speed = 0;
+    other.damage = 0;
+    cast(3, 0);
+    expect(overcharged(w, me)).toBe(true);
+    w.step();
+    const early = w.status(me, 'haste')!.value;
+    ctl.queue.push({ type: 'attack', target: foe.id });
+    for (let i = 0; i < 30 && lost(foe) === 0; i++) w.step();
+    w.step();
+    expect(w.status(foe, 'slow')).toBeTruthy();
+    expect(foe.statuses.some((st) => st.kind === 'burn')).toBe(true);
+    expect(other.hp).toBeLessThan(other.maxHp);
+    run(w, 3);
+    expect(w.status(me, 'haste')!.value).toBeLessThan(early);
   });
 });

@@ -153,6 +153,54 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const accent = new THREE.Color(KITS[u.champ!.kit].color);
   const glow = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.8 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb8b2a2, metalness: 0.6, roughness: 0.35, flatShading: true });
+  if (u.champ!.kit === 'fennick') {
+    // Fennick: a lean tinker in a green coat and goggles, a satchel in his team's colour, a quiver of three
+    // coloured arrows, and a mechanical bow whose nocked arrowhead glows the next arrow's colour (views.ts).
+    const coat = new THREE.MeshStandardMaterial({ color: 0x3f6b55, roughness: 0.8, flatShading: true });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 1.3, 8), coat);
+    body.position.y = 0.95;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe6c3a0 }));
+    head.position.y = 1.85;
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), new THREE.MeshStandardMaterial({ color: 0xc0632e, flatShading: true }));
+    hair.position.y = 1.9;
+    const goggles = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.04, 6, 18), metal);
+    goggles.rotation.x = Math.PI / 2;
+    goggles.position.y = 1.98;
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.86), teamMat);
+    strap.position.set(0, 1.25, 0);
+    strap.rotation.x = 0.6;
+    const satchel = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.28, 0.14), teamMat);
+    satchel.position.set(0.05, 0.75, -0.42);
+    const quiver = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0x6b4a2e }));
+    quiver.position.set(-0.3, 1.45, 0.12);
+    quiver.rotation.x = 0.35;
+    g.add(body, head, hair, goggles, strap, satchel, quiver);
+    [0x8fd8ff, 0xff8a3d, 0xffe14a].forEach((color, i) => {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.06), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 }));
+      f.position.set(-0.3, 1.88, 0.24 + (i - 1) * 0.07);
+      g.add(f);
+    });
+    // The bow, held out in front: a brass-capped arc with a string and a nocked arrow.
+    const bow = new THREE.Group();
+    const limb = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.04, 6, 24, Math.PI * 0.9), new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.6 }));
+    limb.rotation.z = -Math.PI * 0.45;
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.48, 4), new THREE.MeshBasicMaterial({ color: 0xeeeeee }));
+    string.position.x = -0.12;
+    const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 8), metal);
+    gear.rotation.x = Math.PI / 2;
+    gear.position.x = 0.73;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 5), new THREE.MeshStandardMaterial({ color: 0x8a6a44 }));
+    shaft.rotation.z = Math.PI / 2;
+    shaft.position.x = 0.38;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 6), new THREE.MeshStandardMaterial({ color: 0x8fd8ff, emissive: 0x8fd8ff, emissiveIntensity: 1.2 }));
+    tip.name = 'arrowtip';
+    tip.rotation.z = -Math.PI / 2;
+    tip.position.x = 0.98;
+    bow.add(limb, string, gear, shaft, tip);
+    bow.position.set(0.35, 1.25, 0.15);
+    g.add(bow);
+    return g;
+  }
   if (u.champ!.kit === 'lumen') {
     // Lumen: a candle-saint in long cream robes with a team-coloured stole, a soft face, and a lit candle in her hands.
     const cloth = new THREE.MeshStandardMaterial({ color: 0xf1e6cf, roughness: 0.85, flatShading: true });

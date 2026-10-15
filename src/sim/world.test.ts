@@ -198,3 +198,39 @@ describe('determinism', () => {
     expect(trace(7)).not.toEqual(trace(8));
   });
 });
+
+describe('minion aggro', () => {
+  /** A red minion beside a red champion, and a blue champion `away` units off; nothing moves on its own. */
+  function scene(away: number) {
+    const w = new World();
+    const victim = w.spawnChampion('red', 'arlo', idle);
+    victim.pos = { x: 0, y: 0 };
+    victim.maxHp = victim.hp = 5000;
+    const m = w.spawnMinion('red', 'melee', { x: 1, y: 1 });
+    m.speed = 0;
+    const attacker = w.spawnChampion('blue', 'arlo', idle);
+    attacker.pos = { x: -away, y: 0 };
+    return { w, victim, m, attacker };
+  }
+
+  it('minions turn on a champion who hits theirs from close by', () => {
+    const { w, victim, m, attacker } = scene(4);
+    w.dealDamage(attacker, victim, 50, { attack: true });
+    expect(m.attackTarget).toBe(attacker.id);
+  });
+
+  it("burns and other procs don't call for help", () => {
+    const { w, victim, m, attacker } = scene(4);
+    w.dealDamage(attacker, victim, 50, { proc: true });
+    expect(m.attackTarget).not.toBe(attacker.id);
+  });
+
+  it("a long-range poke from outside the minions' reach doesn't drag them across the lane", () => {
+    const { w, victim, m, attacker } = scene(11);
+    w.dealDamage(attacker, victim, 50, { slot: 0, poke: true });
+    expect(m.attackTarget).not.toBe(attacker.id);
+    // Any other ability from that far still does.
+    w.dealDamage(attacker, victim, 50, { slot: 0 });
+    expect(m.attackTarget).toBe(attacker.id);
+  });
+});

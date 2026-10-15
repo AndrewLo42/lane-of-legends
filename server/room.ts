@@ -303,6 +303,7 @@ function validCommand(c: unknown): c is Command {
     case 'attack': return Number.isInteger(cmd.target);
     case 'stop': return true;
     case 'cast': return slot(3) && point(cmd.at);
+    case 'release': return slot(3) && point(cmd.at);
     case 'levelUp': return slot(3);
     case 'summon': return slot(1) && point(cmd.at);
     default: return false;

@@ -122,6 +122,8 @@ export class Duel {
   private aiming: Slot | null = null;
   /** The summoner spell whose key (D/F) is held; same hold-to-aim, release-to-cast as abilities. */
   private aimingSpell: SummonerSlot | null = null;
+  /** A press-and-hold ability (Fennick's Longshot) whose key is down: it started on the press and looses on release. */
+  private holding: Slot | null = null;
   private acc = 0;
   private reissue = 0;
   /** Wall-clock time the duel was decided (so a throttled background tab still moves on). */
@@ -455,26 +457,40 @@ export class Duel {
     const { world, me, player } = this;
     const { input, cam, indicator } = this.shell;
     const cursor = cam.groundAt(input.mouse.x, input.mouse.y);
+    const at = cursor ? { x: cursor.x, y: cursor.z } : { ...me.pos };
     ABILITY_KEYS.forEach((code, i) => {
       if (!input.wasPressed(code)) return;
       if (input.isDown('AltLeft') || input.isDown('AltRight')) player.queue.push({ type: 'levelUp', slot: i as Slot });
-      else {
+      else if (abilitiesOf(me)[i].release) {
+        // Press and hold: it starts now and looses when the key comes up.
+        player.queue.push({ type: 'cast', slot: i as Slot, at });
+        this.holding = i as Slot;
+        this.aiming = null;
+      } else {
         this.aiming = i as Slot;
         this.aimingSpell = null;
       }
     });
+    if (this.holding != null && !input.isDown(ABILITY_KEYS[this.holding])) {
+      player.queue.push({ type: 'release', slot: this.holding, at });
+      this.holding = null;
+    }
     SUMMONER_KEYS.forEach((code, i) => {
       if (!input.wasPressed(code)) return;
       this.aimingSpell = i as SummonerSlot;
       this.aiming = null;
     });
     if (this.aimingSpell != null) return this.handleSummoner(this.aimingSpell, cursor);
-    if (this.aiming == null) return indicator.hide();
+    if (this.aiming == null) {
+      // While a hold is drawn, its indicator shows how far it reaches now.
+      const def = this.holding != null ? abilitiesOf(me)[this.holding] : null;
+      if (def?.holdAim && !me.dead) return indicator.show(def.holdAim(me), this.view.positionOf(me.id)!, at, true);
+      return indicator.hide();
+    }
     if (input.rmbClicked || me.dead) {
       this.aiming = null; // right-click cancels, like League
       return indicator.hide();
     }
-    const at = cursor ? { x: cursor.x, y: cursor.z } : { ...me.pos };
     if (!input.isDown(ABILITY_KEYS[this.aiming])) {
       player.queue.push({ type: 'cast', slot: this.aiming, at });
       this.aiming = null;

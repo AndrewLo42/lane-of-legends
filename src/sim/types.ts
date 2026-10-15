@@ -12,7 +12,7 @@ export type Team = 'blue' | 'red';
 /** `pet`: a champion's companion unit (Pip's Thistle), fighting alongside but not a champion. */
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'pet';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit' | 'lumen';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit' | 'lumen' | 'fennick';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -44,7 +44,10 @@ export interface Mods {
 export interface DamageSource {
   attack?: boolean;
   slot?: Slot;
+  /** Also: procs don't call minions and towers for help. */
   proc?: boolean;
+  /** A long-range poke (Fennick's Longshot): minions only answer the call for help if the shooter is within their aggro range. */
+  poke?: boolean;
 }
 
 export interface Status {
@@ -178,7 +181,7 @@ export interface PetState {
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue' | 'candle';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue' | 'candle' | 'frostArrow' | 'fireArrow' | 'sparkArrow' | 'prismArrow' | 'longshot' | 'net';
 
 export interface Missile {
   id: number;
@@ -209,7 +212,7 @@ export interface Missile {
 
 export interface Zone {
   id: number;
-  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear' | 'standard' | 'banner' | 'sanctuary';
+  kind: 'stasis' | 'echo' | 'anchor' | 'maelstrom' | 'honey' | 'hive' | 'glyph' | 'spear' | 'standard' | 'banner' | 'sanctuary' | 'net';
   team: Team;
   ownerId: number;
   pos: Vec2;
@@ -269,7 +272,7 @@ export interface ChampionKill {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind' | 'thrust';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind' | 'thrust' | 'zap' | 'volley';
   pos: Vec2;
   dir?: number;
   radius?: number;
@@ -286,6 +289,8 @@ export type Command =
   | { type: 'attack'; target: number }
   | { type: 'stop' }
   | { type: 'cast'; slot: Slot; at: Vec2 }
+  /** Let go of a press-and-hold ability's key (Fennick's Longshot). */
+  | { type: 'release'; slot: Slot; at: Vec2 }
   | { type: 'levelUp'; slot: Slot }
   | { type: 'summon'; slot: SummonerSlot; at: Vec2 };
 
