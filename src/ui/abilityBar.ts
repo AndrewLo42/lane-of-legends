@@ -127,8 +127,9 @@ export class AbilityBar {
     if (kit.meter && this.meter && this.meterText) {
       const v = kit.meter.value(me);
       this.meter.style.width = `${(100 * v) / kit.meter.max}%`;
-      this.meterText.textContent = `${kit.meter.label} ${Math.floor(v)} / ${kit.meter.max}`;
-      this.meter.parentElement!.classList.toggle('full', v >= kit.meter.max);
+      this.meterText.textContent = kit.meter.text?.(me) ?? `${kit.meter.label} ${Math.floor(v)} / ${kit.meter.max}`;
+      this.meter.style.background = kit.meter.color?.(me) ?? '';
+      this.meter.parentElement!.classList.toggle('full', kit.meter.glow?.(me) ?? v >= kit.meter.max);
     }
     this.xp.style.width = c.level >= 11 ? '100%' : `${(100 * c.xp) / xpToNext(c.level)}%`;
 

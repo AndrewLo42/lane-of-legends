@@ -203,6 +203,11 @@ export class World {
       case 'cast':
         this.startCast(u, cmd.slot, cmd.at);
         break;
+      case 'release': {
+        const def = u.champ && abilitiesOf(u)[cmd.slot];
+        if (def?.release) def.release({ world: this, self: u, at: { ...cmd.at }, rank: u.champ!.abilities[cmd.slot].rank, recast: false });
+        break;
+      }
       case 'levelUp':
         this.levelAbility(u, cmd.slot);
         break;
@@ -255,7 +260,7 @@ export class World {
       } else {
         c.mana -= cost;
       }
-      st.readyAt = this.tick + ticks((def.cooldown(st.rank) * 100) / (100 + c.mods.haste));
+      st.readyAt = this.tick + this.cooldownTicks(u, slot);
       if (def.recastWindow) st.recastUntil = this.tick + ticks(def.recastWindow);
     }
     u.windup = 0;
@@ -267,6 +272,12 @@ export class World {
     if (time > 0) c.casting = { slot, at: { ...at }, fireAt: this.tick + ticks(time), recast, paid };
     else this.resolveCast(ctx, slot);
     for (const a of perksOf(u)) a.onCast?.(this, u, slot, ctx.at, recast);
+  }
+
+  /** An ability's cooldown at its current rank, after ability haste. */
+  cooldownTicks(u: Unit, slot: Slot) {
+    const c = u.champ!;
+    return ticks((abilitiesOf(u)[slot].cooldown(c.abilities[slot].rank) * 100) / (100 + c.mods.haste));
   }
 
   /** Run an ability's effect again with no cost, wind-up or cooldown (Double Tap). */
@@ -675,12 +686,17 @@ export class World {
 
   private fire(u: Unit, target: Unit) {
     const rage = this.status(u, 'rage')?.value ?? 0;
-    const mult = u.champ ? kitOf(u).autoDamageMult?.(this, u) ?? 1 : 1;
-    const hit = (t: Unit) => this.dealDamage(this.get(u.id) ?? null, t, (u.damage + rage) * mult, { attack: true });
+    const shot = u.champ ? kitOf(u).onAttackFire?.(this, u, target) : undefined;
+    const mult = (u.champ ? kitOf(u).autoDamageMult?.(this, u) ?? 1 : 1) * (shot?.damageMult ?? 1);
+    const hit = (t: Unit) => {
+      this.dealDamage(this.get(u.id) ?? null, t, (u.damage + rage) * mult, { attack: true });
+      shot?.onHit?.(t);
+    };
     if (u.projectileSpeed <= 0) return hit(target);
     const off = u.kind === 'tower' ? 0 : u.radius;
     const from = { x: u.pos.x + Math.cos(u.facing) * off, y: u.pos.y + Math.sin(u.facing) * off };
-    this.fireHoming(u, target, u.kind === 'tower' ? 'tower' : (u.champ && kitOf(u).autoStyle) || 'auto', u.projectileSpeed, hit, from);
+    const style = u.kind === 'tower' ? 'tower' : shot?.style ?? ((u.champ && kitOf(u).autoStyle) || 'auto');
+    this.fireHoming(u, target, style, u.projectileSpeed, hit, from);
   }
 
   private updateMissiles() {
@@ -804,7 +820,8 @@ export class World {
     if (target.champ && amount > 0) amount = kitOf(target).soak?.(this, target, amount) ?? amount;
     target.hp -= amount;
     target.lastHurtTick = this.tick;
-    if (src?.kind === 'champion' && target.kind === 'champion') this.callForHelp(src, target);
+    // Only direct hits call for help: burns, stings and other procs (Fennick's spark jumping off a minion) don't.
+    if (src?.kind === 'champion' && target.kind === 'champion' && !from.proc) this.callForHelp(src, target, !!from.poke);
     if (target.hp <= 0) this.kill(target, src);
     if (src?.champ && !src.dead) {
       if (src.champ.mods.omnivamp > 0) this.heal(src, amount * src.champ.mods.omnivamp);
@@ -832,13 +849,17 @@ export class World {
     this.winReason = reason;
   }
 
-  /** Hitting a champion turns its towers and nearby minions on you. */
-  private callForHelp(attacker: Unit, victim: Unit) {
+  /**
+   * Hitting a champion turns its towers and nearby minions on you. For a `poke` (Fennick's Longshot),
+   * minions only answer if you're within their own aggro range, so a shot from outside the wave doesn't
+   * drag it across the lane.
+   */
+  private callForHelp(attacker: Unit, victim: Unit, poke: boolean) {
     for (const u of this.units) {
       if (u.dead || u.team !== victim.team) continue;
       const helps =
         (u.kind === 'tower' && gap(u, attacker) <= u.range) ||
-        (u.kind === 'minion' && dist(u.pos, victim.pos) <= CALL_FOR_HELP);
+        (u.kind === 'minion' && dist(u.pos, victim.pos) <= CALL_FOR_HELP && (!poke || gap(u, attacker) <= MINION_AGGRO));
       if (helps && u.attackTarget !== attacker.id) {
         u.attackTarget = attacker.id;
         u.windup = 0;

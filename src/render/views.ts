@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { holdingSpear } from '../sim/kits/aurelle';
 import { leapOf } from '../sim/kits/gerrit';
 import { radiant, sunrise } from '../sim/kits/lumen';
+import { ARROW_LOOK, drawFraction, drawing, nextArrow, overcharged, volleyReady } from '../sim/kits/fennick';
 import { panicking, riding, thistleOf } from '../sim/kits/pip';
 import type { KitId, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
@@ -23,7 +24,7 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   if (u.kind === 'pet') return { name: 'pet_thistle', height: THISTLE_HEIGHT };
   return undefined;
 }
-const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7, lumen: 2.4 };
+const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7, lumen: 2.4, fennick: 2.4 };
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -80,6 +81,9 @@ interface UnitView {
   /** Lumen: her halo (brighter while Radiant) and the burning sun of Sunrise. */
   halo?: THREE.Mesh;
   sun?: THREE.Group;
+  /** Fennick: the ring closing in as he draws Longshot, and Overcharge's three-colour aura. */
+  draw?: THREE.Mesh;
+  prism?: THREE.Group;
   /** Thistle's code-driven hop: cycle phase, this frame's lift and squash, and an attack lunge timer. */
   hop?: { phase: number; lift: number; squash: number; lunge: number };
 }
@@ -288,6 +292,7 @@ export class WorldView {
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
       if (u.kind === 'pet') this.hopVisuals(u, v, dt);
       if (u.champ?.kit === 'lumen') this.lumenVisuals(u, v);
+      if (u.champ?.kit === 'fennick') this.fennickVisuals(u, v);
       if (u.champ?.kit === 'gerrit' && !u.dead) {
         // Fallen Standards: the leap arcs through the air.
         const leap = leapOf(u);
@@ -570,6 +575,48 @@ export class WorldView {
         const b = caster.obj.position;
         v.tether.geometry.setFromPoints([new THREE.Vector3(a.x, 1.1, a.z), new THREE.Vector3(b.x, 1.1, b.z)]);
       }
+    }
+  }
+
+  /**
+   * Fennick: his arrowhead (placeholder) glows the colour of the next arrow, a ring closes in on him as
+   * he draws Longshot (bright when it's full), and three coloured rings orbit him during Overcharge.
+   */
+  private fennickVisuals(u: Unit, v: UnitView) {
+    const tip = v.obj.getObjectByName('arrowtip') as THREE.Mesh | undefined;
+    if (tip) {
+      const mat = tip.material as THREE.MeshStandardMaterial;
+      const color = ARROW_LOOK[nextArrow(u)].color;
+      mat.color.set(color);
+      mat.emissive.set(color);
+      mat.emissiveIntensity = volleyReady(this.world, u) ? 2.5 + Math.sin(performance.now() / 80) : 1.2;
+    }
+    if (!v.draw) {
+      v.draw = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.05, 40), new THREE.MeshBasicMaterial({ color: 0x9ff0c8, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+      v.draw.rotation.x = -Math.PI / 2;
+      v.draw.position.y = 0.07;
+      v.obj.add(v.draw);
+    }
+    const k = drawFraction(u);
+    v.draw.visible = !u.dead && drawing(u);
+    v.draw.scale.setScalar(2.2 - k * 1.3);
+    const ring = v.draw.material as THREE.MeshBasicMaterial;
+    ring.opacity = k >= 1 ? 0.95 : 0.35 + k * 0.4;
+    ring.color.set(k >= 1 ? 0xffffff : 0x9ff0c8);
+    const on = !u.dead && overcharged(this.world, u);
+    if (on && !v.prism) {
+      v.prism = new THREE.Group();
+      [0x8fd8ff, 0xff8a3d, 0xffe14a].forEach((color, i) => {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.035, 6, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 }));
+        r.rotation.set(Math.PI / 2 + (i - 1) * 0.5, (i * Math.PI) / 3, 0);
+        r.position.y = 1.2;
+        v.prism!.add(r);
+      });
+      v.obj.add(v.prism);
+    }
+    if (v.prism) {
+      v.prism.visible = on;
+      if (on) v.prism.rotation.y = performance.now() / 300;
     }
   }
 

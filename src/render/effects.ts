@@ -257,6 +257,34 @@ export class EffectsView {
         pillar.position.set(Math.cos(a) * z.radius * 0.9, 0.8, Math.sin(a) * z.radius * 0.9);
         g.add(pillar);
       }
+    } else if (z.kind === 'net') {
+      // Fennick's Snare Shot: a rope net spread on the ground, weighted at the edge, with a ring
+      // counting down to the root.
+      const rope = mat(0xd8c89a, 0.85);
+      const floor = ringShape(z.radius, z.radius, mat(0xd8c89a, 0.12));
+      floor.position.y = 0.03;
+      const rim = ringShape(z.radius, 0.08, rope);
+      rim.position.y = 0.05;
+      g.add(floor, rim);
+      for (let i = 0; i < 3; i++) {
+        const r = ringShape(z.radius * (0.3 + i * 0.22), 0.04, rope);
+        r.position.y = 0.05;
+        g.add(r);
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI;
+        const strand = flat(new THREE.Mesh(new THREE.PlaneGeometry(z.radius * 2, 0.04), rope));
+        strand.rotation.z = a;
+        strand.position.y = 0.05;
+        g.add(strand);
+        const weight = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), new THREE.MeshStandardMaterial({ color: 0x55504a, metalness: 0.6 }));
+        weight.position.set(Math.cos(a * 2) * z.radius, 0.09, Math.sin(a * 2) * z.radius);
+        g.add(weight);
+      }
+      const timer = flat(new THREE.Mesh(new THREE.RingGeometry(z.radius + 0.15, z.radius + 0.35, 48), mat(0xc9e8d8, 0.9)));
+      timer.name = 'timer';
+      timer.position.y = 0.06;
+      g.add(timer);
     } else if (z.kind === 'honey') {
       // A glossy amber puddle with a few darker drips.
       const puddle = ringShape(z.radius, z.radius, mat(0xf2a516, 0.55));
@@ -396,6 +424,31 @@ export class EffectsView {
           fade(tri, 0.95)(k);
           tri.scale.setScalar(0.6 + k * 1.4);
           tri.rotation.z = k * 1.2;
+        });
+        break;
+      }
+      // ---- Fennick ----
+      case 'zap': {
+        // Spark arrow: a bolt of yellow lightning jumping to the next enemy.
+        const g = new THREE.Group();
+        g.rotation.y = -(fx.dir ?? 0);
+        g.position.y = 1;
+        const bolt = lineShape(fx.radius ?? 2, 0.12, basic(0xfff1a0, 0.95));
+        g.add(bolt);
+        add(g, 0.22, (k) => {
+          fade(bolt, 0.95)(k);
+          bolt.position.y = Math.sin(k * 40) * 0.05;
+        });
+        break;
+      }
+      case 'volley': {
+        // Volley readied: three rings, frost, fire and spark, spinning up around him.
+        [0x8fd8ff, 0xff8a3d, 0xffe14a].forEach((color, i) => {
+          const r = ringShape(0.7 + i * 0.12, 0.08, basic(color, 0.9));
+          add(r, 0.5, (k) => {
+            fade(r, 0.9)(k);
+            r.position.y = 0.3 + i * 0.5 + k * 0.4;
+          });
         });
         break;
       }

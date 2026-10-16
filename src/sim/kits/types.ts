@@ -54,6 +54,13 @@ export interface AbilityDef {
   recast?: (ctx: CastCtx) => void;
   /** Recast wind-up, if different from castTime. */
   recastTime?: number;
+  /**
+   * Press and hold (Fennick's Longshot): `cast` runs when the key goes down and starts the hold, and
+   * letting go sends a release, which runs this (aimed where the cursor is then).
+   */
+  release?: (ctx: CastCtx) => void;
+  /** The indicator while the key is held, if it changes as it's held (a drawn bow reaching further). */
+  holdAim?: (self: Unit) => Aim;
 }
 
 export interface KitStats {
@@ -102,10 +109,22 @@ export interface Kit {
   damageMult?: (world: World, self: Unit, target: Unit) => number;
   /** Melee or ranged, for champion select's filters; by default from the attack reach (under 3 is melee). */
   reach?: 'melee' | 'ranged';
-  /** A second meter the HUD shows under the mana bar (Lumen's Devotion). */
-  meter?: { label: string; max: number; value: (self: Unit) => number };
+  /**
+   * A second meter the HUD shows under the mana bar (Lumen's Devotion). `text` replaces the "label
+   * value / max" caption, `color` the bar's colour (Fennick's next arrow), and `glow` when it glows
+   * (by default: when it's full).
+   */
+  meter?: {
+    label: string; max: number; value: (self: Unit) => number;
+    text?: (self: Unit) => string; color?: (self: Unit) => string; glow?: (self: Unit) => boolean;
+  };
   /** Missile look for ranged auto-attacks (default 'auto'). */
   autoStyle?: MissileStyle;
+  /**
+   * An auto-attack is leaving the bow (Fennick's arrows): what it looks like, a damage multiplier, and
+   * an extra effect when it lands (after its damage).
+   */
+  onAttackFire?: (world: World, self: Unit, target: Unit) => { style?: MissileStyle; damageMult?: number; onHit?: (t: Unit) => void };
   /** Multiplier on auto-attack damage right now (Aurelle's unarmed bolts hit softer). */
   autoDamageMult?: (world: World, self: Unit) => number;
   abilities: [AbilityDef, AbilityDef, AbilityDef, AbilityDef];

@@ -81,6 +81,18 @@ export function buildMissile(m: Missile): MissileLook {
   const obj = new THREE.Group();
   const add = (...o: THREE.Object3D[]) => (obj.add(...o), o[0]);
 
+  /** An arrow along +x: shaft, a glowing head of `color`, and fletching. */
+  const arrow = (color: number, core: number, scale = 1): Omit<MissileLook, 'obj' | 'mats'> => {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7 * scale, 5).rotateZ(Math.PI / 2), lit(0x8a6a44, { roughness: 0.8 }));
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.07 * scale, 0.2 * scale, 6).rotateZ(-Math.PI / 2), basic(core));
+    head.position.x = 0.42 * scale;
+    const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.16 * scale, 0.12 * scale, 0.01), basic(color));
+    fletch.position.x = -0.3 * scale;
+    const fletch2 = fletch.clone();
+    fletch2.rotation.x = Math.PI / 2;
+    add(shaft, head, fletch, fletch2, glow(color, 0.6 * scale));
+    return { height: 1.15, trail: { color, width: 0.12 * scale, life: 0.12 } };
+  };
   const looks: Record<MissileStyle, () => Omit<MissileLook, 'obj' | 'mats'>> = {
     // Champion and caster-minion autos: a team-coloured orb.
     auto: () => {
@@ -279,6 +291,36 @@ export function buildMissile(m: Missile): MissileLook {
       core.position.x = 0.06;
       add(flame, core, glow(0xffa630, 1.3));
       return { height: 1.2, trail: { color: 0xffb347, width: 0.3, life: 0.2 }, animate: (t) => flame.scale.set(1 + Math.sin(t * 40) * 0.12, 1, 1) };
+    },
+    // Fennick's arrows: a wooden shaft with a coloured head, fletching, and a trail of its element.
+    frostArrow: () => arrow(0x8fd8ff, 0xdff6ff),
+    fireArrow: () => arrow(0xff8a3d, 0xffe0a0),
+    sparkArrow: () => arrow(0xffe14a, 0xffffff),
+    // Overcharge: a white arrow trailing all three colours.
+    prismArrow: () => {
+      const look = arrow(0xffffff, 0xffffff);
+      const ring = droplets(3, 0.16, 0.05, basic(0x8fd8ff));
+      (ring.children[1] as THREE.Mesh).material = basic(0xff8a3d);
+      (ring.children[2] as THREE.Mesh).material = basic(0xffe14a);
+      add(ring);
+      return { ...look, trail: { color: 0xd8c8ff, width: 0.2, life: 0.16 }, animate: (t) => (ring.rotation.x = t * 14) };
+    },
+    // Longshot: a long heavy arrow, glowing with the draw.
+    longshot: () => {
+      const look = arrow(0x6fc3a0, 0xe8fff4, 1.6);
+      add(glow(0x9ff0c8, 1.4));
+      return { ...look, trail: { color: 0x9ff0c8, width: 0.3, life: 0.22 } };
+    },
+    // Snare Shot: a weighted net spinning open in flight.
+    net: () => {
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 4, 10), lit(0xc9b98a, { roughness: 0.9 }));
+      const web = new THREE.Mesh(new THREE.CircleGeometry(0.32, 10), basic(0xe8dcb0, 0.35));
+      const weights = droplets(4, 0.34, 0.06, lit(0x55504a, { metalness: 0.6, roughness: 0.4 }));
+      const g = new THREE.Group();
+      g.add(mesh, web);
+      g.rotation.y = Math.PI / 2;
+      add(g, weights);
+      return { height: 1.15, trail: { color: 0xc9b98a, width: 0.2, life: 0.12 }, animate: (t) => { g.rotation.z = t * 8; weights.rotation.x = t * 8; } };
     },
     tongue: () => {
       // Thistle's Gulp: a sticky, bulbous pink tip; the stretch back to his mouth is a `Tongue`.

@@ -6,6 +6,7 @@ import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, nearStandard, standardOnLine, standardsOf } from './kits/gerrit';
 import { LUMEN_TUNING, devotion } from './kits/lumen';
+import { FENNICK_TUNING, drawFraction, drawing, longshotRange, overcharged, volleyReady } from './kits/fennick';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -114,6 +115,7 @@ export class BotController implements Controller {
       pip: { play: this.pip, escape: this.pipEscape },
       gerrit: { play: this.gerrit, escape: this.gerritEscape },
       lumen: { play: this.lumen, escape: this.lumenEscape },
+      fennick: { play: this.fennick, escape: this.fennickEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -895,6 +897,77 @@ export class BotController implements Controller {
     if (!foe) return null;
     if (ready(2) && near(5)) return cast(2, toward(self.pos, spawnPoint(self.team), LUMEN_TUNING.E.range));
     if (ready(1) && near(3)) return cast(1, self.pos);
+    return null;
+  }
+
+  // ---------- Fennick ----------
+
+  /**
+   * Draw Longshot from long range and loose it at full draw (or early when someone closes in), net
+   * whoever dives him, Volley into trades, Overcharge to finish a fight, and kite melee champions
+   * between attacks.
+   */
+  private fennick(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim } = ctx;
+    const { Q, E } = FENNICK_TUNING;
+    const mana = self.champ!.mana / self.champ!.maxMana;
+    if (drawing(self)) return this.fennickLoose(ctx);
+    if (!foe) return null;
+    const hp = self.hp / self.maxHp;
+    const foeHp = foe.hp / foe.maxHp;
+    const d = gap(self, foe);
+    const towardFoe = self.team === 'blue' ? 1 : -1;
+    const diving = d < 3.5 && (foe.attackTarget === self.id || foe.range < 3);
+    const trading = d <= self.range + 0.3 && !unsafe(foe.pos);
+    // Net a diver, or a target worth an all-in.
+    if (ready(2) && near(E.range - 0.8) && (diving || (foeHp < 0.45 && hp > 0.4 && !unsafe(foe.pos)))) {
+      const p = aim(foe, E.speed);
+      if (!minionInTheWay(world, self, p, E.width)) return cast(2, p);
+    }
+    if (ready(3) && near(self.range + 1.5) && ((foeHp < 0.5 && hp > 0.3) || (hp > 0.5 && foe.attackTarget === self.id))) return cast(3, self.pos);
+    if (ready(1) && trading && (foeHp < 0.7 || overcharged(world, self) || diving)) return cast(1, self.pos);
+    if (trading && (foeHp < 0.55 || overcharged(world, self) || volleyReady(world, self))) return { type: 'attack', target: foe.id };
+    // Kite melee champions: shoot when the bow is ready, step back along the lane in between.
+    if (foe.range < 3 && d < foe.range + 3) {
+      if (self.windup > 0) return { type: 'attack', target: foe.id };
+      if (self.attackCd === 0 && d <= self.range) return { type: 'attack', target: foe.id };
+      const away = { x: self.pos.x - towardFoe * 3, y: self.pos.y + Math.sign(self.pos.y - foe.pos.y || 1) };
+      if (!unsafe(away)) return { type: 'move', to: away };
+    }
+    // Poke: start drawing at a safe distance (it can't be cancelled, and he can't attack meanwhile).
+    if (ready(0) && mana > 0.3 && d > 4 && d < Q.maxRange - 1 && !diving) return cast(0, foe.pos);
+    return null;
+  }
+
+  /** Mid-draw: loose at full draw, or early if the target is closing in or about to slip out of reach. */
+  private fennickLoose({ world, self, foe, aim }: Ctx): Command | null {
+    const { Q } = FENNICK_TUNING;
+    const k = drawFraction(self);
+    const held = (world.tick - ((self.champ!.data as { drawStart?: number }).drawStart ?? world.tick)) / TICK_HZ;
+    if (!foe) return held > 1.5 ? { type: 'release', slot: 0, at: self.pos } : null;
+    const p = aim(foe, Q.speed);
+    const reach = longshotRange(k);
+    const d = dist(self.pos, p);
+    const pressed = gap(self, foe) < 3;
+    if ((k >= 1 && d < reach) || (pressed && k > 0.3) || held > Q.timeout - 0.4) return { type: 'release', slot: 0, at: p };
+    // Walk back while drawing if they're closing in.
+    if (gap(self, foe) < 5) return { type: 'move', to: toward(self.pos, spawnPoint(self.team), 2) };
+    return null;
+  }
+
+  private fennickEscape(ctx: Ctx): Command | null {
+    const { world, self, foe, near, ready, aim } = ctx;
+    if (drawing(self)) {
+      const out = this.fennickLoose(ctx);
+      if (out?.type === 'release') return out;
+    }
+    if (!foe) return null;
+    const { E } = FENNICK_TUNING;
+    if (ready(2) && near(5)) {
+      const p = aim(foe, E.speed);
+      if (!minionInTheWay(world, self, p, E.width)) return cast(2, p);
+    }
+    if (ready(3) && near(4)) return cast(3, self.pos);
     return null;
   }
 
