@@ -35,33 +35,192 @@ npm test           # sim tests
 
 Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Sir Gerrit**, **Lumen** and **Fennick** (below).
 
-| | Arlo, the Wayfinder (ranged, Ezreal-like) | Tock, the Unwound (melee time-bender) | Maren, the Tidecaller (ranged control mage) |
-|---|---|---|---|
-| Passive | **Triangulate**: every attack or ability hit takes a bearing; the 3rd on the same enemy within 4s deals bonus damage and gives +15% attack speed for 2s | **Second Hand**: every 3rd attack echoes 0.4s later for 60% | **Undertow**: abilities Soak champions; the 3rd stack roots for 1s |
-| Q | **Sparkshot**: skillshot that hits the first enemy; on hit, all cooldowns -1.5s | **Pendulum**: telegraphed cone sweep; recast within 3s to backswing (+50% to anything hit twice) | **Riptide**: lobbed wave lands after 0.6s (telegraphed) for damage + 30% slow |
-| W | **Rune Flare**: passes minions and marks a champion; an attack or ability detonates it for damage + mana | **Stopwatch**: field that slows enemies 35% and freezes enemy skillshots in mid-air (auto-attacks pass through); they crumble when it ends. Standing in his own field shields Tock (once per field), fading 1s after he leaves | **Tide Shield**: absorb shield; bursts around her when it breaks or fades |
-| E | **Phase Step**: blink, then a homing bolt at the nearest enemy (marked first) | **Skip**: dash through enemies, leaving an echo; recast within 4s to snap back | **Undertow Hook**: skillshot that drags the first enemy 4 units toward her |
-| R | **Skyline Barrage**: 0.75s wind-up, then a wide wave across the whole lane (minions take half) | **Rewind**: plant an anchor; after 3s (or recast) snap back, recover all HP lost since, and replay 50/75% of the damage you dealt to champions | **Maelstrom**: 3s whirlpool that drags enemies inward and damages, then erupts and stuns 1s |
+Each champion's **Bot vs bot** row is its bot's win rate against every other bot champion (both sides, several seeds, the run's duel rules): a balance guide, not a promise.
 
-Tock's bot opens good fights with Rewind: it plants the anchor with the enemy in reach, then Stopwatch, Skip, both Pendulum swings and attacks, snapping back with its health restored and the echo on them (it still uses Rewind to escape when low). Bot vs bot he wins about 58%, the strongest on the roster.
+### Arlo, the Wayfinder
 
-**Lisha, the Blossom Blade** (melee duelist, Irelia-like): **Petal Harvest** passive: consuming a mark with Q heals her · **Q Petal Step**: dash to a clicked enemy and cut it; resets if it was marked (also refunds half the mana) or dies · **W Find Your Center**: 1s meditation (rooted), then 3s of 35–55% damage reduction and 3% max HP/s regeneration · **E Twin Petals**: a pincer: two blades start beside her and close on the aimed point; everything inside the V is cut (outermost first) and marked (minions take 80%) · **R Blossom Storm**: a fan of 9 blades, up to 3 per enemy, marking everything. The bot plays her hit-and-run: Twin Petals to mark, Petal Step in (it can't be dodged, and a mark resets it and heals her), swing while a blade is up, and step out of their reach once both are down; it won't fight inside their wave or an unstoppable champion, gets out early when a fight turns, and only meditates (Find Your Center roots her) out of their reach. Bot vs bot she wins about 50% (strong into Pip, Mabel and Aurelle; weak into Gormund, Maren and Sable).
+Ranged skillshot marksman (Ezreal-like).
 
-**Mabel, the Beekeeper** (a mouse; short-range lane pusher, smallest hitbox): spends **bees** instead of mana (4 rising to 8, one regrows every 4s, last hits give one). **The Swarm** passive: each bee adds damage to her attacks, honeyed enemies take 30% more from her bees, minions that die stung count as her last hits (**Pollinated**), and getting hit by a champion makes her scurry (+30% speed). **Q Sting**: a bee latches on and stings over 3s; stings stack · **W Honey Pot**: a slowing puddle that honeys enemies · **E Hive**: a 10s hive that fires bees, buffs nearby allied minions and doubles her bee regrowth · **R Queen's Fury**: refill the swarm and dive one champion with every bee.
+| | |
+|---|---|
+| **Passive: Triangulate** | Every attack or ability hit takes a bearing; the 3rd on the same enemy within 4s deals bonus damage and gives +15% attack speed for 2s. |
+| **Q: Sparkshot** | Skillshot that hits the first enemy; on hit, all his cooldowns drop by 1.5s. |
+| **W: Rune Flare** | Passes through minions and marks a champion; an attack or ability detonates the mark for damage and mana. |
+| **E: Phase Step** | Blink, then a homing bolt at the nearest enemy (marked ones first). |
+| **R: Skyline Barrage** | 0.75s wind-up, then a wide wave across the whole lane (minions take half). |
+| **Bot** | Pokes with Sparkshot and Rune Flare, last-hits out of range with Sparkshot when it has mana to spare, Phase Steps in for a kill and out when losing up close, and fires Skyline Barrage from anywhere when it would kill. |
+| **Bot vs bot** | About 44%. Strong into Tock, Pip and Gormund; weak into Sable, Maren and Aurelle. |
+| **Code** | `src/sim/kits/arlo.ts` |
 
-**Lumen, the Kindly** (experimental; placeholder candle-saint): a ranged sustain caster whose light heals and whose heat burns. **Devotion** passive: her healing fills a 0–100 meter (shown under her mana); healing beyond 3% of her max health a second becomes Devotion instead of health (the healing cap), and healing past full health becomes an Afterglow shield (up to 20% of her max health, 3s). At 100 she's **Radiant**: 20% more damage and 10% move speed, until she spends it. **Q Candleflame**: a skillshot that burns the first enemy hit and heals her for 30% of it (15% off minions, more for a minion kill). **W Sanctuary**: a ring of light for 3s; she heals inside, enemies inside burn and are slowed 20%. **E Warm Embrace**: a dash that shields her and burns enemies she passes through. **R Sunrise**: needs 50 Devotion and spends it all; she becomes a burning sun for 4–8s (longer with more Devotion), burning everything near her and healing off it. The bot pokes with Candleflame, lays Sanctuary under trades, dashes through when winning, and saves Devotion (Radiant) unless Sunrise wins the fight; bot vs bot she wins about 46% (strong into Gormund, Sable, Pip and Maren; weak into Arlo, Lisha and Mabel). Code: `src/sim/kits/lumen.ts`.
+### Tock, the Unwound
 
-**Fennick, the Tinker-Archer** (experimental; placeholder archer): a ranged auto-attack carry with no dash. **Quiver** passive: his attacks turn through frost (slows), fire (burns) and spark (jumps to the nearest other enemy) arrows; the HUD's meter shows the next one. **Q Longshot** is the game's first *press-and-hold* ability: the key going down starts the draw (he slows and can't attack), and letting go sends a `release` command that looses it; it reaches 6 to 12 units over 1.25s, and a full draw hits harder, pierces, and carries his next arrow. It looses itself after 3s. **W Volley**: his next attack looses all three arrows in quick succession, then the quiver skips ahead one. **E Snare Shot**: a net arrow; enemies in the net are slowed, and anyone still in it after 0.75s is rooted. **R Overcharge**: for 5s every attack carries all three arrows, plus 25–35% move speed that fades. The bot maxes Longshot and fires it fully drawn down the longest line of minions to clear the wave (catching the champion in it when it can), pokes with attacks and Volley when the trade is safe, and goes all in (Snare Shot, Overcharge, attacks) when they're low and he isn't, keeping the net for divers against melee champions; it kites melee champions throughout. Longshot is a *poke*: minions only answer the call for help if he's within their aggro range, so a full draw from outside the wave doesn't drag it across the lane. Bot vs bot he wins about 42% (strong into Pip, Aurelle and Mabel; weak into divers like Gormund, Sable and Tock). Code: `src/sim/kits/fennick.ts`.
+Melee time-bender who trades, then undoes the damage.
 
-**Sir Gerrit, the Grounded** (experimental; placeholder knight): an old knight of a fallen order who plants standards and thrusts himself into them. **Hold the Ground** passive: within 4 units of any of his standards he takes 25% less damage, attacks 20% faster and restores 2% of his max health a second. **Q Halberd Thrust**: a 7-unit line thrust that damages and slows; if it crosses one of his standards he's pulled to it, knocking up (0.5s) everyone he passes (each enemy at most once every 2s), and the standard stays. **W Bulwark**: a shield for 3s that slows champions who hit him; recast while it holds to slam it down, giving up the rest of it, and root enemies within 1 unit for 0.75s. **E Plant the Standard**: thrown up to 7 units (the same as the thrust's reach, so a standard thrown at full range can always be thrusted to), damages and slows where it lands, stands 8s (one at a time, can't be attacked). **R Fallen Standards**: click an enemy champion within 6 units; he leaps onto them, and on landing three old banners fly out and plant behind the target for 4s (they count as standards; enemies passing close are slowed), and Halberd Thrust comes off cooldown, so he can thrust through them to cut off the retreat. The bot plants a standard at his feet when a fight starts, engages with the standard past the enemy and a thrust through them, and escapes by planting toward his tower and thrusting to it; bot vs bot he wins about 43% (strong into Gormund and Pip, weak into ranged poke). Every bot steps off the line between an enemy Gerrit and his standards while his thrust is up. Code: `src/sim/kits/gerrit.ts`.
+| | |
+|---|---|
+| **Passive: Second Hand** | Every 3rd attack echoes 0.4s later for 60%. |
+| **Q: Pendulum** | Telegraphed cone sweep; recast within 3s to backswing (+50% to anything hit by both swings). |
+| **W: Stopwatch** | A field that slows enemies 35% and freezes enemy skillshots in mid-air (auto-attacks pass through); they crumble when it ends. Standing in his own field shields Tock (once per field), fading 1s after he leaves. |
+| **E: Skip** | Dash through enemies, leaving an echo; recast within 4s to snap back to it. |
+| **R: Rewind** | Plant an anchor; after 3s (or on recast) snap back to it, recover all health lost since, and every champion he damaged takes 50/75% of that damage again. |
+| **Bot** | Opens good fights with Rewind: plants the anchor with the enemy in reach, then Stopwatch, Skip, both Pendulum swings and attacks, snapping back with its health restored and the echo on them (still a panic button when low). Freezes skillshots flying at it with Stopwatch, and against ranged champions drops Stopwatch on them and Skips in. |
+| **Bot vs bot** | About 65%, the strongest on the roster (left strong on purpose; a 120/100s Rewind cooldown would bring him to about 53%). Strong into Lisha, Aurelle and Sable; weak into Mabel and Arlo. |
+| **Code** | `src/sim/kits/tock.ts` |
 
-**Pip & Thistle, the Odd Couple** (Pip is a BlenderKit model; Thistle is a custom static toad, hopped and squashed in code): a tiny sprout-knight riding a giant, anxious toad. **Best Friends** passive: Thistle is a second unit (a *pet*) with his own health that grows with Pip's level. While Pip rides, damage hits Thistle first, and he takes only 80% of it. He regenerates 2% of his health a second after 4s without being hit, and heals at the fountain. At 0 Thistle panics, throws Pip off and bounds home (untargetable) for 12s, coming back at half health. On foot, Thistle bites whatever Pip attacks, snaps at a champion attacking Pip, stops skillshots with his body, and minions and towers go for him before Pip. His kills are Pip's; only Pip's death counts. Riding (melee, faster, +20% auto damage, and 40% more damage to minions: Thistle eats waves): **Q Gulp** tongue skillshot (a pink tongue stretches from Thistle's mouth and snaps back) (minions take 150%; one it finishes is swallowed, heals Thistle and halves the remaining cooldown; the enemy champion is yanked in), **W Hop** leap with a slowing splash, **E Hop Off** vault off (+20% move speed for 2s) and fight on foot. On foot (5-range slingshot): **Q Pebble Burst** three pebbles in a spread (repeat hits on one target deal 50%), **W Puff Up** Thistle hops to a spot and puffs up for 3s (40% less damage taken, heals 30 + 6% of his max health over it, slows enemies around him; he doesn't grow), **E Saddle Up** dash to Thistle and climb on. Each form keeps its own Q/W cooldowns. **R Big Leap** (both forms): Thistle crashes onto an area, damaging and knocking up (0.8s stun) everyone there; riding, Pip comes along. The bot rides by default, Gulps any minion it would finish out of reach (a sure last hit that feeds Thistle), Hops onto minion clumps, steps out of reach when Thistle wears thin unless it's winning the fight, and fights on foot only while Thistle recovers, puffing him up in the enemy's path. Bot vs bot he wins about 49%: strong into Gormund and Tock, weak into Mabel. Code: `src/sim/kits/pip.ts`.
+### Maren, the Tidecaller
 
-**Aurelle, the Spellspear** (floating battle mage): **Bound Weapon** passive: holding her spear she attacks with 2.6-range thrusts; without it, arcane bolts (range 5, 70% damage); picking it up empowers her next thrust, and a dropped spear flies back after 6s · **Q Arcane Lance**: throw the spear through minions; if it impales a champion it stops in them and she can recast within 3s to rip it back through everything (60% damage); a miss lands at max range and can't be recalled · **W Glyph Step**: blink, leaving a glyph that detonates and slows · **E Sweep / Arcane Nova**: with the spear, a knockback sweep; without it, a bigger burst · **R Arsenal Ascendant**: for 6s, Arcane Lance throws three returning spectral lances (2s cooldown) and her attacks cleave; then they crash down around her.
+Ranged control mage.
 
-**Gormund, Lord of the Labyrinth** (a minotaur; melee juggernaut, bare-handed): no mana; **abilities cost a share of his current health** (never lethal). **Thick Hide** passive: after 3s without trading with the enemy champion or taking tower shots (minions don't count), he regenerates 5% max HP per second; **Fury**: up to +30% damage as his health drops, maxed at 30% health · **Q Hurl Stone** (7%): a rock skillshot that slows 35% and shatters for 60% splash; hitting the champion refunds its cost · **W Bellow** (5%): a roar that slows nearby enemies 35%, gives him 25% speed for 2s and 25% damage reduction for 3s · **E Bull Rush** (10%): a straight 6-unit charge; the first champion in the way is carried to the end and stunned for 0.75s, minions are shoved aside · **R Labyrinth Rage**: for 7s he grows huge, is unstoppable (sheds and ignores slows, roots, stuns and pulls), casts for free and heals for 20% of his damage. The bot plays him aggressively: Bull Rush in, Bellow when they're in reach, and swing; it commits on even trades (Fury) and takes some minion hits for it. Stones cost health, so it throws them only where they'll land (the target slowed, stunned or close, or a kill), plus Hurl Stone into minion clumps to clear; bot vs bot he wins about 54% (strong into Arlo, Lisha, Tock and Aurelle; weak into Mabel and Pip).
+| | |
+|---|---|
+| **Passive: Undertow** | Her abilities Soak champions; the 3rd stack roots for 1s. |
+| **Q: Riptide** | A lobbed wave that lands after 0.6s (telegraphed) for damage and a 30% slow. |
+| **W: Tide Shield** | An absorb shield that bursts around her when it breaks or fades. |
+| **E: Undertow Hook** | Skillshot that drags the first enemy 4 units toward her. |
+| **R: Maelstrom** | A 3s whirlpool that drags enemies inward and damages, then erupts and stuns for 1s. |
+| **Bot** | Riptides where the enemy will be, hooks them in when healthy, drops Maelstrom on a slowed, rooted or hurt target, shields when they commit or a tower is about to hit, and farms with Riptide on minion clumps. |
+| **Bot vs bot** | About 60%. Strong into Arlo, Mabel and Lisha; weak into Sable and Tock. |
+| **Code** | `src/sim/kits/maren.ts` |
 
-**Sable, the Silent** (a quiet harvest reaper; melee catcher with a chained scythe): **Gleaning** passive: hooked enemies are Gleaned for 4s (she reaches 1.2 further against them, and her damage to them heals her 25%); her attacks sweep, hitting others in a short arc for 50% · **Q Reaping Hook**: a skillshot that yanks the first enemy to her and opens a 2.5s **Reaping window** for ONE follow-up (autos in the window are ordinary, so weave some in first): **Q again** to *Reap* (an empowered cone swing, up to 75% stronger the lower they are), **W** to *Bind* (root 1.25s), or **E** to *Vault* (leap over them to their far side and slow them). The follow-ups glow as recasts on Q, W and E while the window is open, and using one closes it · **W Wide Swath**: a slowing spin (extra damage to minions) · **E Drift**: a short dash; she takes 25% less damage for 2s · **R Last Harvest**: after a 0.5s wind-up (telegraphed), a great crescent drags everything in it to her and opens the window on all of them. The bot plays her aggressively and maxes Wide Swath first: it Drifts in beside the enemy (the damage reduction carries the trade) then swaths and swings, Drifts into their casters to swath the back of the wave, hooks from range, and spends the Reaping window as before; bot vs bot she wins about 55% (strong into Arlo, Pip and Lisha; weak into Gormund, Tock and Mabel).
+### Lisha, the Blossom Blade
+
+Melee duelist (Irelia-like): mark enemies, then dash from target to target.
+
+| | |
+|---|---|
+| **Passive: Petal Harvest** | Consuming a mark with Petal Step heals her. |
+| **Q: Petal Step** | Dash to a clicked enemy and cut it; the cooldown resets if it was marked (also refunding half the mana) or dies. |
+| **W: Find Your Center** | 1s meditation (rooted), then 3s of 35–55% damage reduction and 3% max health per second. |
+| **E: Twin Petals** | A pincer: two blades start beside her and close on the aimed point; everything inside the V is cut (outermost first) and marked (minions take 80%). |
+| **R: Blossom Storm** | A fan of 9 blades, up to 3 per enemy, marking everything. |
+| **Bot** | Hit and run: Twin Petals to mark, Petal Step in (it can't be dodged, and a mark resets it and heals her), swing while a blade is up, and step out of their reach once both are down. Won't fight inside their wave or an unstoppable champion, gets out early when a fight turns, and only meditates out of their reach. |
+| **Bot vs bot** | About 45%. Strong into Aurelle and Arlo; weak into Sable, Gormund and Mabel. |
+| **Code** | `src/sim/kits/lisha.ts` |
+
+### Mabel, the Beekeeper
+
+A mouse; short-range lane pusher with the smallest hitbox. Spends **bees** instead of mana (4 rising to 8; one regrows every 4s, and last hits give one).
+
+| | |
+|---|---|
+| **Passive: The Swarm** | Each bee adds damage to her attacks, honeyed enemies take 30% more from her bees, minions that die stung count as her last hits (Pollinated), and getting hit by a champion makes her scurry (+30% speed). |
+| **Q: Sting** | A bee latches on and stings over 3s; stings stack. |
+| **W: Honey Pot** | A slowing puddle that honeys enemies. |
+| **E: Hive** | A 10s hive that fires bees, buffs nearby allied minions and doubles her bee regrowth. |
+| **R: Queen's Fury** | Refill the swarm and dive one champion with every bee. |
+| **Bot** | Kites melee champions (honey on the chaser, the hive behind her, a step back between shots), honeys first, keeps a bee in reserve for the hive, plants the hive between her and a fight or by her wave to siege, honeys minion clumps, stings minions so they count as hers, and calls Queen's Fury on a hurt or honeyed champion. |
+| **Bot vs bot** | About 64%. Strong into Pip, Gormund and Aurelle; weak into Maren and Sable. |
+| **Code** | `src/sim/kits/mabel.ts` |
+
+### Aurelle, the Spellspear
+
+Floating battle mage with a spear she throws and recalls.
+
+| | |
+|---|---|
+| **Passive: Bound Weapon** | Holding her spear she attacks with 2.6-range thrusts; without it, arcane bolts (range 5, 70% damage). Picking it up empowers her next thrust, and a dropped spear flies back after 6s. |
+| **Q: Arcane Lance** | Throw the spear through minions; if it impales a champion it stops in them, and she can recast within 3s to rip it back through everything (60% damage). A miss lands at max range and can't be recalled. |
+| **W: Glyph Step** | Blink, leaving a glyph that detonates and slows. |
+| **E: Sweep / Arcane Nova** | With the spear, a knockback sweep; without it, a bigger burst. |
+| **R: Arsenal Ascendant** | For 6s, Arcane Lance throws three returning spectral lances (2s cooldown) and her attacks cleave; then they crash down around her. |
+| **Bot** | Throws the lance at the champion (never into a Stopwatch field), rips it back the moment it impales, sweeps or novas when they're inside it, calls Arsenal Ascendant when a fight is on, and fetches a dropped spear only when it isn't in the enemy's reach, their wave or under their tower. |
+| **Bot vs bot** | About 42%. Strong into Pip and Maren; weak into Lisha, Mabel and Tock. |
+| **Code** | `src/sim/kits/aurelle.ts` |
+
+### Gormund, Lord of the Labyrinth
+
+A minotaur; melee juggernaut, bare-handed. No mana: **abilities cost a share of his current health** (never lethal).
+
+| | |
+|---|---|
+| **Passive: Thick Hide and Fury** | After 3s without trading with the enemy champion or taking tower shots (minions don't count), he regenerates 5% max health per second. Fury: up to +30% damage as his health drops, maxed at 30% health. |
+| **Q: Hurl Stone (7%)** | A rock skillshot that slows 35% and shatters for 60% splash; hitting the champion refunds its cost. |
+| **W: Bellow (5%)** | A roar that slows nearby enemies 35%, gives him 25% speed for 2s and 25% damage reduction for 3s. |
+| **E: Bull Rush (10%)** | A straight 6-unit charge; the first champion in the way is carried to the end and stunned for 0.75s, and minions are shoved aside. |
+| **R: Labyrinth Rage** | For 7s he grows huge, is unstoppable (sheds and ignores slows, roots, stuns and pulls), casts for free and heals for 20% of his damage. |
+| **Bot** | Aggressive: Bull Rush in, Bellow when they're in reach, and swing; commits on even trades (Fury) and takes some minion hits for it. Stones cost health, so it throws them only where they'll land (the target slowed, stunned or close, or a kill), plus into minion clumps to clear. |
+| **Bot vs bot** | About 45%. Strong into Lisha and Aurelle; weak into Pip, Mabel and Maren. |
+| **Code** | `src/sim/kits/gormund.ts` |
+
+### Sable, the Silent
+
+A quiet harvest reaper; melee catcher with a chained scythe.
+
+| | |
+|---|---|
+| **Passive: Gleaning** | Hooked enemies are Gleaned for 4s: she reaches 1.2 further against them, and her damage to them heals her 25%. Her attacks sweep, hitting others in a short arc for 50%. |
+| **Q: Reaping Hook** | A skillshot that yanks the first enemy to her and opens a 2.5s **Reaping window** for one follow-up (autos in the window are ordinary, so weave some in first): **Q again** to *Reap* (an empowered cone swing, up to 75% stronger the lower they are), **W** to *Bind* (root 1.25s), or **E** to *Vault* (leap over them to their far side and slow them). The follow-ups glow as recasts while the window is open, and using one closes it. |
+| **W: Wide Swath** | A slowing spin (extra damage to minions). |
+| **E: Drift** | A short dash; she takes 25% less damage for 2s. |
+| **R: Last Harvest** | After a 0.5s wind-up (telegraphed), a great crescent drags everything in it to her and opens the window on all of them. |
+| **Bot** | Aggressive, maxing Wide Swath first: Drifts in beside the enemy (the damage reduction carries the trade), then swaths and swings, Drifts into their casters to swath the back of the wave, hooks from range, and spends the Reaping window. |
+| **Bot vs bot** | About 54%. Strong into Arlo, Gormund and Lisha; weak into Tock and Aurelle. |
+| **Code** | `src/sim/kits/sable.ts` |
+
+### Pip & Thistle, the Odd Couple
+
+A tiny sprout-knight riding a giant, anxious toad. Pip is a BlenderKit model; Thistle is a custom static toad, hopped and squashed in code.
+
+| | |
+|---|---|
+| **Passive: Best Friends** | Thistle is a second unit (a *pet*) with his own health that grows with Pip's level. While Pip rides, damage hits Thistle first, and he takes only 80% of it. He regenerates 2% of his health a second after 4s without being hit, and heals at the fountain. At 0 Thistle panics, throws Pip off and bounds home (untargetable) for 12s, coming back at half health. On foot, Thistle bites whatever Pip attacks, snaps at a champion attacking Pip, stops skillshots with his body, and minions and towers go for him before Pip. His kills are Pip's; only Pip's death counts. |
+| **Riding** | Melee and faster, +20% auto damage and 40% more damage to minions (Thistle eats waves). |
+| **Q: Gulp (riding)** | Tongue skillshot (a pink tongue stretches from Thistle's mouth and snaps back). Minions take 150%; one it finishes is swallowed, heals Thistle and halves the remaining cooldown; the enemy champion is yanked in. |
+| **W: Hop (riding)** | A leap with a slowing splash. |
+| **E: Hop Off (riding)** | Vault off (+20% move speed for 2s) and fight on foot. |
+| **On foot** | A 5-range slingshot. Each form keeps its own Q/W cooldowns. |
+| **Q: Pebble Burst (on foot)** | Three pebbles in a spread (repeat hits on one target deal 50%). |
+| **W: Puff Up (on foot)** | Thistle hops to a spot and puffs up for 3s: 40% less damage taken, heals 30 + 6% of his max health over it, and slows enemies around him (he doesn't grow). |
+| **E: Saddle Up (on foot)** | Dash to Thistle and climb on. |
+| **R: Big Leap (both forms)** | Thistle crashes onto an area, damaging and knocking up (0.8s stun) everyone there; riding, Pip comes along. |
+| **Bot** | Rides by default, Gulps any minion it would finish out of reach (a sure last hit that feeds Thistle), Hops onto minion clumps, steps out of reach when Thistle wears thin unless it's winning the fight, and fights on foot only while Thistle recovers, puffing him up in the enemy's path. |
+| **Bot vs bot** | About 49%. Strong into Gormund, Tock and Sable; weak into Mabel, Arlo and Lisha. |
+| **Code** | `src/sim/kits/pip.ts` |
+
+### Sir Gerrit, the Grounded (experimental)
+
+An old knight of a fallen order who plants standards and thrusts himself into them. Placeholder model.
+
+| | |
+|---|---|
+| **Passive: Hold the Ground** | Within 4 units of any of his standards he takes 25% less damage, attacks 20% faster and restores 2% of his max health a second. |
+| **Q: Halberd Thrust** | A 7-unit line thrust that damages and slows; if it crosses one of his standards he's pulled to it, knocking up (0.5s) everyone he passes (each enemy at most once every 2s), and the standard stays. |
+| **W: Bulwark** | A shield for 3s that slows champions who hit him; recast while it holds to slam it down, giving up the rest of it, and root enemies within 1 unit for 0.75s. |
+| **E: Plant the Standard** | Thrown up to 7 units (the thrust's reach, so a standard at full range can always be thrusted to); damages and slows where it lands and stands 8s (one at a time, can't be attacked). |
+| **R: Fallen Standards** | Click an enemy champion within 6 units; he leaps onto them, three old banners fly out and plant behind the target for 4s (they count as standards; enemies passing close are slowed), and Halberd Thrust comes off cooldown, so he can thrust through them to cut off the retreat. |
+| **Bot** | Plants a standard at his feet when a fight starts, engages with a standard past the enemy and a thrust through them, and escapes by planting toward his tower and thrusting to it. Every bot steps off the line between an enemy Gerrit and his standards while his thrust is up. |
+| **Bot vs bot** | About 34%. Strong into Gormund and Pip; weak into ranged poke (Arlo, Maren) and Sable. |
+| **Code** | `src/sim/kits/gerrit.ts` |
+
+### Lumen, the Kindly (experimental)
+
+A ranged sustain caster whose light heals and whose heat burns. Placeholder candle-saint.
+
+| | |
+|---|---|
+| **Passive: Devotion** | Her healing fills a 0–100 meter (shown under her mana). Healing beyond 3% of her max health a second becomes Devotion instead of health (the healing cap), and healing past full health becomes an Afterglow shield (up to 20% of her max health, 3s). At 100 she's **Radiant**: 20% more damage and 10% move speed, until she spends it. |
+| **Q: Candleflame** | A skillshot that burns the first enemy hit and heals her for 30% of it (15% off minions, more for a minion kill). |
+| **W: Sanctuary** | A ring of light for 3s; she heals inside, and enemies inside burn and are slowed 20%. |
+| **E: Warm Embrace** | A dash that shields her and burns enemies she passes through. |
+| **R: Sunrise** | Needs 50 Devotion and spends it all; she becomes a burning sun for 4–8s (longer with more Devotion), burning everything near her and healing off it. |
+| **Bot** | Pokes with Candleflame, lays Sanctuary under trades, dashes through when winning, and saves Devotion (Radiant) unless Sunrise wins the fight. |
+| **Bot vs bot** | About 46%. Strong into Gormund, Maren and Arlo; weak into Aurelle, Mabel and Tock. |
+| **Code** | `src/sim/kits/lumen.ts` |
+
+### Fennick, the Tinker-Archer (experimental)
+
+A ranged auto-attack carry with no dash. Placeholder archer.
+
+| | |
+|---|---|
+| **Passive: Quiver** | His attacks turn through frost (slows), fire (burns) and spark (jumps to the nearest other enemy) arrows; the HUD's meter shows the next one. |
+| **Q: Longshot** | The game's first *press-and-hold* ability: the key going down starts the draw (he slows and can't attack), and letting go sends a `release` command that looses it. It reaches 6 to 12 units over 1.25s; a full draw hits for 125%, pierces, and carries his next arrow. It looses itself after 3s. It's a *poke*: minions only answer the call for help if he's within their aggro range, so a full draw from outside the wave doesn't drag it across the lane. |
+| **W: Volley** | His next attack looses all three arrows in quick succession, then the quiver skips ahead one. |
+| **E: Snare Shot** | A net arrow; enemies in the net are slowed, and anyone still in it after 0.75s is rooted. |
+| **R: Overcharge** | For 5s every attack carries all three arrows, plus 25–35% move speed that fades. |
+| **Bot** | Maxes Longshot and fires it fully drawn down the longest line of minions to clear the wave (catching the champion in it when it can), pokes with attacks and Volley when the trade is safe, and goes all in (Snare Shot, Overcharge, attacks) when they're low and he isn't, keeping the net for divers against melee champions. Kites melee champions throughout. |
+| **Bot vs bot** | About 44%. Strong into Pip, Aurelle and Arlo; weak into divers (Tock, Gormund, Lisha). |
+| **Code** | `src/sim/kits/fennick.ts` |
 
 Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
 
