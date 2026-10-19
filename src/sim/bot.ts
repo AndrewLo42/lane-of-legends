@@ -621,44 +621,39 @@ export class BotController implements Controller {
     const hp = self.hp / self.maxHp;
     const foeHp = foe.hp / foe.maxHp;
     const d = gap(self, foe);
-    // Fury makes low health less scary for him than for anyone else, so he commits on even trades.
-    const fighting = foeHp < 0.6 || hp > foeHp - 0.05 || raging(world, self);
-    // Hitting a champion turns their minions on him, so don't dive into the middle of their wave
-    // unless it ends the fight (or Labyrinth Rage is carrying him through it).
+    const rage = raging(world, self);
+    // Aggressive: Fury makes low health less scary for him than for anyone else, so he commits on even
+    // trades and takes a few of their minions' hits for it, just not a full wave or their tower.
     const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
-    const safe = !unsafe(foe.pos) && (wave < 3 || foeHp < 0.3 || raging(world, self));
-    // Only chase what he can catch: slowed, stunned, nearly dead, or already in his face. Otherwise
-    // he farms and lets ranged champions come to him.
-    const caught = world.isRooted(foe) || !!world.status(foe, 'slow') || foeHp < 0.3 || near(2) || raging(world, self);
-    if (ready(3) && near(4) && fighting && safe) return cast(3, self.pos);
-    // Bellow when they're in reach: slows them for the chase and cuts what he takes in the trade.
-    if (ready(1) && near(W.radius - 0.5) && (fighting || world.tick - self.lastHurtTick < 10)) return cast(1, self.pos);
-    // Fresh from a Bull Rush or Hurl Stone: they're stuck, swing.
-    if (caught && fighting && near(4) && safe) return { type: 'attack', target: foe.id };
-    // Being poked from out of reach: charge them (unless their whole wave is waiting), or throw a
-    // stone, or back off out of their range. Never just stand and take it.
-    const poked = foe.attackTarget === self.id && d > self.range + 0.5;
-    if (poked) {
+    const bold = !unsafe(foe.pos) && (rage || ((hp > 0.4 || foeHp < 0.3) && hp > foeHp - 0.25 && (wave < 5 || foeHp < 0.4)));
+    // Stunned, rooted or slowed: they can't step out of a stone, and he can catch them.
+    const pinned = world.isRooted(foe) || world.isStunned(foe) || !!world.status(foe, 'slow');
+    if (ready(3) && near(4) && bold) return cast(3, self.pos);
+    // Bull Rush in (aimed past them, so they're carried the full distance and stunned).
+    if (ready(2) && d > 1.5 && d < E.range - 0.5 && bold) {
+      const p = aimAfter(foe, E.windup + d / E.speed);
+      return cast(2, toward(self.pos, p, dist(self.pos, p) + 2));
+    }
+    // Bellow when they're in reach: slows them, speeds him and cuts what he takes in the trade.
+    if (ready(1) && near(W.radius - 0.5) && (bold || world.tick - self.lastHurtTick < 10)) return cast(1, self.pos);
+    // Stones cost health: throw them only where they'll land (pinned, close, or a kill), not as poke to be sidestepped.
+    const stone = ready(0) && near(Q.range - 0.5) && (hp > 0.35 || rage || foeHp < 0.3) && (pinned || d < 3 || foe.hp < ctx.dmg(0));
+    if (stone) {
+      const p = aim(foe, Q.speed);
+      if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
+    }
+    // Committed: swing while they're stuck or in his face.
+    if (bold && (pinned || near(2)) && near(4)) return { type: 'attack', target: foe.id };
+    // Being poked from out of reach: charge them (unless their whole wave is waiting), or back off out
+    // of their range. Never just stand and take it.
+    if (foe.attackTarget === self.id && d > self.range + 0.5) {
       if (ready(2) && d < E.range - 0.5 && hp > 0.35 && !unsafe(foe.pos) && (wave < 4 || foeHp < 0.5)) {
         const p = aimAfter(foe, E.windup + d / E.speed);
         return cast(2, toward(self.pos, p, dist(self.pos, p) + 2));
       }
-      if (ready(0) && near(Q.range - 0.5)) {
-        const p = aim(foe, Q.speed);
-        if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
-      }
       const back = self.team === 'blue' ? -1 : 1;
       const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2), y: self.pos.y };
       if (!unsafe(out)) return { type: 'move', to: out };
-    }
-    // Bull Rush through them (aimed past, so they're carried the full distance).
-    if (ready(2) && d > 1.5 && d < E.range - 0.5 && fighting && safe && (hp > 0.3 || foeHp < 0.3)) {
-      const p = aimAfter(foe, E.windup + d / E.speed);
-      return cast(2, toward(self.pos, p, dist(self.pos, p) + 2));
-    }
-    if (ready(0) && near(Q.range - 0.5) && (hp > 0.35 || raging(world, self) || foeHp < 0.3)) {
-      const p = aim(foe, Q.speed);
-      if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
     }
     return this.gormundFarm(ctx);
   }
