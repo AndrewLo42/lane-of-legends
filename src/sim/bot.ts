@@ -445,6 +445,22 @@ export class BotController implements Controller {
     }
     if (!foe) return this.tockFarm(ctx);
     const healthy = self.hp > self.maxHp * 0.5;
+    const hp = self.hp / self.maxHp;
+    const foeHp = foe.hp / foe.maxHp;
+
+    // Rewind as the opener: plant the anchor when a good fight is in reach, then throw everything in.
+    // When it snaps back he has his health again and they take the echo of all of it.
+    const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
+    const goodFight = !unsafe(foe.pos) && (wave < 4 || foeHp < 0.4) && (foeHp < 0.7 || hp >= foeHp - 0.1);
+    if (ready(3) && near(5) && goodFight && hp > 0.4) return cast(3, self.pos);
+    if (isRewinding(self)) {
+      if (ready(1) && near(6) && !near(1)) return cast(1, ctx.aimAfter(foe, 0.3));
+      if (ready(2) && near(6.5) && !near(1.5)) return cast(2, foe.pos);
+      if (recasting(0) && near(3)) return cast(0, foe.pos);
+      if (ready(0) && near(3)) return cast(0, foe.pos);
+      if (ready(1) && near(2.5)) return cast(1, self.pos);
+      return { type: 'attack', target: foe.id };
+    }
 
     // Against ranged champions: drop Stopwatch on them (35% slow), then Skip in while they're stuck.
     if (foe.range >= 3 && !unsafe(foe.pos)) {
@@ -453,14 +469,13 @@ export class BotController implements Controller {
       if (ready(2) && inField && near(6.5) && !near(1.5)) return cast(2, foe.pos);
     }
 
-    if (ready(3) && !healthy && near(4)) return cast(3, self.pos);
+    if (ready(3) && !healthy && near(4)) return cast(3, self.pos); // or to get out of a fight gone wrong
     if (ready(1) && near(2.5)) return cast(1, self.pos); // slow them and shield himself in a melee trade
     if (recasting(0) && near(3)) return cast(0, foe.pos);
     if (ready(0) && near(3)) return cast(0, foe.pos);
     if (ready(2) && healthy && near(6.5) && !near(2) && !unsafe(foe.pos)) return cast(2, foe.pos);
     if (ready(1) && near(6) && foe.champ?.kit === 'arlo') return cast(1, foe.pos);
     if (recasting(2) && (self.hp < self.maxHp * 0.35 || unsafe(self.pos))) return cast(2, self.pos);
-    if (isRewinding(self)) return { type: 'attack', target: foe.id }; // make the replay hurt
     return this.tockFarm(ctx);
   }
 
