@@ -522,8 +522,11 @@ export class BotController implements Controller {
     const qReach = (u: Unit) => gap(self, u) <= 6;
     const healthy = self.hp > self.maxHp * 0.5;
     if (foe) {
-      // Brace when trading at close range and getting hurt.
-      if (ready(1) && near(3) && self.hp < self.maxHp * 0.7) return cast(1, self.pos);
+      // Find Your Center roots her for a second: meditate to recover once out of their reach (or while
+      // they can't act), never in the middle of a trade where they'd get a free second of hits.
+      const theirReach = foe.range + foe.radius + self.radius + 1;
+      const helpless = world.isStunned(foe) || world.isRooted(foe);
+      if (ready(1) && near(8) && self.hp < self.maxHp * 0.7 && (dist(self.pos, foe.pos) > theirReach || helpless)) return cast(1, self.pos);
       if (ready(3) && near(7) && (foe.hp < foe.maxHp * 0.55 || healthy) && !unsafe(foe.pos)) return cast(3, aim(foe, 24));
       if (ready(0) && qReach(foe) && (marked(foe) || foe.hp < dmg(0)) && !unsafe(foe.pos)) return cast(0, foe.pos);
       // Twin Petals' point reaches 8 at most, so only throw it when they're close enough to sit inside the V.
@@ -535,14 +538,41 @@ export class BotController implements Controller {
         const d = dirTo(self.pos, p);
         return cast(2, { x: p.x + d.x * 2.5, y: p.y + d.y * 2.5 });
       }
+      // Aggressive: a duelist commits on even trades, taking a few of their minions' hits for it (not a full
+      // wave or their tower). Petal Step can't be dodged and every mark refunds and heals.
+      const hp = self.hp / self.maxHp;
+      const foeHp = foe.hp / foe.maxHp;
+      const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
+      // Not into their wave (its hits add up fast on her), and not into an unstoppable champion.
+      const bold = !unsafe(foe.pos) && (hp > 0.4 || foeHp < 0.3) && hp > foeHp - 0.2 && (wave < 3 || foeHp < 0.35) &&
+        (!world.isUnstoppable(foe) || foeHp < 0.3);
+      // The fight has turned (she's clearly behind, or they've gone unstoppable): get out now, while
+      // there's still health to get out with, rather than at the usual retreat threshold.
+      if (near(3) && hp < 0.55 && (hp < foeHp - 0.1 || (world.isUnstoppable(foe) && foeHp > 0.3))) {
+        const out = this.lishaEscape(ctx);
+        if (out) return out;
+        const back = self.team === 'blue' ? -1 : 1;
+        return { type: 'move', to: { x: self.pos.x + back * 4, y: self.pos.y } };
+      }
+      // Hit and run: with Petal Step and Twin Petals both down (and no mark on them), she has nothing to
+      // win a slugging match with, so step out of their reach until a blade comes back. Only a clearly
+      // won fight, or a nearly dead target, is worth standing in.
+      const armed = ready(0) || ready(2) || marked(foe);
+      if (!armed && near(2.5) && foeHp > 0.3 && hp < foeHp + 0.15) {
+        const back = self.team === 'blue' ? -1 : 1;
+        const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2.5), y: self.pos.y };
+        if (!unsafe(out)) return { type: 'move', to: out };
+      }
+      // In the fight: keep swinging, and Petal Step again the moment a mark (or the kill) is there.
+      if (bold && armed && gap(self, foe) <= world.attackRange(self, foe) + 1) return { type: 'attack', target: foe.id };
       // Commit when the fight is good, mark or not: she's a duelist. But if Twin Petals is about to
       // come back, wait for it: a marked Petal Step refunds itself and heals her, an unmarked one doesn't.
-      const winning = foe.hp < foe.maxHp * 0.6 || self.hp > foe.hp * 1.2;
+      const winning = bold || foe.hp < foe.maxHp * 0.6 || self.hp > foe.hp * 1.2;
       const eSoon = self.champ!.abilities[2].rank > 0 && (self.champ!.abilities[2].readyAt - world.tick) / TICK_HZ < 2;
-      if (ready(0) && qReach(foe) && healthy && winning && !eSoon && !near(1) && !unsafe(foe.pos)) return cast(0, foe.pos);
+      if (ready(0) && qReach(foe) && (healthy || bold) && winning && !eSoon && !near(1) && !unsafe(foe.pos)) return cast(0, foe.pos);
       // Engage through the wave: dash onto a marked or killable minion next to them (the reset brings
       // Petal Step straight back), then onto them.
-      if (ready(0) && healthy && !qReach(foe) && gap(self, foe) < 12 && !unsafe(foe.pos)) {
+      if (ready(0) && (healthy || bold) && !qReach(foe) && gap(self, foe) < 12 && !unsafe(foe.pos)) {
         const stone = world.units.find(
           (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && qReach(u) && (marked(u) || u.hp < dmg(0)) &&
             dist(u.pos, foe.pos) < dist(self.pos, foe.pos) - 2 && gap(u, foe) <= 5 && !unsafe(u.pos),
@@ -574,7 +604,9 @@ export class BotController implements Controller {
       );
       if (out) return cast(0, out.pos);
     }
-    return ready(1) && near(4) ? cast(1, self.pos) : null; // brace and regenerate on the way out
+    // Meditate (a second rooted) only once out of their reach: in it, it's a free second of hits for them.
+    const clear = !foe || dist(self.pos, foe.pos) > foe.range + foe.radius + self.radius + 1.5;
+    return ready(1) && near(8) && clear ? cast(1, self.pos) : null; // regenerate on the way out
   }
 
   // ---------- Aurelle ----------
