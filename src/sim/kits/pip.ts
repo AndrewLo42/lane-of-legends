@@ -15,7 +15,8 @@ import type { AbilityDef, Kit } from './types';
 /** Thistle: his health and bite (both grow with Pip's level), how far he strays, and how long he panics. */
 const THISTLE = { hp: 650, hpPerLevel: 85, soak: 0.8, damage: 32, damagePerLevel: 2.5, range: 1.2, attackInterval: 1.1, windup: 0.2, speed: 6.6, radius: 0.85, leash: 7, guardAhead: 1.4, panic: 12, comeBack: 0.5, calm: 4, regen: 0.02 };
 /** Riding: melee reach, a little faster, and harder hits (the toad's tongue). */
-const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85 };
+/** Riding: reach, speed, auto damage and radius; `minion`: all their damage to minions (Thistle eats waves). */
+const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85, minion: 1.3 };
 const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 6, 5], range: 5.5, width: 0.9, speed: 24, minion: 1.5, heal: 40, healPct: 0.06, yank: 2.5 };
 const HOP = { base: [60, 95, 130, 165, 200], ad: 0.4, cost: 40, cd: [11, 10, 9, 8, 7], range: 4.5, speed: 15, radius: 1.8, slow: 0.25, slowFor: 1 };
 const PEBBLES = { base: [40, 60, 80, 100, 120], ad: 0.3, cost: 35, cd: [6, 5.5, 5, 4.5, 4], range: 5.5, width: 0.5, speed: 26, spread: 0.22, repeat: 0.5 };
@@ -349,7 +350,7 @@ export const PIP: Kit = {
     icon: '🤝',
     describe: (self) =>
       `Thistle has his own health (${Math.round(thistleMaxHp(self))} at this level). While Pip rides him, damage hits Thistle first, ` +
-      `and he takes only ${THISTLE.soak * 100}% of it. ` +
+      `and he takes only ${THISTLE.soak * 100}% of it, and they deal ${Math.round((MOUNT.minion - 1) * 100)}% more damage to minions. ` +
       `At 0 health Thistle panics: he throws Pip off and bounds home, coming back after ${THISTLE.panic}s with ` +
       `${THISTLE.comeBack * 100}% health. He regenerates ${THISTLE.regen * 100}% of his health per second after ${THISTLE.calm}s ` +
       `without being hit, and heals at the fountain. On foot, Thistle bites whatever Pip attacks, stops skillshots, and minions and towers ` +
@@ -359,6 +360,7 @@ export const PIP: Kit = {
   abilities: RIDING_ABILITIES,
   otherForm: { label: 'On foot', abilities: FOOT_ABILITIES, active: (self) => !riding(self) },
   autoDamageMult: (_world, self) => (riding(self) ? MOUNT.autoDamage : 1),
+  damageMult: (_world, self, target) => (riding(self) && target.kind === 'minion' ? MOUNT.minion : 1),
   soak: (world, self, amount) => {
     const t = thistleOf(world, self);
     if (!riding(self) || !t || t.hp <= 0 || panicking(world, t)) return amount;

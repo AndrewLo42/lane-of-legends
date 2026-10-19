@@ -831,8 +831,9 @@ export class BotController implements Controller {
         const winning = foeHp < 0.5 || ours > foeHp - 0.05;
         const wave = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team === foe.team && dist(u.pos, foe.pos) < 5).length;
         const safe = !unsafe(foe.pos) && (wave < 3 || foeHp < 0.3);
-        // Thistle's wearing thin and they're not about to drop: step out of their reach so he can recover.
-        if (toadHp < 0.33 && foeHp > 0.35 && near(foe.range + 3)) {
+        // Thistle's wearing thin and Pip isn't ahead: step out of their reach so he can recover. Ahead
+        // (Pip himself fresh, them hurt), keep pressing: walking away hands them the lane.
+        if (toadHp < 0.33 && foeHp > 0.35 && !winning && near(foe.range + 3)) {
           const out = { x: foe.pos.x + back * (foe.range + foe.radius + self.radius + 2.5), y: self.pos.y };
           if (!unsafe(out)) return { type: 'move', to: out };
         }
@@ -849,14 +850,27 @@ export class BotController implements Controller {
           if (!unsafe(out)) return { type: 'move', to: out };
         }
       }
-      // Feed a hurt Thistle: Gulp a minion it would finish.
-      if (ready(0) && toadHp < 0.85 && self.champ!.mana > self.champ!.maxMana * 0.3) {
+      // Farm with the kit, not just Thistle's slaps: Gulp is a sure last hit (and feeds Thistle), Hop's
+      // splash clears a clump. Gulp anything it would finish that's out of his reach (or whenever Thistle
+      // is hurt), keeping a little mana back for the fight.
+      const mana = self.champ!.mana / self.champ!.maxMana;
+      const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && !unsafe(u.pos));
+      if (ready(0) && mana > 0.25) {
         const gulp = ctx.dmg(0) * GULP.minion;
-        const snack = world.units.find(
-          (u) => !u.dead && u.kind === 'minion' && u.team !== self.team && u.hp < gulp && dist(u.pos, self.pos) < GULP.range - 0.3 &&
-            !unsafe(u.pos) && !minionInTheWay(world, self, u.pos, GULP.width, u),
-        );
+        const snack = enemyMinions
+          .filter((u) => u.hp < gulp && dist(u.pos, self.pos) < GULP.range - 0.3 && (toadHp < 0.85 || gap(self, u) > self.range + 0.3) &&
+            !minionInTheWay(world, self, u.pos, GULP.width, u))
+          .sort((a, b) => a.hp - b.hp)[0];
         if (snack) return cast(0, snack.pos);
+      }
+      if (ready(1) && mana > 0.4 && !(foe && near(HOP.range + 2))) {
+        const splash = ctx.dmg(1);
+        const spot = enemyMinions.find(
+          (m) => dist(m.pos, self.pos) < HOP.range &&
+            enemyMinions.filter((o) => dist(o.pos, m.pos) < HOP.radius).length >= 3 &&
+            enemyMinions.some((o) => dist(o.pos, m.pos) < HOP.radius && o.hp < splash),
+        );
+        if (spot) return cast(1, spot.pos);
       }
       return null;
     }
