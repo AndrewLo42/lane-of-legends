@@ -21,8 +21,8 @@ import { spawnPoint } from './sim/lane';
 import { BOT_KIT_IDS, KITS, KIT_IDS } from './sim/kits';
 import { DUEL_RULES, SANDBOX_RULES } from './sim/rules';
 import { SIGNATURE_SUMMONERS } from './sim/summoners';
-import type { KitId } from './sim/types';
-import { augmentPick, connectionLost, duelRecap, floorIntro, onlineLobby, onlineUnavailable, pickBots, pickChampion, runEnd, shop, starterItem } from './ui/screens';
+import type { KitId, SummonerId } from './sim/types';
+import { augmentPick, connectionLost, duelRecap, floorIntro, onlineLobby, onlineUnavailable, pickBots, pickChampion, pickOpponent, runEnd, shop, starterItem } from './ui/screens';
 
 installCursors();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -103,6 +103,21 @@ if (freePlayKit) {
   });
 } else {
   void runLoop();
+}
+
+/** Free play from champion select: pick the bot to fight, play under sandbox rules (nexus to win, Esc leaves), then the recap. */
+async function freePlay(kit: KitId, summoners: SummonerId[]) {
+  const enemyKit = await pickOpponent(kit);
+  if (!enemyKit) return;
+  duel = new Duel(shell, {
+    seed: Date.now() % 1e9, rules: SANDBOX_RULES, kit, augments: [], summoners,
+    enemyKit, enemyAugments: [], enemySummoners: SIGNATURE_SUMMONERS[enemyKit], enemyStatMult: 1, enemyAccuracy: 0.8,
+    label: 'Free play', sandbox: true, freePlay: true,
+  });
+  const outcome = await duel.finished;
+  duel.dispose();
+  duel = null;
+  await duelRecap(outcome.recap, outcome.won, outcome.reason, `Free play · ${KITS[kit].name} vs ${KITS[enemyKit].name}`);
 }
 
 /** Bot vs bot, just for fun: pick two champions, watch them duel under the run's duel rules, then back home. */
@@ -194,6 +209,10 @@ async function runLoop() {
       }
       if (choice.mode === 'online') {
         await playOnline();
+        continue;
+      }
+      if (choice.mode === 'free') {
+        await freePlay(choice.kit, choice.summoners);
         continue;
       }
       run = newRun(choice.kit, Date.now() % 1e9, choice.summoners);

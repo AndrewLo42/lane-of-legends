@@ -152,8 +152,11 @@ const EXPERIMENTAL = 'lane-rogue.experimental';
  * and their full kit in the panel beside it. Click a portrait to look, double-click it or press
  * Start (or Enter) to begin; the arrow keys step through the roster.
  */
-/** What the home screen chose: start a run, or watch two bots duel. */
-export type HomeChoice = { mode: 'run'; kit: KitId; summoners: SpellPair } | { mode: 'watch' } | { mode: 'online' };
+/** What the home screen chose: start a run, free play against a bot, watch two bots duel, or play online. */
+export type HomeChoice =
+  | { mode: 'run' | 'free'; kit: KitId; summoners: SpellPair }
+  | { mode: 'watch' }
+  | { mode: 'online' };
 
 export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => void = () => {}): Promise<HomeChoice> {
   let current: KitId = KIT_IDS[0];
@@ -185,7 +188,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     <header class="selectbar">
       <h1>Lane League</h1>
       <p class="sub">Five duels. One lane. Pick augments as you climb, and the run ends at your first loss.</p>
-      <nav class="homelinks"><button class="link watch" data-help>❔ How to play</button><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button></nav>
+      <nav class="homelinks"><button class="link watch" data-help>❔ How to play</button><button class="link watch" data-free title="Practise as the selected champion against a bot you choose: no goals, no run">🎯 Free play</button><button class="link watch" data-online>⚔ Play online</button><button class="link watch" data-watch>🤖 Watch bots duel</button></nav>
     </header>
     <div class="selectmain">
       <aside class="rosterpanel">
@@ -206,8 +209,8 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       <div class="stagegap"></div>
       <section class="champinfo"></section>
     </div>
-    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Arrow keys to browse · Enter to start ·
-      Free play: add <code>?champ=arlo&amp;enemy=tock</code> to the URL.</p>`);
+    <p class="hint">${meta.runs ? `${meta.runs} run${meta.runs === 1 ? '' : 's'} · ${meta.wins} won · ` : ''}Arrow keys to browse · Enter to start a run ·
+      Free play to practise against a bot of your choice.</p>`);
   el.classList.add('select');
   const info = el.querySelector<HTMLElement>('.champinfo')!;
   const search = el.querySelector<HTMLInputElement>('.search')!;
@@ -282,7 +285,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
     applyFilters();
   });
 
-  const kit = await new Promise<KitId | 'watch' | 'online'>((resolve) => {
+  const kit = await new Promise<KitId | 'watch' | 'online' | { free: KitId }>((resolve) => {
     const onClick = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       const pick = t.closest<HTMLElement>('[data-kit]');
@@ -312,6 +315,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
         applyFilters();
       }
       if (t.closest('[data-start]')) done();
+      if (t.closest('[data-free]')) finish({ free: current });
       if (t.closest('[data-watch]')) finish('watch');
       if (t.closest('[data-online]')) finish('online');
       if (t.closest('[data-help]')) openHowToPlay();
@@ -337,7 +341,7 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
       } else return;
       e.preventDefault();
     };
-    const finish = (choice: KitId | 'watch' | 'online') => {
+    const finish = (choice: KitId | 'watch' | 'online' | { free: KitId }) => {
       el.removeEventListener('click', onClick);
       el.removeEventListener('dblclick', onDouble);
       removeEventListener('keydown', onKey);
@@ -354,13 +358,48 @@ export async function pickChampion(meta: Meta, onFocus: (kit: KitId | null) => v
   hide();
   if (kit === 'watch') return { mode: 'watch' };
   if (kit === 'online') return { mode: 'online' };
+  const chosen = typeof kit === 'object' ? kit.free : kit;
   try {
-    localStorage.setItem(LAST_KIT, kit);
+    localStorage.setItem(LAST_KIT, chosen);
     localStorage.setItem(LAST_SPELLS, JSON.stringify(spells));
   } catch {
     /* ignore */
   }
-  return { mode: 'run', kit, summoners: spells };
+  return { mode: typeof kit === 'object' ? 'free' : 'run', kit: chosen, summoners: spells };
+}
+
+// ---------- free play ----------
+
+/** Free play: pick the bot to fight as `you` (Random allowed); null goes back to champion select. */
+export async function pickOpponent(you: KitId): Promise<KitId | null> {
+  let pick: KitId | 'random' = 'random';
+  for (;;) {
+    const el = show(`
+      <div class="floorhead"><small>Free play as ${KITS[you].name}</small><h1>Choose your opponent</h1></div>
+      <div class="botrow red"><small>Opponent</small>
+        <div class="roster">
+          ${BOT_KIT_IDS.map((id) => `
+            <button class="pick${pick === id ? ' on' : ''}" data-action="pick:${id}" style="--accent:${KITS[id].color}" title="${KITS[id].name}, ${KITS[id].title}">
+              <span class="mini-portrait">${portraitHtml(id)}</span><span class="pname">${KITS[id].name}</span>
+            </button>`).join('')}
+          <button class="pick${pick === 'random' ? ' on' : ''}" data-action="pick:random" style="--accent:#e8e6df" title="Random">
+            <span class="mini-portrait"><b>?</b></span><span class="pname">Random</span>
+          </button>
+        </div>
+      </div>
+      <p class="hint">No goals and no run: destroy their nexus, or leave any time with <kbd>Esc</kbd>. The bot plays with its signature hero skills.</p>
+      <div class="actions"><button class="go" data-action="go">Fight</button><button class="link" data-action="back">Back</button></div>`);
+    const action = await waitFor(el);
+    if (action === 'back') {
+      hide();
+      return null;
+    }
+    if (action === 'go') {
+      hide();
+      return pick === 'random' ? BOT_KIT_IDS[Math.floor(Math.random() * BOT_KIT_IDS.length)] : pick;
+    }
+    pick = action.slice(5) as KitId | 'random';
+  }
 }
 
 // ---------- bot vs bot ----------

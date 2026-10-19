@@ -53,6 +53,11 @@ export interface DuelSetup {
   label: string;
   /** Free play: the duel never "finishes"; R reloads after a win. */
   sandbox?: boolean;
+  /**
+   * Free play started from champion select (not the URL): Esc or the Leave button ends it any time, and
+   * it finishes after a win like a normal duel instead of waiting for R.
+   */
+  freePlay?: boolean;
   /** Bot vs bot: the blue side is a bot too (at `enemyAccuracy`); the player only watches. */
   spectate?: boolean;
   /**
@@ -201,11 +206,12 @@ export class Duel {
     this.bars = new HealthBars(world, this.view, this.me.id, this.me.team);
     this.damageNumbers = new DamageNumbers(world, this.view, this.me.id);
     this.killFeed = new KillFeed(world, this.me, !!setup.spectate);
-    this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox, !!setup.spectate);
+    this.hud = new Hud(world, this.me, this.foe, setup.label, !!setup.sandbox && !setup.freePlay, !!setup.spectate);
     this.abilityBar = new AbilityBar(world, this.me, (slot) => this.player.queue.push({ type: 'levelUp', slot }));
     this.targetRing = new TargetRing(shell.scene);
     this.minimap = new Minimap(world, this.me, shell.cam, shell.input, shell.marker, (c) => this.player.queue.push(c));
     if (setup.spectate) this.buildSpectatorPanel();
+    if (setup.freePlay) this.buildFreePlayPanel();
     shell.input.endFrame(); // drop keys pressed on the menus
     shell.cam.locked = true;
     if (import.meta.env.DEV) Object.assign(window, { world, me: this.me, view: this.view, cam: shell.cam, net: net?.client });
@@ -227,6 +233,7 @@ export class Duel {
     if (spectating && !over) {
       if (input.wasPressed('Escape')) this.leave();
     } else if (!over) {
+      if (this.setup.freePlay && input.wasPressed('Escape')) this.leave();
       this.handleAbilities();
       this.handleAttackMove(hover);
       // Right-click an enemy to attack it, the ground to move; holding keeps re-issuing, like League.
@@ -246,7 +253,7 @@ export class Duel {
       if (input.wasPressed('KeyS')) player.queue.push({ type: 'stop' });
     } else {
       shell.indicator.hide();
-      if (this.setup.sandbox && input.wasPressed('KeyR')) location.reload();
+      if (this.setup.sandbox && !this.setup.freePlay && input.wasPressed('KeyR')) location.reload();
       this.decidedAt ??= performance.now();
       const paused = performance.now() - this.decidedAt >= END_PAUSE * 1000;
       if (net) {
@@ -255,7 +262,7 @@ export class Duel {
         if (end && paused) {
           this.resolve({ won: end.winner === me.team, reason: end.reason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: end.recap, left: end.left });
         }
-      } else if (!this.setup.sandbox && paused) {
+      } else if ((!this.setup.sandbox || this.setup.freePlay) && paused) {
         this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe) });
       }
     }
@@ -330,7 +337,7 @@ export class Duel {
     this.targetRing.dispose();
   }
 
-  /** Bot vs bot: stop watching now (resolves `finished` as if the match ended). */
+  /** Bot vs bot or free play: stop now (resolves `finished` as if the match ended). */
   leave() {
     const { world, me } = this;
     this.resolve({ won: world.winner === me.team, reason: world.winReason, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe) });
@@ -345,6 +352,18 @@ export class Duel {
     if (!alive.length) return toV3(this.me.pos);
     if (alive.length === 1 || alive[0].distanceTo(alive[1]) > 22) return alive[0];
     return alive[0].clone().add(alive[1]).multiplyScalar(0.5);
+  }
+
+  /** Free play's bar: what this is, and a way out. */
+  private buildFreePlayPanel() {
+    const el = document.createElement('div');
+    el.id = 'spectate';
+    el.innerHTML = `<span>🎯 Free play</span><button data-leave title="Back to champion select (Esc)">Leave</button>`;
+    el.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-leave]')) this.leave();
+    });
+    document.body.appendChild(el);
+    this.spectatorPanel = el;
   }
 
   private buildSpectatorPanel() {
