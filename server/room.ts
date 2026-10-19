@@ -320,6 +320,7 @@ function validCommand(c: unknown): c is Command {
   switch (cmd.type) {
     case 'move': return point(cmd.to);
     case 'attack': return Number.isInteger(cmd.target);
+    case 'attackMove': return point(cmd.to);
     case 'stop': return true;
     case 'cast': return slot(3) && point(cmd.at);
     case 'release': return slot(3) && point(cmd.at);

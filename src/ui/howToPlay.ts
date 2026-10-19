@@ -26,6 +26,7 @@ export function openHowToPlay() {
       <h3>Controls</h3>
       <table class="keys">
         ${row(k('Right-click'), 'Move, or attack the enemy under the cursor (hold to keep moving)')}
+        ${row(`${k('A')} + ${k('Left-click')}`, 'Attack-move: A shows your attack range; click to attack the enemy nearest the click, or walk there attacking whatever comes into reach')}
         ${row(k('Q', 'W', 'E', 'R'), 'Hold to aim an ability, release to cast. Right-click while aiming cancels.')}
         ${row(k('D', 'F'), 'Hero skills (Blink, Ghost…): aim and cast the same way')}
         ${row(`${k('Alt')} + ${k('Q')}…`, 'Level up an ability when you have a point (or click its <b>+</b>)')}

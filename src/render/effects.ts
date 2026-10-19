@@ -574,6 +574,7 @@ export class AimIndicator {
         target.name = 'target';
         this.group.add(target);
       }
+      if (aim.shape === 'ring') this.group.add(ringShape(aim.radius, 0.1, castable ? basic(0xff8a7a, 0.6) : mat));
       if (aim.shape === 'dash') {
         this.group.add(ringShape(aim.range, 0.08, mat));
         const arrow = lineShape(aim.range, 0.5, mat);

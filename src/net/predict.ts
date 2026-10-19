@@ -53,6 +53,11 @@ function applyLocally(me: Unit, cmds: Command[]) {
       me.moveTarget = clampToLane(c.to, me.radius);
       me.attackTarget = null;
       me.windup = 0;
+    } else if (c.type === 'attackMove') {
+      // The server takes the first enemy in reach on the way; until it says so, just walk.
+      me.moveTarget = clampToLane(c.to, me.radius);
+      me.attackTarget = null;
+      me.windup = 0;
     } else if (c.type === 'attack') {
       me.attackTarget = c.target;
       me.windup = 0;

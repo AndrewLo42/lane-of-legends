@@ -234,3 +234,50 @@ describe('minion aggro', () => {
     expect(m.attackTarget).toBe(attacker.id);
   });
 });
+
+describe('attack-move', () => {
+  /** A champion that's told one thing, then left alone. */
+  function setup(cmd: Command) {
+    const w = new World();
+    const me = w.spawnChampion('blue', 'arlo', scripted([cmd]));
+    me.pos = { x: -10, y: 0 };
+    return { w, me };
+  }
+
+  it('walks to the point and attacks the first enemy that comes into reach on the way', () => {
+    const { w, me } = setup({ type: 'attackMove', to: { x: 10, y: 0 } });
+    const foe = w.spawnChampion('red', 'tock', idle);
+    foe.pos = { x: 2, y: 3 };
+    foe.speed = 0;
+    run(w, 0.5);
+    expect(me.attackTarget).toBeNull(); // still out of reach: walking
+    expect(me.pos.x).toBeGreaterThan(-10);
+    run(w, 3);
+    expect(me.attackTarget).toBe(foe.id);
+    expect(foe.hp).toBeLessThan(foe.maxHp);
+  });
+
+  it('carries on to the point once the target is dead, and stops there', () => {
+    const { w, me } = setup({ type: 'attackMove', to: { x: 6, y: 0 } });
+    const m = w.spawnMinion('red', 'melee', { x: 0, y: 2 });
+    m.speed = 0;
+    m.hp = 1;
+    run(w, 4);
+    expect(m.dead).toBe(true);
+    expect(Math.hypot(me.pos.x - 6, me.pos.y)).toBeLessThan(0.2);
+    expect(me.attackMove).toBeNull();
+  });
+
+  it('a plain move cancels it', () => {
+    const w = new World();
+    const ctl = { queue: [] as Command[], think() { const q = this.queue; this.queue = []; return q; } };
+    const me = w.spawnChampion('blue', 'arlo', ctl);
+    me.pos = { x: -10, y: 0 };
+    ctl.queue.push({ type: 'attackMove', to: { x: 10, y: 0 } });
+    run(w, 0.2);
+    ctl.queue.push({ type: 'move', to: { x: -12, y: 0 } });
+    run(w, 0.1);
+    expect(me.attackMove).toBeNull();
+    expect(me.moveTarget).toEqual({ x: -12, y: 0 });
+  });
+});

@@ -10,7 +10,9 @@ export type Aim =
   /** Two blades closing on the cursor from either side of the caster (see `pincerShape`). */
   | { shape: 'pincer'; range: number; minRange: number; spread: number }
   /** Click an enemy within `range`; the indicator shows the range. */
-  | { shape: 'target'; range: number };
+  | { shape: 'target'; range: number }
+  /** Just a ring around the champion (attack-move's attack range). */
+  | { shape: 'ring'; radius: number };
 
 export interface CastCtx {
   world: World;

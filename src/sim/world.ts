@@ -160,6 +160,7 @@ export class World {
       if (u.dead) continue;
       if (u.kind === 'minion') this.minionBrain(u);
       else if (u.kind === 'tower') this.towerBrain(u);
+      else if (u.kind === 'champion' && u.attackMove && !this.isBusy(u)) this.attackMoveStep(u);
       else if (u.kind === 'champion' && !u.moveTarget && u.attackTarget == null && !this.isBusy(u)) this.autoAcquire(u);
     }
     for (const u of this.champions()) if (!u.dead) this.updateCast(u);
@@ -187,15 +188,24 @@ export class World {
     switch (cmd.type) {
       case 'move':
         u.moveTarget = clampToLane(cmd.to, u.radius);
+        u.attackMove = null;
         u.attackTarget = null;
         u.windup = 0; // moving cancels a wound-up attack
         break;
       case 'attack':
         if (u.attackTarget === cmd.target || !this.canAttack(u, this.get(cmd.target))) break;
+        u.attackMove = null;
         u.attackTarget = cmd.target;
         u.windup = 0;
         break;
+      case 'attackMove':
+        u.attackMove = clampToLane(cmd.to, u.radius);
+        u.moveTarget = { ...u.attackMove };
+        u.attackTarget = null;
+        u.windup = 0;
+        break;
       case 'stop':
+        u.attackMove = null;
         u.moveTarget = null;
         u.attackTarget = null;
         u.windup = 0;
@@ -643,6 +653,28 @@ export class World {
       this.nearest(t, t.range, (u) => u.kind === 'champion');
     t.attackTarget = next?.id ?? null;
     t.windup = 0;
+  }
+
+  /**
+   * Attack-moving: with nothing to attack, take the nearest enemy in reach (any kind, like League), else
+   * keep walking to the point; arriving there ends the attack-move.
+   */
+  private attackMoveStep(c: Unit) {
+    if (c.attackTarget != null) return;
+    let best: Unit | undefined;
+    let bestD = Infinity;
+    for (const u of this.units) {
+      if (!this.canAttack(c, u)) continue;
+      const d = gap(c, u);
+      if (d <= this.attackRange(c, u) && d < bestD) { best = u; bestD = d; }
+    }
+    if (best) {
+      c.attackTarget = best.id;
+      return;
+    }
+    const to = c.attackMove!;
+    if (dist(c.pos, to) < 0.1) c.attackMove = null;
+    else c.moveTarget = { ...to };
   }
 
   /** An idle champion attacks whatever wanders into range, preferring minions (so it doesn't pull tower aggro by accident). */

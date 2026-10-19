@@ -11,6 +11,8 @@ export class Input {
   rmb = false;
   /** Right button went down since the last `endFrame` (spawns the click marker). */
   rmbClicked = false;
+  /** Left button went down on the game view since the last `endFrame` (attack-move clicks). */
+  lmbClicked = false;
   wheel = 0;
   /** Cursor is inside the window (edge-pan only while it is). */
   inside = true;
@@ -36,6 +38,7 @@ export class Input {
         this.rmb = true;
         this.rmbClicked = true;
       }
+      if (e.button === 0) this.lmbClicked = true;
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 2) this.rmb = false;
@@ -60,6 +63,7 @@ export class Input {
   endFrame() {
     this.pressed.clear();
     this.rmbClicked = false;
+    this.lmbClicked = false;
     this.wheel = 0;
   }
 }

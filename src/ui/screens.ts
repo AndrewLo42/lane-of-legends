@@ -50,7 +50,7 @@ function ladder(run: RunState) {
   }).join('')}</ol>`;
 }
 
-const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · hold <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> to aim,
+const CONTROLS = `<p class="controls"><kbd>Right-click</kbd> move / attack · <kbd>A</kbd>+click attack-move · hold <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> to aim,
   release to cast (right-click cancels) · <kbd>D</kbd><kbd>F</kbd> hero skills · <kbd>Alt</kbd>+key or <kbd>+</kbd> level up · <kbd>S</kbd> stop · <kbd>Y</kbd> camera lock ·
   hold <kbd>Space</kbd> centre camera · wheel zoom · minimap: left-click to look, right-click to walk</p>`;
 

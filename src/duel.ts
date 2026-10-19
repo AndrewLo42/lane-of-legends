@@ -97,6 +97,8 @@ class PlayerController implements Controller {
 
 const ABILITY_KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR'];
 const SUMMONER_KEYS = ['KeyD', 'KeyF'];
+/** An attack-move click picks the enemy closest to it within this many units (edge distance); further, it walks there. */
+const ATTACK_MOVE_PICK = 4;
 /** How long the victory/defeat banner shows before the duel hands back control. */
 const END_PAUSE = 2.5;
 
@@ -124,6 +126,8 @@ export class Duel {
   private aimingSpell: SummonerSlot | null = null;
   /** A press-and-hold ability (Fennick's Longshot) whose key is down: it started on the press and looses on release. */
   private holding: Slot | null = null;
+  /** A was pressed: your attack range shows, and the next left-click attacks (or attack-moves). */
+  private attackMoving = false;
   private acc = 0;
   private reissue = 0;
   /** Wall-clock time the duel was decided (so a throttled background tab still moves on). */
@@ -217,12 +221,14 @@ export class Duel {
     /** Decided: someone won (online, the server's word, which also covers a forfeit). */
     const over = net ? !!this.netEnd || !!world.winner : !!world.winner;
     const hover = me.dead || over || spectating ? undefined : this.enemyUnderCursor();
-    renderer.domElement.style.cursor = hover ? CURSOR.attack : this.aiming != null || this.aimingSpell != null ? CURSOR.aim : CURSOR.normal;
+    renderer.domElement.style.cursor =
+      hover || this.attackMoving ? CURSOR.attack : this.aiming != null || this.aimingSpell != null ? CURSOR.aim : CURSOR.normal;
 
     if (spectating && !over) {
       if (input.wasPressed('Escape')) this.leave();
     } else if (!over) {
       this.handleAbilities();
+      this.handleAttackMove(hover);
       // Right-click an enemy to attack it, the ground to move; holding keeps re-issuing, like League.
       this.reissue -= dt;
       if (!me.dead && (input.rmbClicked || (input.rmb && this.reissue <= 0))) {
@@ -493,6 +499,43 @@ export class Duel {
     const spell = me.champ!.summoners[slot];
     if (!spell) return indicator.hide();
     indicator.show(SUMMONERS[spell.id].aim, this.view.positionOf(me.id)!, at, world.summonerBlocker(me, slot) === null);
+  }
+
+  /**
+   * Attack-move, like League: A shows your attack range, then a left-click attacks the enemy closest to
+   * the click (the one under the cursor first). With nobody near the click you walk there, attacking the
+   * first enemy that comes into reach. Right-click, an ability key or dying cancels it.
+   */
+  private handleAttackMove(hover: Unit | undefined) {
+    const { me, player } = this;
+    const { input, cam, indicator, marker } = this.shell;
+    if (input.wasPressed('KeyA') && !me.dead) {
+      this.attackMoving = true;
+      this.aiming = this.aimingSpell = null;
+    }
+    if (!this.attackMoving) return;
+    if (input.rmbClicked || me.dead || this.aiming != null || this.aimingSpell != null || this.holding != null) {
+      this.attackMoving = false;
+      return;
+    }
+    indicator.show({ shape: 'ring', radius: me.range + me.radius }, this.view.positionOf(me.id)!, me.pos, true);
+    if (!input.lmbClicked) return;
+    this.attackMoving = false;
+    indicator.hide();
+    const g = cam.groundAt(input.mouse.x, input.mouse.y);
+    if (!g) return;
+    const at = { x: g.x, y: g.z };
+    let pick = hover;
+    let best = ATTACK_MOVE_PICK;
+    if (!pick) {
+      for (const u of this.world.units) {
+        if (!this.world.canAttack(me, u)) continue;
+        const d = Math.hypot(u.pos.x - at.x, u.pos.y - at.y) - u.radius;
+        if (d < best) { pick = u; best = d; }
+      }
+    }
+    player.queue.push(pick ? { type: 'attack', target: pick.id } : { type: 'attackMove', to: at });
+    marker.show(pick ? g.clone().set(pick.pos.x, 0, pick.pos.y) : g, true);
   }
 
   private handleAbilities() {

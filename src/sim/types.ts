@@ -149,6 +149,8 @@ export interface Unit {
   /** 0 = melee (instant hit when the windup ends). */
   projectileSpeed: number;
   attackTarget: number | null;
+  /** Attack-moving here (champions): walking to it, attacking whatever comes into reach on the way. */
+  attackMove?: Vec2 | null;
   /** Ticks until the next attack may start. */
   attackCd: number;
   /** Ticks left in the current windup, 0 when not attacking. */
@@ -287,6 +289,8 @@ export interface Fx {
 export type Command =
   | { type: 'move'; to: Vec2 }
   | { type: 'attack'; target: number }
+  /** Walk to a point, attacking the nearest enemy that comes into reach on the way (League's attack-move). */
+  | { type: 'attackMove'; to: Vec2 }
   | { type: 'stop' }
   | { type: 'cast'; slot: Slot; at: Vec2 }
   /** Let go of a press-and-hold ability's key (Fennick's Longshot). */

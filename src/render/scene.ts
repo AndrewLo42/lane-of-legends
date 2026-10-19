@@ -531,7 +531,9 @@ export class ClickMarker {
     scene.add(this.mesh);
   }
 
-  show(at: THREE.Vector3) {
+  /** Green for a move, red for an attack-move (as in League). */
+  show(at: THREE.Vector3, attack = false) {
+    (this.mesh.material as THREE.MeshBasicMaterial).color.set(attack ? 0xff5a4a : 0x6dff7a);
     this.mesh.position.set(at.x, 0.03, at.z);
     this.age = 0;
   }
