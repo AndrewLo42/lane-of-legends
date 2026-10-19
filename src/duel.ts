@@ -17,7 +17,7 @@ import { KillFeed } from './ui/killFeed';
 import { duelRecap, type DuelRecap } from './sim/recap';
 import type { NetClient } from './net/client';
 import { SEAT_GRACE, applySnapshot, type ServerMsg, type Snapshot } from './net/protocol';
-import { predictOwn, type PendingBatch } from './net/predict';
+import { predictOwn, restoreOwn, serverOwn, type OwnState, type PendingBatch } from './net/predict';
 import { CURSOR } from './ui/cursors';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -132,7 +132,7 @@ export class Duel {
   private speed = 1;
   private spectatorPanel?: HTMLDivElement;
   /** Online: snapshots received since the last frame, when the latest arrived, and the server's verdict. */
-  private snaps: Snapshot[] = [];
+  private snaps: { snap: Snapshot; at: number }[] = [];
   private lastSnapAt = performance.now();
   private netEnd: Extract<ServerMsg, { t: 'end' }> | null = null;
   /**
@@ -144,6 +144,13 @@ export class Duel {
   private acked = 0;
   private rtt = 100;
   private pingEl?: HTMLDivElement;
+  /** Your champion's predicted fields as the server last said (see `restoreOwn`). */
+  private ownTruth!: OwnState;
+  /** For the network readout: when recent snapshots arrived, frames drawn and bytes received since `statsAt`. */
+  private arrivals: number[] = [];
+  private frames = 0;
+  private statsAt = performance.now();
+  private bytesAt = 0;
   /** When the server was last heard from (messages arrive even while the tab is hidden), and whether it's gone. */
   private heardAt = performance.now();
   private lost = false;
@@ -162,15 +169,16 @@ export class Duel {
       // A mirror of the server's world: never stepped here, only overwritten by snapshots.
       applySnapshot(world, net.start.snap);
       this.me = world.get(net.start.you)!;
+      this.ownTruth = serverOwn(this.me);
       this.foe = world.get(net.start.foe)!;
       net.client.onMessage = (msg) => {
         this.heardAt = performance.now();
-        if (msg.t === 'snap') this.snaps.push(msg.snap);
+        if (msg.t === 'snap') this.arrived(msg.snap);
         else if (msg.t === 'end') this.netEnd = msg;
         else if (msg.t === 'peer') this.peerAway = msg.connected ? null : msg.wait;
         else if (msg.t === 'resume') {
           // Back in: the whole world as the server has it now; anything unacknowledged was lost with the drop.
-          this.snaps = [msg.snap];
+          this.snaps = [{ snap: msg.snap, at: performance.now() }];
           this.pending = [];
           this.reconnectingSince = null;
         } else if (msg.t === 'error' && this.reconnectingSince != null) this.lost = true; // the seat is gone
@@ -200,6 +208,7 @@ export class Duel {
   }
 
   frame(dt: number) {
+    this.frames++;
     const { world, me, player, shell } = this;
     const { input, cam, marker, renderer } = shell;
 
@@ -257,15 +266,19 @@ export class Duel {
         net.client.send({ t: 'cmds', seq: ++this.seq, cmds });
         this.pending.push({ seq: this.seq, at: performance.now(), cmds });
       }
-      for (const snap of this.snaps.splice(0)) {
+      for (const { snap, at } of this.snaps.splice(0)) {
         this.view.snapshot();
+        // Snapshots carry only what changed: put back the server's own values under any prediction first.
+        restoreOwn(me, this.ownTruth);
         applySnapshot(world, snap);
-        this.acknowledge(snap.ack);
+        this.ownTruth = serverOwn(me);
+        this.acknowledge(snap.ack, at);
         if (!this.setup.spectate) predictOwn(world, me, this.pending, this.rtt, performance.now());
         this.lastSnapAt = performance.now();
       }
       alpha = Math.min(1, (performance.now() - this.lastSnapAt) / (DT * 1000));
       this.keepConnected(net.client);
+      this.showPing(net.client);
       if (this.lost && !this.netEnd) {
         this.resolve({ won: false, reason: null, seconds: Math.round(world.tick / TICK_HZ), gold: me.gold, recap: duelRecap(world, me, this.foe), lost: true });
       }
@@ -352,24 +365,53 @@ export class Duel {
    * within a forgiving radius of the ground point.
    */
   /** Drop the command batches the server has applied, timing the round trip of the newest one. */
-  private acknowledge(ack: number) {
+  private acknowledge(ack: number, arrivedAt: number) {
     if (ack <= this.acked) return;
     this.acked = ack;
     const sent = this.pending.find((p) => p.seq === ack);
-    if (sent) this.rtt += (performance.now() - sent.at - this.rtt) * 0.2; // smoothed
+    if (sent) this.rtt += (arrivedAt - sent.at - this.rtt) * 0.2; // smoothed; timed to when it arrived, not when it was drawn
     this.pending = this.pending.filter((p) => p.seq > ack);
-    this.showPing();
   }
 
-  private showPing() {
+  /** A snapshot came in: queue it for the next frame and note when, for the readout's jitter. */
+  private arrived(snap: Snapshot) {
+    const at = performance.now();
+    this.snaps.push({ snap, at });
+    this.arrivals.push(at);
+    if (this.arrivals.length > 61) this.arrivals.shift();
+  }
+
+  /**
+   * The network readout, refreshed twice a second: ping (command to acknowledgement), jitter (how
+   * unevenly snapshots arrive), frames per second and download rate. Hover it for what each means.
+   */
+  private showPing(net: NetClient) {
+    const now = performance.now();
+    if (now - this.statsAt < 500) return;
     if (!this.pingEl) {
       this.pingEl = document.createElement('div');
       this.pingEl.id = 'ping';
+      this.pingEl.title =
+        'Ping: from sending a command to the server confirming it (includes the server waiting for its next tick).\n' +
+        'Jitter: how unevenly snapshots arrive (they should come every 33 ms); high jitter makes others stutter.\n' +
+        'FPS: frames drawn a second; low FPS adds delay to everything.\nKB/s: data received from the server.';
       document.body.appendChild(this.pingEl);
     }
+    const secs = (now - this.statsAt) / 1000;
+    const gaps = this.arrivals.slice(1).map((t, i) => t - this.arrivals[i]);
+    const jitter = gaps.length ? gaps.reduce((s, g) => s + Math.abs(g - DT * 1000), 0) / gaps.length : 0;
+    const fps = this.frames / secs;
+    const kbs = (net.bytesIn - this.bytesAt) / 1024 / secs;
+    this.frames = 0;
+    this.bytesAt = net.bytesIn;
+    this.statsAt = now;
     const ms = Math.round(this.rtt);
-    this.pingEl.textContent = `${ms} ms`;
-    this.pingEl.className = ms < 80 ? 'good' : ms < 160 ? 'ok' : 'bad';
+    // Each number coloured by its own health, so it's clear which one is the problem.
+    const grade = (v: number, good: number, ok: number, higherIsBetter = false) =>
+      (higherIsBetter ? v >= good : v <= good) ? 'good' : (higherIsBetter ? v >= ok : v <= ok) ? 'ok' : 'bad';
+    this.pingEl.innerHTML =
+      `<b class="${grade(ms, 80, 160)}">${ms} ms</b> · <i class="${grade(jitter, 12, 25)}">±${Math.round(jitter)} ms</i> · ` +
+      `<i class="${grade(fps, 45, 28, true)}">${Math.round(fps)} fps</i> · <i>${kbs.toFixed(0)} KB/s</i>`;
   }
 
   /**

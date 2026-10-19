@@ -5,7 +5,7 @@ import { SIGNATURE_SUMMONERS } from '../sim/summoners';
 import type { Slot } from '../sim/types';
 import { TICK_HZ } from '../sim/util';
 import { World } from '../sim/world';
-import { applySnapshot, newCursor, takeSnapshot, type Snapshot } from './protocol';
+import { applySnapshot, encode, newCursor, takeSnapshot, type Snapshot } from './protocol';
 
 describe('PvP snapshots', () => {
   it('a client world fed JSON snapshots every tick matches the server', () => {
@@ -14,14 +14,14 @@ describe('PvP snapshots', () => {
     server.spawnChampion('red', 'aurelle', new BotController(0.9), { summoners: SIGNATURE_SUMMONERS.aurelle });
     const client = new World(7, DUEL_RULES);
     const cursor = newCursor();
-    applySnapshot(client, JSON.parse(JSON.stringify(takeSnapshot(server, cursor))) as Snapshot);
+    applySnapshot(client, JSON.parse(encode(takeSnapshot(server, cursor))) as Snapshot);
     const me = client.get(blue.id)!; // the client keeps this reference for the whole duel
 
     let fx = 0;
     let hits = 0;
     for (let i = 0; i < 60 * TICK_HZ && !server.winner; i++) {
       server.step();
-      const snap = JSON.parse(JSON.stringify(takeSnapshot(server, cursor))) as Snapshot;
+      const snap = JSON.parse(encode(takeSnapshot(server, cursor))) as Snapshot;
       fx += snap.fx.length;
       hits += snap.hits.length;
       applySnapshot(client, snap);
@@ -44,5 +44,38 @@ describe('PvP snapshots', () => {
       expect(client.castBlocker(me, slot)).toBe(server.castBlocker(blue, slot));
       expect(client.canLevel(me, slot)).toBe(server.canLevel(blue, slot));
     }
+  });
+
+  it("sends only what changed: a small fraction of the whole world each tick", () => {
+    const server = new World(3, DUEL_RULES);
+    server.spawnChampion('blue', 'pip', new BotController(0.9));
+    server.spawnChampion('red', 'arlo', new BotController(0.9));
+    const cursor = newCursor();
+    let delta = 0;
+    let whole = 0;
+    for (let i = 0; i < 60 * TICK_HZ && !server.winner; i++) {
+      server.step();
+      delta += encode(takeSnapshot(server, cursor)).length;
+      whole += encode(takeSnapshot(server, newCursor())).length;
+    }
+    expect(delta).toBeLessThan(whole / 4);
+  });
+
+  it('a fresh cursor (a player back after a drop) brings a stale client world back in step', () => {
+    const server = new World(9, DUEL_RULES);
+    server.spawnChampion('blue', 'lisha', new BotController(0.9));
+    server.spawnChampion('red', 'mabel', new BotController(0.9));
+    const client = new World(9, DUEL_RULES);
+    const cursor = newCursor();
+    for (let i = 0; i < 20 * TICK_HZ; i++) {
+      server.step();
+      applySnapshot(client, JSON.parse(encode(takeSnapshot(server, cursor))) as Snapshot);
+    }
+    // The client misses 15 seconds (minions die, new ones spawn), then gets everything again.
+    for (let i = 0; i < 15 * TICK_HZ; i++) server.step();
+    applySnapshot(client, JSON.parse(encode(takeSnapshot(server, newCursor()))) as Snapshot);
+    const view = (w: World) => w.units.map((u) => [u.id, u.kind, Math.round(u.hp), u.champ?.level]);
+    expect(view(client)).toEqual(view(server));
+    client.units.forEach((u, i) => expect(Math.hypot(u.pos.x - server.units[i].pos.x, u.pos.y - server.units[i].pos.y)).toBeLessThan(0.002));
   });
 });

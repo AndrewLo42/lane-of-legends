@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DUEL_RULES } from '../sim/rules';
 import type { Command, Controller, Vec2 } from '../sim/types';
 import { DT, World } from '../sim/world';
-import { predictOwn, type PendingBatch } from './predict';
-import { applySnapshot, newCursor, takeSnapshot, type Snapshot } from './protocol';
+import { predictOwn, restoreOwn, serverOwn, type PendingBatch } from './predict';
+import { applySnapshot, encode, newCursor, takeSnapshot, type Snapshot } from './protocol';
 
 /** The server side of one player: commands arrive with a delay, and are acknowledged once applied. */
 class Remote implements Controller {
@@ -35,7 +35,7 @@ describe('client-side prediction', () => {
     server.spawnChampion('red', 'tock', { think: () => [] });
     const client = new World(3, DUEL_RULES);
     const cursor = newCursor();
-    applySnapshot(client, JSON.parse(JSON.stringify(takeSnapshot(server, cursor))) as Snapshot);
+    applySnapshot(client, JSON.parse(encode(takeSnapshot(server, cursor))) as Snapshot);
     const me = client.get(meOnServer.id)!;
 
     const tickMs = DT * 1000;
@@ -47,6 +47,7 @@ describe('client-side prediction', () => {
     const clientTrail: { at: number; pos: Vec2 }[] = [];
     const start = { ...me.pos };
     let clickAt = 0;
+    let truth = serverOwn(me);
 
     for (let i = 0; i < 150; i++) {
       now = i * tickMs;
@@ -60,10 +61,12 @@ describe('client-side prediction', () => {
       remote.deliver(now);
       server.step();
       serverTrail.push({ at: now, pos: { ...meOnServer.pos } });
-      snaps.push({ at: now + ONE_WAY, snap: JSON.parse(JSON.stringify(takeSnapshot(server, cursor, remote.applied))) as Snapshot });
+      snaps.push({ at: now + ONE_WAY, snap: JSON.parse(encode(takeSnapshot(server, cursor, remote.applied))) as Snapshot });
       while (snaps.length && snaps[0].at <= now) {
         const { snap } = snaps.shift()!;
+        restoreOwn(me, truth);
         applySnapshot(client, snap);
+        truth = serverOwn(me);
         while (pending.length && pending[0].seq <= snap.ack) pending.shift();
         predictOwn(client, me, pending, 2 * ONE_WAY, now);
       }
@@ -84,5 +87,33 @@ describe('client-side prediction', () => {
     }
     // And once the walk is over, both rest at the same spot.
     expect(dist(clientTrail.at(-1)!.pos, serverTrail.at(-1)!.pos)).toBeLessThan(0.05);
+  });
+
+  it("snaps back to the server's position when a predicted walk never happened there", () => {
+    const server = new World(3, DUEL_RULES);
+    const remote = new Remote();
+    const meOnServer = server.spawnChampion('blue', 'arlo', remote);
+    server.spawnChampion('red', 'tock', { think: () => [] });
+    const client = new World(3, DUEL_RULES);
+    const cursor = newCursor();
+    applySnapshot(client, JSON.parse(encode(takeSnapshot(server, cursor))) as Snapshot);
+    const me = client.get(meOnServer.id)!;
+    let truth = serverOwn(me);
+    // The client walks off at once, but the server saw it differently: the batch arrives and is
+    // acknowledged, yet the champion stays put there. Its position never changes, so it's never resent.
+    const pending: PendingBatch[] = [{ seq: 1, at: 0, cmds: [{ type: 'move', to: { x: me.pos.x + 10, y: me.pos.y } }] }];
+    remote.inbox.push({ at: 100, seq: 1, cmds: [] });
+    for (let i = 1; i < 60; i++) {
+      const now = i * DT * 1000;
+      remote.deliver(now);
+      server.step();
+      restoreOwn(me, truth);
+      const snap = JSON.parse(encode(takeSnapshot(server, cursor, remote.applied))) as Snapshot;
+      applySnapshot(client, snap);
+      truth = serverOwn(me);
+      while (pending.length && pending[0].seq <= snap.ack) pending.shift();
+      predictOwn(client, me, pending, 200, now);
+    }
+    expect(dist(me.pos, meOnServer.pos)).toBeLessThan(0.01);
   });
 });

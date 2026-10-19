@@ -38,6 +38,8 @@ export class NetClient {
   private code: string | null = null;
   private seat: string | null = null;
   private ws: WebSocket | null = null;
+  /** Characters received so far (about bytes: messages are JSON), for the network readout. */
+  bytesIn = 0;
 
   constructor(readonly url = serverUrl()) {}
 
@@ -112,6 +114,7 @@ export class NetClient {
     this.closed = false;
     ws.addEventListener('message', (e) => {
       if (ws !== this.ws) return;
+      this.bytesIn += String(e.data).length;
       let msg: ServerMsg;
       try {
         msg = JSON.parse(String(e.data)) as ServerMsg;

@@ -3,7 +3,7 @@
  * Durable Object (worker/index.ts) holds exactly one. Players pick and ready up in the lobby, then the
  * room runs an authoritative 1v1 duel stepped at 30 Hz with a snapshot to each player every tick.
  */
-import { RELIC_SECONDS, SEAT_GRACE, newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
+import { RELIC_SECONDS, SEAT_GRACE, encode, newCursor, takeSnapshot, type ClientMsg, type LobbyPlayer, type ServerMsg, type SnapCursor } from '../src/net/protocol';
 import { STARTER_ITEMS } from '../src/sim/items';
 import { KIT_IDS } from '../src/sim/kits';
 import { duelRecap } from '../src/sim/recap';
@@ -54,6 +54,9 @@ const shuffled = <T>(xs: readonly T[]) => {
   return a;
 };
 
+/** A command may pull the next tick this much earlier (ms), so it doesn't wait out the rest of the tick. */
+const PULL_MS = 15;
+
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they read as 1 and 0)
 export const newCode = () => Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
 export const validCode = (code: string) => /^[A-Z]{4}$/.test(code);
@@ -63,6 +66,8 @@ export class Room {
   private world: World | null = null;
   private seed = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** When the next tick is due (performance.now() ms). */
+  private nextTick = 0;
   /** Room setting: each player picks a relic before every duel. And the pick in progress, if any. */
   private relics = false;
   private picking: ReturnType<typeof setTimeout> | null = null;
@@ -153,6 +158,7 @@ export class Room {
         if (!this.world || !Array.isArray(msg.cmds)) return;
         for (const c of msg.cmds.slice(0, 20)) if (validCommand(c)) me.controller.queue.push(c);
         if (Number.isInteger(msg.seq) && msg.seq > me.controller.received) me.controller.received = msg.seq;
+        this.advance(performance.now(), PULL_MS);
         return;
     }
   }
@@ -235,13 +241,13 @@ export class Room {
       send(p.socket, { t: 'start', seed, rules, you: p.unit!.id, foe: foe.unit!.id, snap: takeSnapshot(world, p.cursor, p.controller.applied) });
     }
     // Step on a fixed clock, catching up if the timer runs late.
-    let next = performance.now();
+    this.nextTick = performance.now();
     let peerAt = 0;
     this.timer = setInterval(() => {
       const now = performance.now();
       if (this.paused) {
         // Hold the world still; tell the other player about once a second (it doubles as a heartbeat).
-        next = now;
+        this.nextTick = now;
         const expired = this.players.find((p) => p.goneUntil != null && now >= p.goneUntil);
         if (expired) {
           this.remove(expired);
@@ -253,17 +259,30 @@ export class Room {
         }
         return;
       }
-      let steps = 0;
-      while (now >= next && steps < 5) {
-        world.step();
-        next += DT * 1000;
-        steps++;
-      }
-      if (steps === 0) return;
-      if (now - next > 1000) next = now; // stalled for a long time: don't fast-forward
-      for (const p of this.players) send(p.socket, { t: 'snap', snap: takeSnapshot(world, p.cursor, p.controller.applied) });
-      if (world.winner) this.endDuel(false);
+      // A command waiting to be applied pulls its tick forward too, not just one arriving right now.
+      const waiting = this.players.some((p) => p.controller.queue.length > 0);
+      this.advance(now, waiting ? PULL_MS : 0);
     }, 5);
+  }
+
+  /**
+   * Step the duel up to `now` and send both players a snapshot if anything stepped. `pull` lets the
+   * next tick run that many ms early: a command that just arrived is applied and acknowledged without
+   * waiting out the rest of the tick (the clock stays on schedule; the tick after waits a little longer).
+   */
+  private advance(now: number, pull = 0) {
+    const world = this.world;
+    if (!world || this.paused || world.winner) return;
+    let steps = 0;
+    while (now + (steps === 0 ? pull : 0) >= this.nextTick && steps < 5) {
+      world.step();
+      this.nextTick += DT * 1000;
+      steps++;
+    }
+    if (steps === 0) return;
+    if (now - this.nextTick > 1000) this.nextTick = now; // stalled for a long time: don't fast-forward
+    for (const p of this.players) send(p.socket, { t: 'snap', snap: takeSnapshot(world, p.cursor, p.controller.applied) });
+    if (world.winner) this.endDuel(false);
   }
 
   /** Send the players their recap and put the room back in the lobby for a rematch (without anyone still away). */
@@ -287,7 +306,7 @@ export class Room {
 }
 
 export function send(socket: Socket, msg: ServerMsg) {
-  socket.send(JSON.stringify(msg));
+  socket.send(encode(msg));
 }
 
 const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);

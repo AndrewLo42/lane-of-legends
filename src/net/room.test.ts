@@ -80,6 +80,37 @@ describe('reconnecting to a duel', () => {
   });
 });
 
+describe('ticking', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance', 'Date'] }));
+  afterEach(() => vi.useRealTimers());
+  const move = (seq: number) => JSON.stringify({ t: 'cmds', seq, cmds: [{ type: 'move', to: { x: -50, y: seq % 2 } }] });
+
+  it("a command that arrives mid-tick is applied and acknowledged without waiting out the tick", () => {
+    const { room, a } = duel();
+    vi.advanceTimersByTime(1000);
+    const tick = a.last('snap')!.snap.tick;
+    // Wait until a tick has just gone out, then 20 ms into the next one.
+    while (a.last('snap')!.snap.tick === tick) vi.advanceTimersByTime(1);
+    const after = a.last('snap')!.snap.tick;
+    vi.advanceTimersByTime(20);
+    expect(a.last('snap')!.snap.tick).toBe(after); // the next tick isn't due yet
+    room.message(a, move(1));
+    expect(a.last('snap')!.snap).toMatchObject({ tick: after + 1, ack: 1 });
+  });
+
+  it('commands never run the clock ahead of time', () => {
+    const { room, a } = duel();
+    const start = a.last('start')!.snap.tick;
+    for (let seq = 1; seq <= 600; seq++) {
+      room.message(a, move(seq));
+      vi.advanceTimersByTime(5);
+    }
+    const ticks = a.last('snap')!.snap.tick - start;
+    expect(ticks).toBeGreaterThanOrEqual(89);
+    expect(ticks).toBeLessThanOrEqual(91); // 3 s at 30 ticks a second
+  });
+});
+
 describe('relics in online duels', () => {
   beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance', 'Date'] }));
   afterEach(() => vi.useRealTimers());
@@ -96,7 +127,7 @@ describe('relics in online duels', () => {
     return { room, a, b };
   }
   /** The relic each champion carries, from the duel's first snapshot. */
-  const carried = (s: FakeSocket) => s.last('start')!.snap.units.filter((u) => u.champ).map((u) => u.champ!.items);
+  const carried = (s: FakeSocket) => s.last('start')!.snap.units.changed.filter((u) => u.champ).map((u) => u.champ!.items);
 
   it('offers each player three relics once both are ready, and starts the duel with the ones they chose', () => {
     const { room, a, b } = relicRoom();

@@ -9,6 +9,23 @@ export interface PendingBatch {
   cmds: Command[];
 }
 
+/** The fields prediction changes on your champion. */
+export type OwnState = Pick<Unit, 'pos' | 'moveTarget' | 'attackTarget' | 'windup' | 'facing'>;
+
+/** Your champion's prediction-touched fields as the server last said. */
+export const serverOwn = (me: Unit): OwnState => ({
+  pos: { ...me.pos }, moveTarget: me.moveTarget && { ...me.moveTarget }, attackTarget: me.attackTarget, windup: me.windup, facing: me.facing,
+});
+
+/**
+ * Put back the server's values before applying a snapshot. Snapshots only carry what changed on the
+ * server, so a predicted position the server never matched (you were rooted, or bumped into a minion)
+ * would otherwise stick.
+ */
+export function restoreOwn(me: Unit, s: OwnState) {
+  Object.assign(me, serverOwn(s as Unit));
+}
+
 /**
  * Client-side prediction for your own champion's walking. `me` holds the server's state from the
  * snapshot just applied, which is about a round trip behind your inputs: replay the batches the server
