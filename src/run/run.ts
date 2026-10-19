@@ -42,6 +42,9 @@ interface FloorDef {
   reward: AugmentTier | null;
 }
 
+/** Towers gain this share of their health per floor (+40% by the last). */
+export const TOWER_HP_PER_FLOOR = 0.1;
+
 export const FLOORS: FloorDef[] = [
   { title: 'Rookie', accuracy: 0.55, statMult: 1, enemyAugments: [], reward: 'silver' },
   { title: 'Contender', accuracy: 0.68, statMult: 1, enemyAugments: ['silver'], reward: 'gold' },
@@ -151,6 +154,8 @@ export function floorPlan(run: RunState): FloorPlan {
   const order = shuffle(new Rng(run.seed * 31 + 7), MODIFIERS);
   const modifier = run.floor === 0 ? null : order[(run.floor - 1) % order.length];
   const rules = { ...DUEL_RULES };
+  // Both sides hit harder every floor (augments, items, scaling): towers get sturdier to keep up.
+  rules.towerHpMult *= 1 + TOWER_HP_PER_FLOOR * run.floor;
   modifier?.apply(rules);
   return {
     floor: run.floor, title: def.title, opponent, opponentAugments, opponentItems, opponentSummoners: SIGNATURE_SUMMONERS[opponent], accuracy: def.accuracy, statMult: def.statMult, modifier, rules,
