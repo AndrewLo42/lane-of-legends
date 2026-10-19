@@ -94,7 +94,7 @@ export const SABLE: Kit = {
       `(the scythe's full length), and her damage to them heals her for ${GLEAN.heal * 100}% of it. Her attacks sweep: other ` +
       `enemies in a short arc take ${SWEEP.damage * 100}% of the hit.`,
   },
-  levelOrder: [3, 0, 1, 2],
+  levelOrder: [3, 1, 0, 2], // Wide Swath first: the bot clears and pokes with it
   abilities: [
     {
       name: 'Reaping Hook',

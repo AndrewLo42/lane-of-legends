@@ -36,6 +36,18 @@ interface Ctx {
 const cast = (slot: Slot, at: Vec2): Command => ({ type: 'cast', slot, at });
 
 /**
+ * Poke awareness: having taken `share` of max health from the enemy champion within `window` seconds
+ * while below `healthy` health (and not ahead), a bot farming the wave plays safe; `margin` is how far
+ * outside their attack reach it waits.
+ */
+const POKE = { share: 0.08, window: 3, margin: 1, healthy: 0.75 };
+/** A narrow skillshot is noticed this many seconds before it would hit, and dodged with this share of the bot's accuracy. */
+const SKILLSHOT_NOTICE = 0.45;
+/** Bots attack-move up to the wave only when the enemy champion is dead or at least this far away. */
+const ATTACK_MOVE_CLEAR = 15;
+const SKILLSHOT_DODGE = 0.3;
+
+/**
  * Rule-based CPU opponent: retreat when low, never stand in an enemy tower's range without minions
  * to tank it, use its kit's abilities, trade when healthy, otherwise farm the weakest minion in
  * reach and follow its own wave. Milestone 3 replaces this with a utility AI.
@@ -48,11 +60,15 @@ export class BotController implements Controller {
   /** Telegraphs and missiles already judged: id -> whether this bot reacts to it. */
   private noticed = new Map<number, boolean>();
   private retreating = false;
+  /** Damage this bot took from the enemy champion lately (when, how much), for noticing poke while farming. */
+  private poke: { tick: number; amount: number }[] = [];
+  private hitSeq = 0;
 
   constructor(private accuracy = 0.8) {}
 
   think(world: World, self: Unit): Command[] {
     const cmds: Command[] = [];
+    this.notePoke(world, self);
     if (self.champ!.skillPoints > 0) {
       // One rank in every basic ability first, then the kit's priority order.
       const order = [...([0, 1, 2] as Slot[]).filter((s) => self.champ!.abilities[s].rank === 0), ...kitOf(self).levelOrder];
@@ -138,6 +154,30 @@ export class BotController implements Controller {
     const play = kitPlay.play.call(this, ctx);
     if (play) return play;
 
+    // Being poked from out of reach while farming: only step in for last hits, and otherwise wait out of
+    // the enemy champion's reach behind the wave.
+    const cautious = !!foe && this.underPoke(world, self, foe);
+    if (cautious && foe) {
+      const reach = foe.range + foe.radius + self.radius + POKE.margin;
+      if (dist(self.pos, foe.pos) < reach) {
+        const out = { x: self.pos.x - towardFoe * 2.5, y: self.pos.y + Math.sign(self.pos.y - foe.pos.y || 1) * 0.8 };
+        if (!ctx.unsafe(out)) return { type: 'move', to: out };
+      }
+      // Walk in for a last hit, as long as it isn't inside their reach.
+      const lastHit = alive
+        .filter((u) => u.team === foeTeam && u.kind === 'minion' && u.hp <= self.damage * 1.05 && gap(self, u) < self.range + 4 &&
+          dist(u.pos, foe.pos) > reach && !ctx.unsafe(u.pos))
+        .sort((a, b) => gap(self, a) - gap(self, b))[0];
+      if (lastHit) return { type: 'attack', target: lastHit.id };
+      if (self.attackTarget != null) return { type: 'stop' }; // don't keep swinging at the wave from in front of them
+      // Otherwise wait behind our wave, out of their reach.
+      const wait = allies.length
+        ? { x: allies.reduce((f, m) => (m.pos.x * towardFoe > f * towardFoe ? m.pos.x : f), allies[0].pos.x) - towardFoe * 4, y: self.pos.y }
+        : null;
+      if (wait && dist(wait, foe.pos) > reach && !ctx.unsafe(wait) && Math.abs(wait.x - self.pos.x) > 1.5) return { type: 'move', to: wait };
+      return null;
+    }
+
     // Trade autos when healthy (melee needs to walk further in).
     if (foe && self.hp > self.maxHp * 0.6 && gap(self, foe) < self.range + (self.range < 3 ? 3 : 1) && !ctx.unsafe(foe.pos)) {
       return { type: 'attack', target: foe.id };
@@ -154,7 +194,48 @@ export class BotController implements Controller {
       : sideX(self.team, LANE.towerXs[LANE.towerXs.length - 1] - 3);
     const spot = { x: front, y: (world.rng.next() * 2 - 1) * 2 };
     if (ctx.unsafe(spot) || Math.abs(spot.x - self.pos.x) < 1.5) return null;
+    // Walking up to the wave with the enemy champion dead or far off: attack-move, hitting whatever it
+    // meets on the way. Nearer, a plain move: attack-move would start trades nobody decided on.
+    if (!foe || dist(self.pos, foe.pos) > ATTACK_MOVE_CLEAR) return { type: 'attackMove', to: spot };
     return { type: 'move', to: spot };
+  }
+
+  // ---------- poke ----------
+
+  /** Record damage from the enemy champion (and its pet) since the last tick; forget anything older than the window. */
+  private notePoke(world: World, self: Unit) {
+    for (const h of world.hits) {
+      if (h.seq <= this.hitSeq) continue;
+      this.hitSeq = h.seq;
+      // Direct hits only: stepping back doesn't stop a burn or a sting that's already ticking.
+      if (h.targetId !== self.id || h.proc || (h.sourceKind !== 'champion' && h.sourceKind !== 'pet')) continue;
+      const src = world.get(h.sourceId);
+      // Only hits from out of our reach are poke; trading blows up close is a fight.
+      if (!src || src.team === self.team || gap(self, src) <= self.range + 0.5) continue;
+      this.poke.push({ tick: h.tick, amount: h.amount });
+    }
+    const since = world.tick - POKE.window * TICK_HZ;
+    while (this.poke.length && this.poke[0].tick < since) this.poke.shift();
+  }
+
+  /**
+   * Taking poke: the enemy champion has dealt a noticeable share of our health lately from outside our
+   * own reach. Someone standing in reach is a fight, not poke: the usual trade-or-retreat rules handle it.
+   */
+  private underPoke(world: World, self: Unit, foe: Unit) {
+    if (gap(self, foe) <= self.range + 0.5 || world.isBusy(self)) return false;
+    // A melee champion can't out-wait a ranged one: it farms through the poke and looks for the all-in.
+    if (self.range < 3 && foe.range >= 3) return false;
+    // Healthy, or ahead on health, it can afford some poke; and their wave on our tower needs defending.
+    const hp = self.hp / self.maxHp;
+    if (hp > POKE.healthy || hp > foe.hp / foe.maxHp + 0.1) return false;
+    const sieged = world.units.some(
+      (t) => !t.dead && t.kind === 'tower' && t.team === self.team &&
+        world.units.some((m) => !m.dead && m.kind === 'minion' && m.team !== self.team && dist(m.pos, t.pos) < t.range + t.radius),
+    );
+    if (sieged) return false;
+    const taken = this.poke.reduce((t, p) => t + p.amount, 0);
+    return taken >= self.maxHp * POKE.share;
   }
 
   // ---------- dodging ----------
@@ -165,8 +246,8 @@ export class BotController implements Controller {
    * against this bot's accuracy, so low floors still get caught.
    */
   private dodge(world: World, self: Unit): Command | null {
-    const reacts = (id: number) => {
-      if (!this.noticed.has(id)) this.noticed.set(id, world.rng.next() < this.accuracy);
+    const reacts = (id: number, chance = this.accuracy) => {
+      if (!this.noticed.has(id)) this.noticed.set(id, world.rng.next() < chance);
       return this.noticed.get(id)!;
     };
     const margin = self.radius + 0.3;
@@ -199,9 +280,16 @@ export class BotController implements Controller {
         }
       }
     }
-    // A wide line missile (Skyline Barrage) still crossing the lane.
+    // A wide line missile (Skyline Barrage) still crossing the lane, or a skillshot about to land: step
+    // out of its path. Narrow ones are harder to read (and only worth it in the last moment before they hit).
     for (const m of world.missiles) {
-      if (m.team === self.team || m.targetId != null || m.width < 1.5 || !reacts(m.id)) continue;
+      if (m.team === self.team || m.targetId != null || m.frozenBy != null) continue;
+      const wide = m.width >= 1.5;
+      if (!wide) {
+        const along = (self.pos.x - m.pos.x) * m.dir.x + (self.pos.y - m.pos.y) * m.dir.y;
+        if (along < 0 || along > m.range - m.travelled || along / m.speed > SKILLSHOT_NOTICE) continue;
+      }
+      if (!reacts(m.id, wide ? this.accuracy : this.accuracy * SKILLSHOT_DODGE)) continue;
       const to = fromLine(m.pos, Math.atan2(m.dir.y, m.dir.x), m.range - m.travelled, m.width);
       if (to) return { type: 'move', to };
     }
@@ -507,9 +595,14 @@ export class BotController implements Controller {
       // Sweep with the spear in hand, Nova without it, each only when they're inside it.
       if (ready(2) && (holdingSpear(self) ? near(2.2) : near(3))) return cast(2, self.pos);
     }
-    // Walk back for a dropped spear when it's somewhere safe.
+    // Walk back for a dropped spear when it's somewhere safe: not under their tower, not in the enemy
+    // champion's reach or the middle of their wave (unless they're nearly dead).
     const spear = spearOnGround(self);
-    if (spear && !unsafe(spear) && !(foe && near(3) && self.hp < self.maxHp * 0.5)) return { type: 'move', to: spear };
+    if (spear && !unsafe(spear) && !(foe && near(3) && self.hp < self.maxHp * 0.5)) {
+      const crowd = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, spear) < 3).length;
+      const guarded = !!foe && foe.hp > foe.maxHp * 0.3 && (dist(spear, foe.pos) < foe.range + foe.radius + self.radius + 2 || crowd >= 3);
+      if (!guarded) return { type: 'move', to: spear };
+    }
     return null;
   }
 
@@ -589,7 +682,9 @@ export class BotController implements Controller {
 
   private sable(ctx: Ctx): Command | null {
     const { world, self, foe, near, unsafe, ready, recasting, aim, aimAfter } = ctx;
-    const { Q, REAP, W, R } = SABLE_TUNING;
+    const { Q, REAP, W, E, R } = SABLE_TUNING;
+    const mana = self.champ!.mana;
+    const costs = (...slots: Slot[]) => slots.reduce((t: number, s) => t + abilitiesOf(self)[s].cost(Math.max(1, self.champ!.abilities[s].rank)), 0);
     if (foe) {
       const hp = self.hp / self.maxHp;
       const foeHp = foe.hp / foe.maxHp;
@@ -616,11 +711,22 @@ export class BotController implements Controller {
         return { type: 'attack', target: foe.id };
       }
       if (ready(3) && near(R.radius - 1.5) && (winning || foeHp < 0.5) && safe) return cast(3, aimAfter(foe, R.windup));
+      // Aggressive: Drift in beside them (its damage reduction carries the trade), then Wide Swath and swing.
+      // She accepts a few of their minions' hits for it, just not a full wave or their tower.
+      const bold = hp > 0.45 && hp > foeHp - 0.2 && (wave < 5 || foeHp < 0.4) && !unsafe(foe.pos);
+      const d = gap(self, foe);
+      if (ready(2) && bold && d > W.radius - 0.8 && d < E.range + W.radius - 1 && ready(1) && mana > costs(1, 2)) {
+        return cast(2, toward(self.pos, foe.pos, Math.min(E.range, dist(self.pos, foe.pos) - 1)));
+      }
       if (ready(0) && near(Q.range - 0.5) && hp > 0.4 && hp > foeHp - 0.15 && safe) {
         const p = aim(foe, Q.speed);
         if (!minionInTheWay(world, self, p, Q.width)) return cast(0, p);
       }
       if (ready(1) && near(W.radius - 0.3)) return cast(1, self.pos);
+      // Committed (Drift's guard is up, or they're slowed by the swath): keep swinging.
+      if (bold && d <= world.attackRange(self, foe) + 1.5 && (world.status(self, 'guard') || world.status(foe, 'slow'))) {
+        return { type: 'attack', target: foe.id };
+      }
       // Gleaned: her reach is longer against them, so keep swinging while it lasts.
       if (world.status(foe, 'gleaned', self.id) && winning && safe && gap(self, foe) <= world.attackRange(self, foe) + 1) {
         return { type: 'attack', target: foe.id };
@@ -646,11 +752,23 @@ export class BotController implements Controller {
         if (!unsafe(out)) return { type: 'move', to: out };
       }
     }
-    // Farm with Wide Swath: when it would finish a minion, or catches three.
-    if (ready(1) && self.champ!.mana > self.champ!.maxMana * 0.25) {
+    // Farm with Wide Swath: when it would finish a minion, or catches two.
+    const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && !unsafe(u.pos));
+    if (ready(1) && mana > self.champ!.maxMana * 0.2) {
       const swath = ctx.dmg(1) * W.minion;
-      const close = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, self.pos) < W.radius + u.radius && !unsafe(u.pos));
-      if (close.length >= 3 || close.some((m) => m.hp < swath)) return cast(1, self.pos);
+      const close = enemyMinions.filter((u) => dist(u.pos, self.pos) < W.radius + u.radius);
+      if (close.length >= 2 || close.some((m) => m.hp < swath)) return cast(1, self.pos);
+    }
+    // Drift into their casters at the back of the wave and swath them, unless that's walking into the champion.
+    if (ready(2) && ready(1) && mana > costs(1, 2) + self.champ!.maxMana * 0.15) {
+      const casters = enemyMinions.filter((u) => u.role === 'caster' && dist(u.pos, self.pos) < E.range + W.radius - 0.5);
+      for (const c of casters) {
+        const caught = enemyMinions.filter((u) => dist(u.pos, c.pos) < W.radius - 0.3).length;
+        const exposed = foe && !foe.dead && dist(foe.pos, c.pos) < foe.range + foe.radius + 2 && self.hp < self.maxHp * 0.6;
+        if (caught >= 2 && !exposed && dist(c.pos, self.pos) > W.radius - 0.5) {
+          return cast(2, toward(self.pos, c.pos, Math.min(E.range, dist(self.pos, c.pos) - 0.5)));
+        }
+      }
     }
     return null;
   }
