@@ -16,8 +16,8 @@ import type { AbilityDef, Kit } from './types';
 const THISTLE = { hp: 650, hpPerLevel: 85, soak: 0.8, damage: 32, damagePerLevel: 2.5, range: 1.2, attackInterval: 1.1, windup: 0.2, speed: 6.6, radius: 0.85, leash: 7, guardAhead: 1.4, panic: 12, comeBack: 0.5, calm: 4, regen: 0.02 };
 /** Riding: melee reach, a little faster, and harder hits (the toad's tongue). */
 /** Riding: reach, speed, auto damage and radius; `minion`: all their damage to minions (Thistle eats waves). */
-const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85, minion: 1.3 };
-const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 6, 5], range: 5.5, width: 0.9, speed: 24, minion: 1.5, heal: 40, healPct: 0.06, yank: 2.5 };
+const MOUNT = { range: 1.6, speed: 1.12, autoDamage: 1.2, radius: 0.85, minion: 1.4 };
+const GULP = { base: [70, 110, 150, 190, 230], ad: 0.6, cost: 45, cd: [9, 8, 7, 6, 5], range: 5.5, width: 0.9, speed: 24, minion: 1.5, heal: 40, healPct: 0.06, yank: 2.5, refund: 0.5 };
 const HOP = { base: [60, 95, 130, 165, 200], ad: 0.4, cost: 40, cd: [11, 10, 9, 8, 7], range: 4.5, speed: 15, radius: 1.8, slow: 0.25, slowFor: 1 };
 const PEBBLES = { base: [40, 60, 80, 100, 120], ad: 0.3, cost: 35, cd: [6, 5.5, 5, 4.5, 4], range: 5.5, width: 0.5, speed: 26, spread: 0.22, repeat: 0.5 };
 const PUFF = { cost: 40, cd: [14, 13, 12, 11, 10], range: 4, radius: 2.5, guard: 0.4, slow: 0.3, seconds: 3, pulse: 0.5, reach: 8, heal: 30, healPct: 0.06 };
@@ -182,7 +182,8 @@ const RIDING_ABILITIES: Kit['abilities'] = [
     describe: (r, self) =>
       `Thistle's tongue lashes out. The first enemy hit takes ${Math.round(RIDING_ABILITIES[0].damage!(r, self))} damage. ` +
       `A minion takes ${GULP.minion * 100}%, and if that finishes it Thistle swallows it (Pip's last hit) and heals ` +
-      `${GULP.heal} + ${GULP.healPct * 100}% of his max health. The enemy champion is yanked ${GULP.yank} units in.`,
+      `${GULP.heal} + ${GULP.healPct * 100}% of his max health, and the cooldown is cut by ${GULP.refund * 100}%. The enemy ` +
+      `champion is yanked ${GULP.yank} units in.`,
     cast: ({ world, self, at: aim, rank }) => {
       world.fireLine(self, {
         style: 'tongue', dir: dirTo(self.pos, aim), speed: GULP.speed, range: GULP.range, width: GULP.width, canHit: champsAndMinions,
@@ -192,6 +193,11 @@ const RIDING_ABILITIES: Kit['abilities'] = [
             world.dealDamage(self, t, dmg * GULP.minion, { slot: 0 });
             const toad = thistleOf(world, self);
             if (t.dead && toad) world.heal(toad, GULP.heal + toad.maxHp * GULP.healPct);
+            if (t.dead) {
+              // A swallowed minion brings the tongue back sooner: Thistle eats waves.
+              const st = self.champ!.abilities[0];
+              st.readyAt = world.tick + Math.round(Math.max(0, st.readyAt - world.tick) * (1 - GULP.refund));
+            }
             return;
           }
           world.dealDamage(self, t, dmg, { slot: 0 });

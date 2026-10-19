@@ -45,6 +45,8 @@ const POKE = { share: 0.08, window: 3, margin: 1, healthy: 0.75 };
 const SKILLSHOT_NOTICE = 0.45;
 /** Bots attack-move up to the wave only when the enemy champion is dead or at least this far away. */
 const ATTACK_MOVE_CLEAR = 15;
+/** After a push, bots wait this far onto their own side of mid-lane, where the next waves meet. */
+const WAVE_MEET = 4;
 const SKILLSHOT_DODGE = 0.3;
 
 /**
@@ -60,6 +62,8 @@ export class BotController implements Controller {
   /** Telegraphs and missiles already judged: id -> whether this bot reacts to it. */
   private noticed = new Map<number, boolean>();
   private retreating = false;
+  /** Going home to heal and refill after a push, to come back out with the next wave. */
+  private resetting = false;
   /** Damage this bot took from the enemy champion lately (when, how much), for noticing poke while farming. */
   private poke: { tick: number; amount: number }[] = [];
   private hitSeq = 0;
@@ -149,6 +153,12 @@ export class BotController implements Controller {
       if (tanky && !chased && !ctx.near(9) && calmFor(world, self) > TICK_HZ * 2 && !ctx.unsafe(self.pos)) return { type: 'stop' };
       return kitPlay.escape.call(this, ctx) ?? { type: 'move', to: spawnPoint(self.team) };
     }
+    // Resetting after a push: home until healed and refilled, then back out (the usual positioning below).
+    if (this.resetting) {
+      const full = self.hp >= self.maxHp * 0.95 && (kitOf(self).resource || self.champ!.mana >= self.champ!.maxMana * 0.9);
+      if (full || ctx.near(4)) this.resetting = false;
+      else return { type: 'move', to: spawnPoint(self.team) };
+    }
     if (ctx.unsafe(self.pos)) return { type: 'move', to: { x: self.pos.x - towardFoe * 4, y: self.pos.y } };
 
     const play = kitPlay.play.call(this, ctx);
@@ -188,6 +198,11 @@ export class BotController implements Controller {
       .sort((a, b) => a.hp - b.hp)[0];
     if (farm) return { type: 'attack', target: farm.id };
 
+    // Our wave has pushed into their tower and there's nothing left to farm: don't stand around.
+    const after = this.afterPush(ctx, enemyTowers, allies);
+    if (after === 'hold') return null; // already doing it: don't let the positioning below pull it away
+    if (after) return after;
+
     // Stand a little behind the front of our wave, or by our outer tower if there's no wave.
     const front = allies.length
       ? allies.reduce((f, m) => (m.pos.x * towardFoe > f * towardFoe ? m.pos.x : f), allies[0].pos.x) - towardFoe * 3
@@ -198,6 +213,46 @@ export class BotController implements Controller {
     // meets on the way. Nearer, a plain move: attack-move would start trades nobody decided on.
     if (!foe || dist(self.pos, foe.pos) > ATTACK_MOVE_CLEAR) return { type: 'attackMove', to: spot };
     return { type: 'move', to: spot };
+  }
+
+  // ---------- after a push ----------
+
+  /**
+   * Our wave is at their tower with no enemy minions left to farm. With a healthy wave tanking the tower
+   * (and their champion not close), hit the tower. With only a straggler or two left, nothing productive
+   * is left here: go home if hurt or out of mana, and come back with the next wave; otherwise walk back
+   * to where the next waves will meet.
+   */
+  private afterPush(ctx: Ctx, enemyTowers: Unit[], allies: Unit[]): Command | 'hold' | null {
+    const { world, self, foe, unsafe } = ctx;
+    const tower = enemyTowers.filter((t) => world.isTargetable(t)).sort((a, b) => Math.abs(a.pos.x) - Math.abs(b.pos.x))[0];
+    if (!tower) return null;
+    const sieging = allies.filter((m) => dist(m.pos, tower.pos) < tower.range + tower.radius + 1);
+    if (!sieging.length) return null;
+    const theirs = world.units.some((u) => !u.dead && u.kind === 'minion' && u.team !== self.team && dist(u.pos, tower.pos) < tower.range + 6);
+    if (theirs) return null;
+    const foeClose = !!foe && gap(self, foe) < 7;
+    if (sieging.length >= 3 && !foeClose && self.hp > self.maxHp * 0.5 && !unsafe(tower.pos)) {
+      return self.attackTarget === tower.id ? 'hold' : { type: 'attack', target: tower.id };
+    }
+    if (sieging.length >= 3) return null; // their champion is there: hold behind the wave as usual
+    // There's no recall: the walk home and back costs about half a minute, so only when it's really needed.
+    const manaLow = !kitOf(self).resource && self.champ!.mana < self.champ!.maxMana * 0.2;
+    if (self.hp < self.maxHp * 0.55 || manaLow) {
+      this.resetting = true;
+      return { type: 'move', to: spawnPoint(self.team) };
+    }
+    // Wait where the next waves will meet (both spawn together, so about mid-lane), just on our side; if
+    // their champion is already waiting there, back by our own tower instead.
+    let wait = { x: sideX(self.team, WAVE_MEET), y: 0 };
+    if (foe && !foe.dead && dist(foe.pos, wait) < foe.range + foe.radius + 3) {
+      const own = world.units
+        .filter((t) => !t.dead && t.kind === 'tower' && t.team === self.team)
+        .sort((a, b) => Math.abs(a.pos.x) - Math.abs(b.pos.x))[0];
+      wait = own ? { x: own.pos.x - sideX(self.team, 4), y: 0 } : spawnPoint(self.team);
+    }
+    if (dist(self.pos, wait) <= 2) return 'hold';
+    return self.moveTarget && dist(self.moveTarget, wait) < 1 ? 'hold' : { type: 'move', to: wait };
   }
 
   // ---------- poke ----------
