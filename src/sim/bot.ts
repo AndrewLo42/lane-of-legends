@@ -6,7 +6,7 @@ import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, nearStandard, standardOnLine, standardsOf } from './kits/gerrit';
 import { LUMEN_TUNING, devotion } from './kits/lumen';
-import { FENNICK_TUNING, drawFraction, drawing, longshotRange, overcharged, volleyReady } from './kits/fennick';
+import { FENNICK_TUNING, drawFraction, drawing, longshotRange } from './kits/fennick';
 import { isRewinding } from './kits/tock';
 import { LANE, sideX, spawnPoint } from './lane';
 import { BARRIER, IGNITE, TETHER, igniteTarget } from './summoners';
@@ -1062,55 +1062,99 @@ export class BotController implements Controller {
   // ---------- Fennick ----------
 
   /**
-   * Draw Longshot from long range and loose it at full draw (or early when someone closes in), net
-   * whoever dives him, Volley into trades, Overcharge to finish a fight, and kite melee champions
-   * between attacks.
+   * Max Longshot and use it, fully drawn (it pierces), through the longest line of minions to clear the
+   * wave, catching the champion in it when it can. Between draws, poke with attacks and Volley when the
+   * trade is safe, and all in with Snare Shot (then attacks and Overcharge) when the moment is right:
+   * they're low and he isn't, or they dive him. Kites melee champions throughout.
    */
   private fennick(ctx: Ctx): Command | null {
     const { world, self, foe, near, unsafe, ready, aim } = ctx;
     const { Q, E } = FENNICK_TUNING;
     const mana = self.champ!.mana / self.champ!.maxMana;
     if (drawing(self)) return this.fennickLoose(ctx);
-    if (!foe) return null;
-    const hp = self.hp / self.maxHp;
-    const foeHp = foe.hp / foe.maxHp;
-    const d = gap(self, foe);
     const towardFoe = self.team === 'blue' ? 1 : -1;
-    const diving = d < 3.5 && (foe.attackTarget === self.id || foe.range < 3);
-    const trading = d <= self.range + 0.3 && !unsafe(foe.pos);
-    // Net a diver, or a target worth an all-in.
-    if (ready(2) && near(E.range - 0.8) && (diving || (foeHp < 0.45 && hp > 0.4 && !unsafe(foe.pos)))) {
-      const p = aim(foe, E.speed);
-      if (!minionInTheWay(world, self, p, E.width)) return cast(2, p);
+    const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team);
+    if (foe) {
+      const hp = self.hp / self.maxHp;
+      const foeHp = foe.hp / foe.maxHp;
+      const d = gap(self, foe);
+      const diving = d < 3.5 && (foe.attackTarget === self.id || foe.range < 3);
+      // All in: net them, then Overcharge and attack. Only when it wins: they're low and he isn't (and
+      // not into their tower), or they're diving him anyway.
+      const allIn = diving || (foeHp < 0.45 && hp > 0.4 && hp > foeHp && !unsafe(foe.pos));
+      // Snare Shot is his only peel: against a melee champion, keep it for when they dive (unless it kills).
+      const spareNet = diving || foe.range >= 3 || foeHp < 0.3;
+      if (ready(2) && near(E.range - 0.8) && allIn && spareNet) {
+        const p = aim(foe, E.speed);
+        if (!minionInTheWay(world, self, p, E.width)) return cast(2, p);
+      }
+      const netted = world.isRooted(foe) || !!world.status(foe, 'slow', self.id);
+      if (ready(3) && near(self.range + 1.5) && (allIn || netted) && hp > 0.3) return cast(3, self.pos);
+      if (allIn && d <= self.range + 1 && !unsafe(foe.pos)) {
+        if (ready(1)) return cast(1, self.pos);
+        return { type: 'attack', target: foe.id };
+      }
+      // Kite melee champions: shoot when the bow is ready, step back along the lane in between.
+      if (foe.range < 3 && d < foe.range + 3) {
+        if (self.windup > 0) return { type: 'attack', target: foe.id };
+        if (self.attackCd === 0 && d <= self.range) return { type: 'attack', target: foe.id };
+        const away = { x: self.pos.x - towardFoe * 3, y: self.pos.y + Math.sign(self.pos.y - foe.pos.y || 1) };
+        if (!unsafe(away)) return { type: 'move', to: away };
+      }
+      // Poke with attacks (Volley first) when they're in reach and it's safe: not losing the trade, and
+      // not standing in their minions, which would turn on him for it.
+      const crowd = enemyMinions.filter((u) => dist(u.pos, self.pos) < 4).length;
+      if (d <= self.range + 0.3 && !unsafe(foe.pos) && hp > foeHp - 0.15 && crowd < 3) {
+        if (ready(1) && mana > 0.3 && self.attackCd <= 2) return cast(1, self.pos);
+        return { type: 'attack', target: foe.id };
+      }
     }
-    if (ready(3) && near(self.range + 1.5) && ((foeHp < 0.5 && hp > 0.3) || (hp > 0.5 && foe.attackTarget === self.id))) return cast(3, self.pos);
-    if (ready(1) && trading && (foeHp < 0.7 || overcharged(world, self) || diving)) return cast(1, self.pos);
-    if (trading && (foeHp < 0.55 || overcharged(world, self) || volleyReady(world, self))) return { type: 'attack', target: foe.id };
-    // Kite melee champions: shoot when the bow is ready, step back along the lane in between.
-    if (foe.range < 3 && d < foe.range + 3) {
-      if (self.windup > 0) return { type: 'attack', target: foe.id };
-      if (self.attackCd === 0 && d <= self.range) return { type: 'attack', target: foe.id };
-      const away = { x: self.pos.x - towardFoe * 3, y: self.pos.y + Math.sign(self.pos.y - foe.pos.y || 1) };
-      if (!unsafe(away)) return { type: 'move', to: away };
+    // Draw Longshot whenever there's a line worth a full draw (minions, the champion, ideally both) and
+    // standing still to draw is safe: nobody about to reach him.
+    const threatened = !!foe && gap(self, foe) < Math.min(foe.range + 2, 5);
+    if (ready(0) && mana > 0.3 && !threatened) {
+      const line = this.longshotLine(world, self, Q.maxRange, foe);
+      if (line && line.score >= 3) return cast(0, line.at);
     }
-    // Poke: start drawing at a safe distance (it can't be cancelled, and he can't attack meanwhile).
-    if (ready(0) && mana > 0.3 && d > 4 && d < Q.maxRange - 1 && !diving) return cast(0, foe.pos);
     return null;
   }
 
-  /** Mid-draw: loose at full draw, or early if the target is closing in or about to slip out of reach. */
+  /**
+   * The best line for a full-draw Longshot from here: aimed at each enemy minion and the champion in turn,
+   * scoring every enemy it would pierce (the champion counts three).
+   */
+  private longshotLine(world: World, self: Unit, range: number, foe: Unit | undefined): { at: Vec2; score: number } | null {
+    const { Q } = FENNICK_TUNING;
+    const targets = world.units.filter((u) => !u.dead && u.team !== self.team && (u.kind === 'minion' || u === foe) && dist(u.pos, self.pos) < range);
+    let best: { at: Vec2; score: number } | null = null;
+    for (const t of targets) {
+      const end = toward(self.pos, t.pos, range);
+      let score = 0;
+      for (const u of targets) {
+        if (segmentDistance(u.pos, self.pos, end).d <= Q.width / 2 + u.radius) score += u === foe ? 3 : 1;
+      }
+      if (!best || score > best.score) best = { at: { ...t.pos }, score };
+    }
+    return best;
+  }
+
+  /** Mid-draw: loose at full draw down the best line, or early if they're closing in. */
   private fennickLoose({ world, self, foe, aim }: Ctx): Command | null {
     const { Q } = FENNICK_TUNING;
     const k = drawFraction(self);
     const held = (world.tick - ((self.champ!.data as { drawStart?: number }).drawStart ?? world.tick)) / TICK_HZ;
-    if (!foe) return held > 1.5 ? { type: 'release', slot: 0, at: self.pos } : null;
-    const p = aim(foe, Q.speed);
-    const reach = longshotRange(k);
-    const d = dist(self.pos, p);
-    const pressed = gap(self, foe) < 3;
-    if ((k >= 1 && d < reach) || (pressed && k > 0.3) || held > Q.timeout - 0.4) return { type: 'release', slot: 0, at: p };
+    const pressed = !!foe && gap(self, foe) < 3;
+    if (pressed && k > 0.3) return { type: 'release', slot: 0, at: aim(foe!, Q.speed) };
+    if (k >= 1 || held > Q.timeout - 0.4) {
+      // Lead the champion if the line is through them; otherwise down the best line of minions.
+      const line = this.longshotLine(world, self, longshotRange(k), foe);
+      const onFoe = !!foe && line != null && segmentDistance(foe.pos, self.pos, toward(self.pos, line.at, Q.maxRange)).d <= Q.width / 2 + foe.radius;
+      if (line && line.score > 0) return { type: 'release', slot: 0, at: onFoe ? aim(foe!, Q.speed) : line.at };
+      if (held > Q.timeout - 0.4) return { type: 'release', slot: 0, at: foe ? aim(foe, Q.speed) : self.pos };
+      return null;
+    }
     // Walk back while drawing if they're closing in.
-    if (gap(self, foe) < 5) return { type: 'move', to: toward(self.pos, spawnPoint(self.team), 2) };
+    if (foe && gap(self, foe) < 5) return { type: 'move', to: toward(self.pos, spawnPoint(self.team), 2) };
     return null;
   }
 

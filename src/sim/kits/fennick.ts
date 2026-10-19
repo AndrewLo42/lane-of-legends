@@ -23,7 +23,7 @@ const QUIVER = { slow: 0.25, slowFor: 1.2, burn: 14, burnAd: 0.3, burnFor: 2, sp
 /** Longshot: the draw reaches from `minRange` to `maxRange` over `full` seconds, and looses itself after `timeout`. */
 const Q = {
   base: [60, 95, 130, 165, 200], ad: 0.9, cost: 55, cd: [9, 8.5, 8, 7.5, 7], minRange: 6, maxRange: 12, full: 1.25, timeout: 3,
-  minMult: 0.6, fullMult: 1.3, drawSlow: 0.25, width: 0.7, speed: 30,
+  minMult: 0.6, fullMult: 1.25, drawSlow: 0.25, width: 0.7, speed: 30,
 };
 /** Volley: the next attack within `window` seconds looses all three arrows, `gap` seconds apart, each at `mult` damage. */
 const W = { cost: 40, cd: [11, 10, 9, 8, 7], window: 4, mult: 0.6, gap: 0.1 };
@@ -124,7 +124,7 @@ export const FENNICK: Kit = {
   experimental: true,
   stats: {
     hp: 570, hpPerLevel: 88, mana: 340, manaPerLevel: 45, manaRegen: 2.4, damage: 54, damagePerLevel: 3.8,
-    attackInterval: 0.75, attackSpeedPerLevel: 0.032, windup: 0.17, range: 5.5, projectileSpeed: 28, speed: 6.4, radius: 0.5,
+    attackInterval: 0.75, attackSpeedPerLevel: 0.032, windup: 0.17, range: 5.5, projectileSpeed: 28, speed: 6.3, radius: 0.5,
   },
   passive: {
     name: 'Quiver',
