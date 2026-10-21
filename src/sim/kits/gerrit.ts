@@ -72,7 +72,6 @@ export const GERRIT: Kit = {
     'An old knight of a fallen order who still carries its banner. He plants standards and thrusts himself into them, ' +
     'knocking up whoever is in the way, and fights hardest on his own ground. Stay off the line to his standard.',
   color: '#c9a24a',
-  experimental: true,
   stats: {
     hp: 800, hpPerLevel: 120, mana: 340, manaPerLevel: 45, manaRegen: 2.6, damage: 73, damagePerLevel: 4.5,
     attackInterval: 0.9, attackSpeedPerLevel: 0.022, windup: 0.25, range: 1.8, projectileSpeed: 0, speed: 6.4, radius: 0.7,

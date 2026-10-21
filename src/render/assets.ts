@@ -24,7 +24,7 @@ export const MODELS = {
   champ_sable: 'Sable.glb',
   champ_pip: 'Pip.glb',
   pet_thistle: 'Thistle.glb',
-  champ_gerrit: 'Gerrit.glb', // not built yet: he plays as a placeholder (experimental)
+  champ_gerrit: 'Gerrit.glb',
   champ_fennick: 'Fennick.glb', // not built yet: he plays as a placeholder (experimental)
   champ_lumen: 'Lumen.glb', // not built yet: she plays as a placeholder (experimental) // a static mesh: views.ts hops and squashes it in code
 } as const;

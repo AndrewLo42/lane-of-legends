@@ -1,0 +1,107 @@
+{
+  "out": "public/assets/meshy/Gerrit.glb",
+  "rigged": "assets-src/blenderkit/gerrit/rigged_gerrit.glb",
+  "anims": [
+    "assets-src/blenderkit/gerrit/anims_gerrit.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": {
+      "src": "GR_IdleKnight"
+    },
+    "Run": {
+      "src": "GR_RunKnight"
+    },
+    "Attack": {
+      "src": "GR_Attack",
+      "start": 0.6,
+      "end": 1.5
+    },
+    "Attack2": {
+      "src": "GR_Slash",
+      "start": 0.3,
+      "end": 1.2
+    },
+    "CastQ": {
+      "src": "GR_ThrustHalberd",
+      "start": 0.5,
+      "end": 1.3
+    },
+    "CastW": {
+      "src": "GR_Slam",
+      "start": 1.2,
+      "end": 2.1
+    },
+    "CastE": {
+      "src": "GR_Throw",
+      "start": 3.0,
+      "end": 4.4
+    },
+    "CastR": {
+      "src": "GR_Slam",
+      "start": 0.6,
+      "end": 2.2
+    },
+    "Death": {
+      "src": "GR_Dead",
+      "start": 0.9,
+      "end": 2.8
+    },
+    "Hit": {
+      "src": "GR_Hit",
+      "start": 0.0,
+      "end": 1.0
+    },
+    "Select": {
+      "src": "GR_Salute",
+      "start": 0.0,
+      "end": 3.6
+    }
+  },
+  "props": {
+    "items": {
+      "Halberd": {
+        "file": "assets-src/blenderkit/gerrit/halberd_hand.glb",
+        "hand": "RightHand",
+        "length": 2.309,
+        "offset": [
+          0.015,
+          -0.004,
+          0
+        ],
+        "rot": [
+          90,
+          0,
+          0
+        ],
+        "at": "fist"
+      }
+    }
+  },
+  "fists": {
+    "RightHand": {
+      "palm": [
+        1,
+        0,
+        0
+      ],
+      "knuckle": 0.095,
+      "radius": 0.028,
+      "wrap": 240
+    },
+    "LeftHand": {
+      "palm": [
+        -1,
+        0,
+        0
+      ],
+      "knuckle": 0.095,
+      "radius": 0.028,
+      "wrap": 240
+    }
+  }
+}

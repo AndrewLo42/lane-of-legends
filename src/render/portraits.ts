@@ -35,6 +35,11 @@ function bake(renderer: THREE.WebGLRenderer, kit: KitId): string | null {
   if (!built) return null;
   // Just the body: floating props (Tock's pendulum, Lisha's blades) would crowd the frame.
   for (const child of [...built.root.children]) if (child !== built.model) child.visible = false;
+  // Likewise weapons baked onto a hand bone (Gerrit's halberd would stand right across his face).
+  // (A prop with several materials loads as a group of meshes, so hide whatever hangs off a bone.)
+  built.model.traverse((o) => {
+    if (!(o as THREE.Bone).isBone && (o.parent as THREE.Bone | null)?.isBone) o.visible = false;
+  });
   const anim = new AnimatedModel(built.model, built.clips, RIGS.meshy);
   anim.setBase('Idle');
   anim.update(0.4);

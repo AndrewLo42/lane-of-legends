@@ -33,7 +33,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Sir Gerrit**, **Lumen** and **Fennick** (below).
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen** and **Fennick** (below).
 
 Each champion's **Bot vs bot** row is its bot's win rate against every other bot champion (both sides, several seeds, the run's duel rules): a balance guide, not a promise.
 
@@ -177,9 +177,9 @@ A tiny sprout-knight riding a giant, anxious toad. Pip is a BlenderKit model; Th
 | **Bot vs bot** | About 49%. Strong into Gormund, Tock and Sable; weak into Mabel, Arlo and Lisha. |
 | **Code** | `src/sim/kits/pip.ts` |
 
-### Sir Gerrit, the Grounded (experimental)
+### Sir Gerrit, the Grounded
 
-An old knight of a fallen order who plants standards and thrusts himself into them. Placeholder model.
+An old knight of a fallen order who plants standards and thrusts himself into them, with a halberd. A BlenderKit knight with a hand-made halberd (see `assets-src/blenderkit/gerrit/`).
 
 | | |
 |---|---|
