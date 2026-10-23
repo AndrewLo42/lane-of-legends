@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { LANE } from '../sim/lane';
+import { buildScenery } from './arena';
 import { KITS } from '../sim/kits';
 import type { Team, Unit, Vec2 } from '../sim/types';
 
@@ -8,7 +9,7 @@ export const toV3 = (p: Vec2, h = 0) => new THREE.Vector3(p.x, h, p.y);
 
 export const TEAM_COLOR: Record<Team, number> = { blue: 0x3d8bff, red: 0xff4a3d };
 
-/** Ground, walls and lights for the single lane. */
+/** Ground, walls and lights for the single lane; call `update` every frame to animate it (the braziers). */
 export function buildArena(scene: THREE.Scene) {
   scene.background = new THREE.Color(0x10141a);
   scene.fog = new THREE.Fog(0x10141a, 60, 120);
@@ -22,29 +23,7 @@ export function buildArena(scene: THREE.Scene) {
   s.left = -70; s.right = 70; s.top = 30; s.bottom = -30; s.far = 120;
   scene.add(sun);
 
-  const L = LANE.halfLength;
-  const W = LANE.halfWidth;
-
-  // Grass outside the lane, dirt path inside.
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(L * 2 + 40, W * 2 + 40), new THREE.MeshStandardMaterial({ color: 0x2f4a2a }));
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.y = -0.01;
-  grass.receiveShadow = true;
-  scene.add(grass);
-
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(L * 2, W * 2), new THREE.MeshStandardMaterial({ color: 0x7a6748 }));
-  path.rotation.x = -Math.PI / 2;
-  path.receiveShadow = true;
-  scene.add(path);
-
-  // Low rock walls along both edges.
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x55585f, flatShading: true });
-  for (const side of [-1, 1]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(L * 2 + 4, 1.6, 1.2), wallMat);
-    wall.position.set(0, 0.8, side * (W + 0.6));
-    wall.castShadow = wall.receiveShadow = true;
-    scene.add(wall);
-  }
+  const scenery = buildScenery(scene, TEAM_COLOR);
 
   // Team-tinted base pads under each nexus.
   for (const [team, x] of [['blue', -LANE.nexusX], ['red', LANE.nexusX]] as const) {
@@ -56,6 +35,7 @@ export function buildArena(scene: THREE.Scene) {
     pad.position.set(x, 0.01, 0);
     scene.add(pad);
   }
+  return scenery;
 }
 
 /** Placeholder meshes until the Meshy models land. Origin at the feet, facing +x. */

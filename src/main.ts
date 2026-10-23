@@ -33,7 +33,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-buildArena(scene);
+const arena = buildArena(scene);
 const cam = new MobaCamera(toV3(spawnPoint('blue')));
 addEventListener('resize', () => {
   cam.resize();
@@ -63,6 +63,7 @@ let idleT = 0;
 function frame(now: number) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  arena.update(now / 1000);
   if (duel) {
     duel.frame(dt);
   } else if (stage?.active) {
