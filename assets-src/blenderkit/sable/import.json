@@ -55,6 +55,11 @@
       "src": "S_Hit",
       "start": 0.0,
       "end": 1.0
+    },
+    "Select": {
+      "src": "S_Select",
+      "start": 0.0,
+      "end": 3.5
     }
   },
   "props": {
@@ -81,6 +86,16 @@
     "RightHand": {
       "palm": [
         -1,
+        0,
+        0
+      ],
+      "knuckle": 0.1,
+      "radius": 0.03,
+      "wrap": 230
+    },
+    "LeftHand": {
+      "palm": [
+        1,
         0,
         0
       ],

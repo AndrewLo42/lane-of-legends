@@ -8,15 +8,6 @@ import { RIGS } from './rigs';
 import { placeholderFor } from './scene';
 
 /**
- * Select flourishes for champions whose weapon is baked onto a hand (a named node): the weapon spins
- * round the grip on its local `axis`, `turns` times over `seconds`, easing in and out. Sable rolls
- * her scythe (there's no twirl in the animation library, and a 360° wrist roll would wreck the mesh).
- */
-const TWIRL: Partial<Record<KitId, { node: string; axis: [number, number, number]; turns: number; seconds: number }>> = {
-  sable: { node: 'Scythe', axis: [0, 1, 0], turns: 2, seconds: 1.3 }, // roll about the shaft (glTF +Y): the blade sweeps round overhead
-};
-
-/**
  * The champion select backdrop: the selected champion alone on a podium, spotlit in their colour,
  * playing their Select flourish when chosen. The select screen's info panel covers the right side,
  * so on wide screens the view is shifted to stand the champion left of centre. Rendered by main.ts
@@ -26,7 +17,7 @@ export class SelectStage {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
   active = false;
-  private champs = new Map<KitId, { root: THREE.Object3D; anim?: AnimatedModel; syncProps?: (dt?: number) => void; swingProp?: () => void; twirl?: { node: THREE.Object3D; rest: THREE.Quaternion } }>();
+  private champs = new Map<KitId, { root: THREE.Object3D; anim?: AnimatedModel; syncProps?: (dt?: number) => void; swingProp?: () => void }>();
   private ring: THREE.Mesh;
   private light: THREE.SpotLight;
   private focused: KitId | null = null;
@@ -71,9 +62,7 @@ export class SelectStage {
       const anim = new AnimatedModel(built.model, built.clips, RIGS.meshy);
       anim.setBase('Idle');
       anim.mixer.setTime(i * 0.7);
-      const spin = TWIRL[kit] && built.root.getObjectByName(TWIRL[kit]!.node);
-      const twirl = spin ? { node: spin, rest: spin.quaternion.clone() } : undefined;
-      this.champs.set(kit, { root: built.root, anim, syncProps: built.syncProps, swingProp: built.swingProp, twirl });
+      this.champs.set(kit, { root: built.root, anim, syncProps: built.syncProps, swingProp: built.swingProp });
     });
 
     this.camera.position.set(0, 1.9, 9);
@@ -135,13 +124,6 @@ export class SelectStage {
     c.root.rotation.y = -Math.PI / 2 + Math.sin(this.t * 0.6) * 0.25;
     c.anim?.update(dt);
     c.syncProps?.(dt);
-    const tw = this.focused && TWIRL[this.focused];
-    if (tw && c.twirl) {
-      // Smoothstep from 0 to `turns` full turns, then rest at the grip.
-      const x = Math.min(1, Math.max(0, (this.shown - 0.2) / tw.seconds));
-      const angle = x * x * (3 - 2 * x) * tw.turns * Math.PI * 2;
-      c.twirl.node.quaternion.copy(c.twirl.rest).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...tw.axis), angle));
-    }
   }
 
   render(renderer: THREE.WebGLRenderer) {
