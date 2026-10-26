@@ -11,9 +11,10 @@ import { GERRIT } from './gerrit';
 import { LUMEN } from './lumen';
 import { FENNICK } from './fennick';
 import { PIP } from './pip';
+import { HOLLIS } from './hollis';
 import type { AbilityDef, Kit } from './types';
 
-export const KITS: Record<KitId, Kit> = { arlo: ARLO, tock: TOCK, maren: MAREN, lisha: LISHA, mabel: MABEL, aurelle: AURELLE, gormund: GORMUND, sable: SABLE, pip: PIP, gerrit: GERRIT, lumen: LUMEN, fennick: FENNICK };
+export const KITS: Record<KitId, Kit> = { arlo: ARLO, tock: TOCK, maren: MAREN, lisha: LISHA, mabel: MABEL, aurelle: AURELLE, gormund: GORMUND, sable: SABLE, pip: PIP, gerrit: GERRIT, lumen: LUMEN, fennick: FENNICK, hollis: HOLLIS };
 export const KIT_IDS = Object.keys(KITS) as KitId[];
 /** Champions bots may play: everyone but the experimental ones (no model yet). */
 export const BOT_KIT_IDS = KIT_IDS.filter((k) => !KITS[k].experimental);

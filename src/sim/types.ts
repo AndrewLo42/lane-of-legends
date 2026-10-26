@@ -12,7 +12,7 @@ export type Team = 'blue' | 'red';
 /** `pet`: a champion's companion unit (Pip's Thistle), fighting alongside but not a champion. */
 export type UnitKind = 'champion' | 'minion' | 'tower' | 'nexus' | 'pet';
 export type MinionRole = 'melee' | 'caster';
-export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit' | 'lumen' | 'fennick';
+export type KitId = 'arlo' | 'tock' | 'maren' | 'lisha' | 'mabel' | 'aurelle' | 'gormund' | 'sable' | 'pip' | 'gerrit' | 'lumen' | 'fennick' | 'hollis';
 /** 0..3 = Q W E R. */
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -51,7 +51,7 @@ export interface DamageSource {
 }
 
 export interface Status {
-  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal' | 'unstoppable' | 'gleaned' | 'reaping';
+  kind: 'slow' | 'mark' | 'momentum' | 'burn' | 'soak' | 'root' | 'stun' | 'shield' | 'guard' | 'regen' | 'grievous' | 'haste' | 'rage' | 'tether' | 'sting' | 'honey' | 'bearing' | 'frenzy' | 'impale' | 'arsenal' | 'unstoppable' | 'gleaned' | 'reaping' | 'rally' | 'herded';
   until: number;
   /**
    * slow: fraction removed (0.5 = half speed); momentum/soak: stacks; burn: damage per second;
@@ -62,7 +62,10 @@ export interface Status {
    * bearing: Arlo's Triangulate stacks on a target (the third one procs); frenzy: bonus attack speed fraction;
    * impale: Aurelle's spear is stuck in this unit (she can recall it through them); arsenal: Aurelle's
    * ultimate is up (spectral lances ring her); unstoppable: ignores slows, roots, stuns and displacement;
-   * gleaned: hooked by Sable (her reach and healing); reaping: Sable's follow-up window is open on this unit.
+   * gleaned: hooked by Sable (her reach and healing); reaping: Sable's follow-up window is open on this unit;
+   * rally: a minion whistled onto the unit whose id is `value` (it attacks that unit, ignoring its usual aggro);
+   * herded: a minion Hollis crooked onto his side: it fights for him until tick `value`, then wanders off and dies
+   * (its death counts as his last hit).
    * Root stops movement (and dashes); stun stops everything.
    */
   value: number;
@@ -180,10 +183,14 @@ export interface PetState {
   mounted: boolean;
   /** Broken at 0 health: untargetable and out of the fight until this tick. */
   panicUntil: number;
+  /** Which companion it is, for the renderer (Pip's toad by default). */
+  species?: 'thistle' | 'bramble';
+  /** Never in the fight: can't be targeted or hit, and doesn't jostle other units (Hollis's Bramble). */
+  intangible?: boolean;
 }
 
 /** What a missile looks like; the renderer picks a mesh per style. */
-export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue' | 'candle' | 'frostArrow' | 'fireArrow' | 'sparkArrow' | 'prismArrow' | 'longshot' | 'net';
+export type MissileStyle = 'auto' | 'tower' | 'spark' | 'flare' | 'bolt' | 'wave' | 'tide' | 'petal' | 'tether' | 'bee' | 'spear' | 'lance' | 'stone' | 'hook' | 'gauntlet' | 'water' | 'tongue' | 'candle' | 'frostArrow' | 'fireArrow' | 'sparkArrow' | 'prismArrow' | 'longshot' | 'net' | 'crook' | 'stampede';
 
 export interface Missile {
   id: number;
@@ -274,7 +281,7 @@ export interface ChampionKill {
 /** One-shot visual events for the renderer (swings, blinks, detonations). */
 export interface Fx {
   tick: number;
-  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind' | 'thrust' | 'zap' | 'volley';
+  kind: 'swing' | 'blink' | 'detonate' | 'echoHit' | 'rewind' | 'levelUp' | 'dashHit' | 'splash' | 'erupt' | 'bloom' | 'ignite' | 'ghost' | 'barrier' | 'rage' | 'triangulate' | 'bellow' | 'slam' | 'bind' | 'thrust' | 'zap' | 'volley' | 'whistle' | 'herd';
   pos: Vec2;
   dir?: number;
   radius?: number;

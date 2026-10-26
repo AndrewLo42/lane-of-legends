@@ -322,6 +322,37 @@ export function buildMissile(m: Missile): MissileLook {
       add(g, weights);
       return { height: 1.15, trail: { color: 0xc9b98a, width: 0.2, life: 0.12 }, animate: (t) => { g.rotation.z = t * 8; weights.rotation.x = t * 8; } };
     },
+    // Hollis's Crook: the curled wooden head of a shepherd's crook, on a line back to him.
+    crook: () => {
+      const wood = lit(0x8a6038, { roughness: 0.75 });
+      const curl = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 6, 14, Math.PI * 1.3).rotateX(-Math.PI / 2), wood);
+      curl.position.x = 0.1;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 6).rotateZ(Math.PI / 2), wood);
+      stem.position.x = -0.25;
+      add(curl, stem, glow(0xd8f0b0, 0.45));
+      return { height: 1.2, chain: true };
+    },
+    // Hollis's Stampede: a row of ghostly sheep across the band, bobbing as they run (dir is +x, the band along z).
+    stampede: () => {
+      const wool = basic(0xf4f8ff, 0.8);
+      const face = basic(0x3a3f52, 0.85);
+      const sheep: THREE.Object3D[] = [];
+      for (let i = 0; i < 6; i++) {
+        const s = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1).scale(1.3, 0.85, 0.9), wool);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6).scale(1.2, 1, 0.9), face);
+        head.position.set(0.55, 0.18, 0);
+        s.add(body, head, glow(0xcfe6ff, 1.1));
+        s.position.set((i % 2) * -0.6, 0, -2.5 + i);
+        add(s);
+        sheep.push(s);
+      }
+      return {
+        height: 0.6,
+        trail: { color: 0xcfe6ff, width: 5.5, life: 0.25 },
+        animate: (t) => sheep.forEach((s, i) => (s.position.y = Math.abs(Math.sin(t * 9 + i * 1.3)) * 0.35)),
+      };
+    },
     tongue: () => {
       // Thistle's Gulp: a sticky, bulbous pink tip; the stretch back to his mouth is a `Tongue`.
       const tip = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10).scale(1.15, 0.8, 1), lit(0xe56f86, { roughness: 0.35 }));

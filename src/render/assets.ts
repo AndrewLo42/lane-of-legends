@@ -23,10 +23,11 @@ export const MODELS = {
   champ_gormund: 'Gormund.glb',
   champ_sable: 'Sable.glb',
   champ_pip: 'Pip.glb',
-  pet_thistle: 'Thistle.glb',
+  pet_thistle: 'Thistle.glb', // a static mesh: views.ts hops and squashes it in code
   champ_gerrit: 'Gerrit.glb',
   champ_fennick: 'Fennick.glb', // not built yet: he plays as a placeholder (experimental)
-  champ_lumen: 'Lumen.glb', // not built yet: she plays as a placeholder (experimental) // a static mesh: views.ts hops and squashes it in code
+  champ_lumen: 'Lumen.glb', // not built yet: she plays as a placeholder (experimental)
+  champ_hollis: 'Hollis.glb', // not built yet: he plays as a placeholder (experimental)
 } as const;
 export type ModelName = keyof typeof MODELS;
 

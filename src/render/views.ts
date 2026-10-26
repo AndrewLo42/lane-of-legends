@@ -4,7 +4,7 @@ import { leapOf } from '../sim/kits/gerrit';
 import { radiant, sunrise } from '../sim/kits/lumen';
 import { ARROW_LOOK, drawFraction, drawing, nextArrow, overcharged, volleyReady } from '../sim/kits/fennick';
 import { panicking, riding, thistleOf } from '../sim/kits/pip';
-import type { KitId, Unit, Vec2 } from '../sim/types';
+import type { KitId, Team, Unit, Vec2 } from '../sim/types';
 import { TICK_HZ, type World } from '../sim/world';
 import { AnimatedModel } from './animatedModel';
 import { hasModel, instantiate, type ModelName } from './assets';
@@ -21,10 +21,13 @@ function modelFor(u: Unit): { name: ModelName; height: number } | undefined {
   // Champions are oversized next to structures, as in League, so they read from the MOBA camera.
   // Tock is a big clockwork knight, Gormund a hulking minotaur; Mabel a small mouse.
   if (u.champ) return { name: `champ_${u.champ.kit}`, height: CHAMP_HEIGHT[u.champ.kit] ?? 2.5 };
-  if (u.kind === 'pet') return { name: 'pet_thistle', height: THISTLE_HEIGHT };
+  if (u.kind === 'pet') return u.pet?.species === 'bramble' ? undefined : { name: 'pet_thistle', height: THISTLE_HEIGHT }; // Bramble: placeholder dog
   return undefined;
 }
 const CHAMP_HEIGHT: Partial<Record<KitId, number>> = { tock: 2.8, gormund: 3.1, mabel: 2.0, pip: 1.9, gerrit: 2.7, lumen: 2.4, fennick: 2.4 };
+const WHITE = new THREE.Color(0xffffff);
+/** Whistled minions (Hollis's Q) glow this colour. */
+const RALLY_GLOW = new THREE.Color(0xffd36b);
 /** Gormund's Labyrinth Rage: he grows this much while it lasts. */
 const RAGE_GROWTH = 1.3;
 const SLOT_CLIP = ['CastQ', 'CastW', 'CastE', 'CastR'];
@@ -64,6 +67,8 @@ interface UnitView {
   mark?: { ring: THREE.Mesh; petal: THREE.Mesh; color: string };
   prev: Vec2;
   prevFacing: number;
+  /** The team it was tinted for: a minion Hollis herds changes sides, and its view is rebuilt in the new colour. */
+  team: Team;
   /** Materials with their resting emissive, for the hit flash. */
   mats: { m: THREE.MeshStandardMaterial; emissive: THREE.Color; intensity: number }[];
   /** Skeletal animation, when the unit uses a Meshy model instead of a placeholder. */
@@ -152,7 +157,12 @@ export class WorldView {
     const live = new Set<number>();
     for (const u of this.world.units) {
       live.add(u.id);
-      if (this.units.has(u.id)) continue;
+      const have = this.units.get(u.id);
+      if (have && have.team === u.team) continue;
+      if (have) {
+        this.removeView(have);
+        this.units.delete(u.id);
+      }
       const model = modelFor(u);
       // Champions keep their own colours (health bars show the team); everything else wears it.
       const tint = u.champ ? null : new THREE.Color(TEAM_COLOR[u.team]);
@@ -170,7 +180,7 @@ export class WorldView {
         if (m?.isMeshStandardMaterial) mats.push({ m, emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
       });
       this.scene.add(obj);
-      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, mats, anim, syncProps: built?.syncProps, swingProp: built?.swingProp, lastAttackSeen: u.lastAttackTick });
+      this.units.set(u.id, { obj, prev: { ...u.pos }, prevFacing: u.facing, team: u.team, mats, anim, syncProps: built?.syncProps, swingProp: built?.swingProp, lastAttackSeen: u.lastAttackTick });
     }
     for (const [id, v] of this.units) {
       if (live.has(id)) continue;
@@ -290,7 +300,7 @@ export class WorldView {
       // Floaters (Aurelle) hover off the ground with a slow bob and glide instead of running.
       const hover = u.champ && !u.dead ? FLOAT_HEIGHT[u.champ.kit] : undefined;
       if (hover != null) v.obj.position.y = hover + Math.sin(performance.now() / 600 + u.id) * 0.08;
-      if (u.kind === 'pet') this.hopVisuals(u, v, dt);
+      if (u.kind === 'pet' && u.pet?.species !== 'bramble') this.hopVisuals(u, v, dt);
       if (u.champ?.kit === 'lumen') this.lumenVisuals(u, v);
       if (u.champ?.kit === 'fennick') this.fennickVisuals(u, v);
       if (u.champ?.kit === 'gerrit' && !u.dead) {
@@ -353,11 +363,14 @@ export class WorldView {
         v.obj.rotation.z = u.champ?.casting ? 0.15 : -lunge;
       }
 
-      // Hit flash.
+      // Hit flash; a minion Hollis has whistled onto a target glows gold, pulsing.
       const flash = Math.max(0, 1 - (tick - u.lastHurtTick + alpha) / 4);
+      const rally = u.kind === 'minion' && u.statuses.some((s) => s.kind === 'rally' && s.until > tick) ? 0.45 + Math.sin(performance.now() / 90) * 0.2 : 0;
       for (const { m, emissive, intensity } of v.mats) {
-        m.emissive.copy(emissive).lerp(new THREE.Color(0xffffff), flash * 0.7);
-        m.emissiveIntensity = Math.max(intensity, flash);
+        m.emissive.copy(emissive);
+        if (rally) m.emissive.lerp(RALLY_GLOW, rally);
+        m.emissive.lerp(WHITE, flash * 0.7);
+        m.emissiveIntensity = Math.max(intensity, flash, rally);
       }
 
       this.statusVisuals(u, v, dt);

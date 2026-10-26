@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BotController } from './bot';
 import { KITS } from './kits';
+import { HOLLIS } from './kits/hollis';
 import { SIGNATURE_SUMMONERS } from './summoners';
 import { MABEL_TUNING } from './kits/mabel';
 import { AURELLE_TUNING, holdingSpear, spearOnGround } from './kits/aurelle';
@@ -10,9 +11,10 @@ import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, leapOf, standardsOf } from './kits/gerrit';
 import { LUMEN_TUNING, devotion, lumenHeal, radiant, sunrise } from './kits/lumen';
 import { FENNICK_TUNING, drawing, nextArrow, overcharged } from './kits/fennick';
+import { HOLLIS_TUNING, brambleOf } from './kits/hollis';
 import { abilitiesOf } from './kits';
 import type { Command, Controller, KitId, Slot, Unit } from './types';
-import { TICK_HZ } from './util';
+import { TICK_HZ, dist } from './util';
 import { World, xpToNext } from './world';
 
 /** A controller you push commands into between steps. */
@@ -963,7 +965,7 @@ describe('experimental champions', () => {
 });
 
 describe('bots', () => {
-  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable'], ['pip', 'arlo'], ['gormund', 'pip']] as const) {
+  for (const [blue, red] of [['arlo', 'tock'], ['tock', 'arlo'], ['maren', 'arlo'], ['tock', 'maren'], ['maren', 'maren'], ['lisha', 'arlo'], ['tock', 'lisha'], ['mabel', 'arlo'], ['lisha', 'mabel'], ['aurelle', 'tock'], ['maren', 'aurelle'], ['gormund', 'arlo'], ['lisha', 'gormund'], ['sable', 'maren'], ['tock', 'sable'], ['pip', 'arlo'], ['gormund', 'pip'], ['hollis', 'arlo'], ['tock', 'hollis']] as const) {
     it(`${blue} vs ${red}: both level up and use their abilities`, () => {
       const w = new World(3);
       const a = w.spawnChampion('blue', blue, new BotController(), { summoners: SIGNATURE_SUMMONERS[blue] });
@@ -1558,5 +1560,131 @@ describe('Fennick', () => {
     expect(other.hp).toBeLessThan(other.maxHp);
     run(w, 3);
     expect(w.status(me, 'haste')!.value).toBeLessThan(early);
+  });
+});
+
+describe('Hollis', () => {
+  const { FLOCK, BITE, Q, W, E, R } = HOLLIS_TUNING;
+  /** A minion that stands where it's put (unless something moves it). */
+  const post = (w: World, team: 'blue' | 'red', x: number, y = 0, role: 'melee' | 'caster' = 'melee') => {
+    const m = w.spawnMinion(team, role, { x, y });
+    m.speed = 0;
+    return m;
+  };
+
+  it('Bramble follows him, can never be targeted, and bites what Hollis attacks', () => {
+    const { w, me } = setup('hollis');
+    w.step();
+    const dog = brambleOf(w, me)!;
+    expect(dog.pet?.intangible).toBe(true);
+    expect(w.isTargetable(dog)).toBe(false);
+    me.range = HOLLIS.stats.range;
+    const target = dummy(w, 2.5);
+    run(w, 0.1);
+    near(dist(dog.pos, me.pos), 1.2, 1);
+    me.attackTarget = target.id;
+    run(w, 1);
+    const bites = w.hits.filter((h) => h.sourceId === dog.id && h.targetId === target.id);
+    expect(bites.length).toBe(1);
+    near(bites[0].amount, BITE.base + BITE.ad * me.damage, 1);
+  });
+
+  it('The Flock: nearby allied minions are faster and tougher', () => {
+    const { w, me } = setup('hollis');
+    const close = post(w, 'blue', 3);
+    const far = post(w, 'blue', FLOCK.radius + 3);
+    run(w, 0.2);
+    expect(w.status(close, 'haste')?.value).toBe(FLOCK.haste);
+    expect(w.status(close, 'guard')?.value).toBe(FLOCK.guard);
+    expect(w.status(far, 'haste')).toBeUndefined();
+    expect(me.hp).toBe(me.maxHp);
+  });
+
+  it('Whistle sets his minions on the enemy nearest the cursor, attacking faster', () => {
+    const { w, me, cast } = setup('hollis');
+    const ally = post(w, 'blue', 2, 1, 'caster');
+    const decoy = post(w, 'red', 4, 1); // a minion the caster would normally pick
+    const foe = dummy(w, 6, -1);
+    cast(0, 6, -1);
+    expect(w.status(ally, 'rally')?.value).toBe(foe.id);
+    expect(w.status(ally, 'frenzy')?.value).toBe(Q.attackSpeed);
+    run(w, 2);
+    expect(ally.attackTarget).toBe(foe.id);
+    expect(lost(foe)).toBeGreaterThan(0);
+    expect(decoy.hp).toBe(decoy.maxHp);
+    expect(me.champ!.abilities[0].readyAt).toBeGreaterThan(w.tick);
+  });
+
+  it("Whistle can't be cast with no minions near him", () => {
+    const { w, me, cast } = setup('hollis');
+    dummy(w, 5);
+    cast(0, 5);
+    expect(me.champ!.abilities[0].readyAt).toBe(0);
+  });
+
+  it('Crook herds an enemy minion: it fights for him, then dies as his last hit', () => {
+    const { w, me, cast } = setup('hollis');
+    const m = post(w, 'red', 6);
+    m.speed = 4.6; // it has to be able to move to be pulled over
+    const gold = me.gold;
+    cast(1, 6);
+    run(w, 0.6);
+    expect(m.team).toBe('blue');
+    expect(m.hp).toBeLessThanOrEqual(m.maxHp * 0.5);
+    expect(dist(m.pos, me.pos)).toBeLessThan(3);
+    expect(me.champ!.cs).toBe(0);
+    run(w, W.herd);
+    expect(m.dead).toBe(true);
+    expect(me.champ!.cs).toBe(1);
+    expect(me.gold).toBeGreaterThan(gold);
+  });
+
+  it("a herded minion killed by the enemy is still Hollis's last hit", () => {
+    const { w, me, cast } = setup('hollis');
+    const m = post(w, 'red', 6);
+    const foe = dummy(w, 9);
+    cast(1, 6);
+    run(w, 0.6);
+    w.dealDamage(foe, m, 9999, { attack: true });
+    expect(m.dead).toBe(true);
+    expect(me.champ!.cs).toBe(1);
+    expect(foe.champ!.cs).toBe(0);
+  });
+
+  it('Crook on a champion: damage, a slow, and a pull toward him', () => {
+    const { w, me, cast } = setup('hollis');
+    const foe = dummy(w, 6);
+    cast(1, 6);
+    run(w, 0.6);
+    near(lost(foe), HOLLIS.abilities[1].damage!(1, me));
+    expect(foe.pos.x).toBeLessThan(6 - W.pull + 0.3);
+    expect(w.status(foe, 'slow')?.value).toBe(W.slow);
+  });
+
+  it('Bramble (E) herds enemy minions back toward their tower and nips a champion', () => {
+    const { w, me, cast } = setup('hollis');
+    w.step();
+    const m = post(w, 'red', 5, 1);
+    m.speed = 4; // must be able to move to be herded
+    m.moveTarget = null;
+    const foe = dummy(w, 5, -1);
+    cast(2, 5);
+    run(w, 0.5);
+    expect(m.pos.x).toBeGreaterThan(5 + E.push * 0.5); // red's tower is at +x (it starts walking back once it lands)
+    near(lost(foe), HOLLIS.abilities[2].damage!(1, me));
+    expect(w.status(foe, 'slow')?.value).toBe(E.slow);
+  });
+
+  it('Stampede tramples enemies in the band and sends his own minions charging', () => {
+    const { w, me, cast } = setup('hollis');
+    const ally = post(w, 'blue', 4, 2);
+    const foe = dummy(w, 10, 1.5);
+    const enemy = post(w, 'red', 14, -2);
+    cast(3, 20);
+    run(w, R.windup + 1.6);
+    near(lost(foe), HOLLIS.abilities[3].damage!(1, me));
+    expect(enemy.hp).toBeLessThan(enemy.maxHp);
+    expect(ally.statuses.some((st) => st.kind === 'haste' && st.value === R.haste)).toBe(true);
+    expect(Math.abs(foe.pos.y)).toBeGreaterThan(1.5); // shoved aside
   });
 });

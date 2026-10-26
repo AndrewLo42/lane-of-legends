@@ -38,6 +38,8 @@ export const WAVE = {
 };
 
 export const MINION_AGGRO = 7;
+/** Extra damage a whistled minion (Hollis's Q) deals to the target it was sent at. */
+export const RALLY_DAMAGE = 0.5;
 /** Allied minions within this distance of a champion that gets hit by an enemy champion switch to the attacker. */
 export const CALL_FOR_HELP = 7;
 export const RESPAWN_SECONDS = 8;

@@ -40,7 +40,7 @@ export class HealthBars {
       const x = (this.v.x * 0.5 + 0.5) * innerWidth;
       const y = (-this.v.y * 0.5 + 0.5) * innerHeight + (mounted ? 22 : 0);
       bar.el.style.transform = `translate(${x - WIDTH[u.kind] / 2}px, ${y}px)`;
-      bar.el.style.display = this.v.z > 1 || (u.pet && !mounted && !this.world.isTargetable(u)) ? 'none' : '';
+      bar.el.style.display = this.v.z > 1 || u.pet?.intangible || (u.pet && !mounted && !this.world.isTargetable(u)) ? 'none' : '';
       // Shields show as a white segment after the health. If health plus shield would overflow the
       // bar, the whole bar rescales to fit both (as in League), so a full-health shield still shows.
       const shield = u.statuses.reduce((t, st) => (st.kind === 'shield' ? t + st.value : t), 0);

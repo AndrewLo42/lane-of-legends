@@ -118,7 +118,7 @@ export class Minimap {
         ctx.arc(x, y, 1.8, 0, Math.PI * 2);
         ctx.fill();
       } else if (u.kind === 'pet') {
-        if (u.pet?.mounted) continue; // under its rider's dot
+        if (u.pet?.mounted || u.pet?.intangible) continue; // under its rider's dot (Bramble stays at heel)
         ctx.fillStyle = TEAM[u.team];
         ctx.strokeStyle = '#000a';
         ctx.lineWidth = 1;

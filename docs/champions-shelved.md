@@ -144,3 +144,68 @@ The opponent's choice is whether to burn down the toad or dive past him onto the
 - The bot needs kiting, as with Corvin, plus a rule for skipping to the right arrow.
 - Model: a BlenderKit humanoid with goggles, a satchel and a mechanical bow; the arrow tips change color.
 - **Open question:** is the R too similar to the passive? An alternative is a turret that fires the current arrow type.
+
+## Hollis, the Shepherd
+
+**Status:** built, experimental (placeholder shepherd and sheepdog, no BlenderKit model yet). See `src/sim/kits/hollis.ts` and the README. Herded minions do count as his CS. Changes from the sketch below, from a first balance pass (his bot won 3% at first): health 760 (+110) and AD 68 (+4.5); whistled minions also deal 50% more damage to their target; Crook 70–210 (+60% AD), Bramble's nip 60–200 (+50% AD), the bite 20 (+30% AD) once a second; Hollis himself takes 15% less damage with 2+ minions near him; Stampede has two ranks like every ultimate (175 / 300 (+60% AD), 90 / 70s cooldown). The Flock's 15% applies to all damage, not just champions'. Bot vs bot now about 35%, every win on CS.
+
+**Pitch.** A gentle old shepherd with a crook, a weathered smock and a sheepdog called Bramble at his heel. He's the roster's only **wave controller**: he decides whether the lane freezes, slow-pushes or crashes into a tower. Every other champion fights *alongside* the minions; Hollis fights *through* them. That matters here more than in League, because 45 CS and a tower are two of the three ways to win a duel.
+
+**Stats (melee, a reach of 2.4 with the crook):** health 720 (+105 per level), mana 300 (+40), mana regen 2.4, attack damage 62 (+4), attack interval 0.85s (+2% attack speed per level), move speed 6.3.
+
+### Passive: The Flock
+- Allied minions within 6 units of Hollis move 15% faster and take 15% less damage from champions, so his wave is hard to shove while he stands with it.
+- Bramble, his sheepdog, follows him and bites whatever Hollis attacks, for 12 (+20% AD) damage every 1.2s. Bramble is a pet that can't be targeted, like Thistle while Pip rides him.
+
+### Q: Whistle
+- **Cost / cooldown:** 30 mana; 7 / 6.5 / 6 / 5.5 / 5s.
+- Every allied minion within 7 units switches to the enemy nearest the cursor, champion or minion, and attacks 30% faster for 3s.
+- Whistled at a champion, the wave becomes a real threat: a full wave is about 2 melee and 3 casters (14 and 24 damage per hit).
+- **Telegraph:** the minions' eyes glow, so the target sees it coming.
+
+### W: Crook
+- **Cost / cooldown:** 55 mana; 13 / 12 / 11 / 10 / 9s.
+- A hook along a line (range 8, width 0.8) that catches the first enemy it touches.
+- **A minion:** yanked to Hollis and *herded*: it joins his side for 5s with half its health, then wanders off and dies. When it dies or the time runs out, it counts as Hollis's last hit (CS and gold). One guaranteed CS each cooldown, and one the enemy loses.
+- **A champion:** pulled 2.5 units toward Hollis (`world.pull`) for 60 / 90 / 120 / 150 / 180 (+50% AD) damage, and slowed 30% for 1s.
+
+### E: Bramble
+- **Cost / cooldown:** 40 mana; 14 / 13 / 12 / 11 / 10s.
+- Bramble bounds to a target area (range 7, radius 2.5).
+- **Enemy minions there** are herded 3 units back toward their own tower. That stops a wave crashing into Hollis's tower, or holds a freeze in place.
+- **An enemy champion there** is nipped for 50 / 80 / 110 / 140 / 170 (+40% AD) damage and slowed 25% for 1.5s.
+- Bramble trots back to Hollis afterwards.
+
+### R: Stampede
+- **Cost / cooldown:** 100 mana; 90 / 75 / 60s.
+- After a 0.4s wind-up, a herd of spectral sheep thunders from Hollis down the lane in a band 6 wide, travelling 20 units at 12 per second.
+- **Enemies hit:** 150 / 250 / 350 (+60% AD) damage, shoved aside toward the lane's edge, and slowed 40% for 1.5s.
+- **Allied minions the herd passes:** they charge with it, gaining 40% move speed and 30% damage reduction for 6s.
+- It clears the enemy wave and sends his own crashing into the tower. It's his tower-taking button, not just a damage spell.
+
+### How the duel plays
+- **Early:** freeze the wave near his tower with Bramble and steal CS with Crook. The enemy has to walk up into his minions to farm.
+- **When he's ahead:** Whistle his wave onto the enemy champion whenever they step in to last-hit. Each trade is several minion hits plus Hollis.
+- **To close:** Stampede clears their wave and charges his own minions into the tower, so he wins on CS or the tower rather than kills.
+
+### Counterplay
+- **His power is his wave:** clear his minions and he's a modest melee champion with one hook. Champions that push fast (Mabel, Maren) shut him down.
+- **Crook:** it's a skillshot that stops at the first thing it hits, so standing behind your own minions blocks it. A minion caught that way still counts against you, though.
+- **Whistle:** its glowing eyes give you time to step back out of the wave's range.
+- **Stampede:** it runs straight down the lane, so it can be sidestepped toward the walls.
+
+### Notes for building it
+- **Whistle:** needs a minion target override, a forced target with an expiry that minion AI in `world.ts` respects over its usual aggro (the same hook would serve a future taunt).
+- **Herding a minion:** a temporary team change with an owner for the kill credit. Check the online snapshot carries `team` per unit; it does for champions and minions. Also check the 45-CS win rule counts the credited kill.
+- **Bramble:** reuses the pet system (`spawnPet`, as for Thistle) with a follow-and-bite brain. E is a short dash for the pet, not for Hollis.
+- **Stampede:** a wide projectile that moves down the lane (`spawnProjectile` with a `canHit` that also boosts allies). Arlo's Skyline Barrage is the closest existing effect.
+- **Bot:** a first pass can use simple rules:
+  - Bramble an enemy wave that's about to reach his tower.
+  - Crook a minion that's on low health, or a champion who's in range and unshielded.
+  - Whistle when the enemy is within 5 of his wave and Hollis has more than 50% health.
+  - Stampede when the tower is within 20 and his wave has at least 3 minions.
+  - Wave-state play (freeze or push on purpose) is a stretch goal.
+- **Model:** a BlenderKit elderly humanoid with a smock, a satchel and a crook (as a hand prop, like Gerrit's halberd), plus a quadruped dog for Bramble. A BlenderKit dog, rigged, would be new work: Thistle was animated in code.
+- **Open questions:**
+  - Should herded minions count as Hollis's CS? It's the most distinctive part of the kit, but strong in a CS race. The fallback: they give gold, but not CS.
+  - Is Whistle onto a champion too strong early? Alternative: at ranks 1–2 it works only on minions.

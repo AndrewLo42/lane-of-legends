@@ -5,6 +5,7 @@ import { GORMUND_TUNING, calmFor, raging } from './kits/gormund';
 import { SABLE_TUNING, reaping, windowOpen } from './kits/sable';
 import { PIP_TUNING, panicking, riding, thistleOf } from './kits/pip';
 import { GERRIT_TUNING, nearStandard, standardOnLine, standardsOf } from './kits/gerrit';
+import { HOLLIS_TUNING, flockNear } from './kits/hollis';
 import { LUMEN_TUNING, devotion } from './kits/lumen';
 import { FENNICK_TUNING, drawFraction, drawing, longshotRange } from './kits/fennick';
 import { isRewinding } from './kits/tock';
@@ -136,6 +137,7 @@ export class BotController implements Controller {
       gerrit: { play: this.gerrit, escape: this.gerritEscape },
       lumen: { play: this.lumen, escape: this.lumenEscape },
       fennick: { play: this.fennick, escape: this.fennickEscape },
+      hollis: { play: this.hollis, escape: this.hollisEscape },
     }[self.champ!.kit];
 
     // Go home when low and stay until (nearly) healed by the fountain.
@@ -1072,6 +1074,70 @@ export class BotController implements Controller {
     if (ready(0) && flag && dist(flag.pos, home) < dist(self.pos, home)) return cast(0, flag.pos);
     if (ready(2) && ready(0)) return cast(2, toward(self.pos, home, Math.min(E.range, Q.length) - 0.5));
     if (ready(1) && near(3)) return cast(1, self.pos);
+    return null;
+  }
+
+  // ---------- Hollis ----------
+
+  /**
+   * A first pass at the shepherd: Bramble a wave about to reach his tower back down the lane, crook a
+   * minion he'd otherwise lose (or the champion when it's a clean shot), whistle his wave onto a champion
+   * standing in it while he's healthy, and stampede when his wave can carry it into their tower.
+   */
+  private hollis(ctx: Ctx): Command | null {
+    const { world, self, foe, near, unsafe, ready, aim } = ctx;
+    const { Q, W, E, R } = HOLLIS_TUNING;
+    const hp = self.hp / self.maxHp;
+    const mana = self.champ!.mana;
+    const enemyMinions = world.units.filter((u) => !u.dead && u.kind === 'minion' && u.team !== self.team);
+    const ownTowers = world.units.filter((u) => !u.dead && u.kind === 'tower' && u.team === self.team);
+    const theirTowers = world.units.filter((u) => !u.dead && u.kind === 'tower' && u.team !== self.team);
+    const flock = flockNear(world, self);
+    // Their wave is about to hit his tower: send Bramble to herd it back.
+    if (ready(2)) {
+      const pushing = enemyMinions.filter((m) => ownTowers.some((t) => dist(m.pos, t.pos) < 13) && dist(m.pos, self.pos) <= E.range);
+      if (pushing.length >= 3) {
+        const c = pushing.reduce((a, m) => ({ x: a.x + m.pos.x / pushing.length, y: a.y + m.pos.y / pushing.length }), { x: 0, y: 0 });
+        return cast(2, c);
+      }
+    }
+    if (foe) {
+      const foeHp = foe.hp / foe.maxHp;
+      const winning = foeHp < 0.5 || hp > foeHp;
+      // Stampede: a kill, or a wave that will crash into their tower behind it.
+      if (ready(3) && near(R.length * 0.6) && (foe.hp < ctx.dmg(3) * 1.1 || (winning && flock.length >= 3)) && !unsafe(foe.pos)) return cast(3, foe.pos);
+      // Whistle the flock onto them while they stand in it.
+      const inWave = flock.some((m) => dist(m.pos, foe.pos) < 5);
+      if (ready(0) && inWave && hp > 0.5 && gap(self, foe) <= Q.range) return cast(0, foe.pos);
+      // A clean crook: nothing of theirs in the way.
+      const lineTo = aim(foe, W.speed);
+      const blocked = enemyMinions.some((m) => segmentDistance(m.pos, self.pos, lineTo).d <= W.width / 2 + m.radius && dist(m.pos, self.pos) < dist(lineTo, self.pos));
+      if (ready(1) && !blocked && near(W.length - 0.5) && winning && mana > W.cost + E.cost && !unsafe(foe.pos)) return cast(1, lineTo);
+      // Bramble's nip as a chase or a trade opener.
+      if (ready(2) && near(E.range - 0.5) && winning && !unsafe(foe.pos)) return cast(2, ctx.aimAfter(foe, 0.3));
+      if (near(2.5) && winning && !unsafe(foe.pos)) return { type: 'attack', target: foe.id };
+    }
+    // Crook a minion he can't reach for the last hit (it's his CS either way).
+    if (ready(1) && mana > W.cost + Q.cost) {
+      const reach = self.range + self.radius + 0.5;
+      const pick = enemyMinions
+        .filter((m) => dist(m.pos, self.pos) < W.length - 0.3 && gap(self, m) > reach && !unsafe(m.pos))
+        .filter((m) => !enemyMinions.some((o) => o !== m && segmentDistance(o.pos, self.pos, m.pos).d <= W.width / 2 + o.radius && dist(o.pos, self.pos) < dist(m.pos, self.pos)))
+        .sort((a, b) => a.hp - b.hp)[0];
+      if (pick && pick.hp < pick.maxHp * 0.6) return cast(1, pick.pos);
+    }
+    // Stampede a big wave into their tower when he's pushing.
+    if (ready(3) && flock.length >= 4 && theirTowers.some((t) => dist(t.pos, self.pos) < R.length)) {
+      const t = theirTowers.sort((a, b) => dist(a.pos, self.pos) - dist(b.pos, self.pos))[0];
+      return cast(3, t.pos);
+    }
+    return null;
+  }
+
+  private hollisEscape({ self, foe, near, ready }: Ctx): Command | null {
+    if (!foe || !near(7)) return null;
+    if (ready(2)) return cast(2, foe.pos); // Bramble slows the chase
+    if (ready(1) && near(HOLLIS_TUNING.W.length - 1)) return cast(1, toward(self.pos, foe.pos, HOLLIS_TUNING.W.length));
     return null;
   }
 

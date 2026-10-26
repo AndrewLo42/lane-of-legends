@@ -48,7 +48,7 @@ export function placeholderFor(u: Unit): THREE.Object3D {
       g.add(championPlaceholder(u, mat));
       break;
     case 'pet':
-      g.add(thistlePlaceholder(mat));
+      g.add(u.pet?.species === 'bramble' ? bramblePlaceholder(mat) : thistlePlaceholder(mat));
       break;
     case 'minion': {
       const body = u.role === 'melee'
@@ -127,6 +127,41 @@ function thistlePlaceholder(teamMat: THREE.Material) {
   return g;
 }
 
+/**
+ * Bramble, Hollis's sheepdog: a black-and-white collie, low and long, ears up, tail out, with a collar in
+ * his team's colour. Facing +x.
+ */
+function bramblePlaceholder(teamMat: THREE.Material) {
+  const g = new THREE.Group();
+  const black = new THREE.MeshStandardMaterial({ color: 0x23211f, flatShading: true });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf1ede4, flatShading: true });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8).rotateZ(Math.PI / 2), black);
+  body.position.y = 0.5;
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 8), white);
+  chest.position.set(0.32, 0.5, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), black);
+  head.position.set(0.55, 0.72, 0);
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 8).rotateZ(-Math.PI / 2), white);
+  snout.position.set(0.74, 0.68, 0);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 14), teamMat);
+  collar.rotation.y = Math.PI / 2;
+  collar.position.set(0.44, 0.6, 0);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.4, 6).rotateZ(Math.PI / 2 + 0.5), white);
+  tail.position.set(-0.45, 0.6, 0);
+  g.add(body, chest, head, snout, collar, tail);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 5), black);
+    ear.position.set(0.5, 0.9, side * 0.09);
+    g.add(ear);
+    for (const fx of [0.3, -0.3]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.38, 6), fx > 0 ? white : black);
+      leg.position.set(fx, 0.19, side * 0.12);
+      g.add(leg);
+    }
+  }
+  return g;
+}
+
 /** Champion stand-ins: Arlo is a slim capsule with a glowing gauntlet, Tock a squat clockwork knight with a scythe. */
 function championPlaceholder(u: Unit, teamMat: THREE.Material) {
   const g = new THREE.Group();
@@ -179,6 +214,31 @@ function championPlaceholder(u: Unit, teamMat: THREE.Material) {
     bow.add(limb, string, gear, shaft, tip);
     bow.position.set(0.35, 1.25, 0.15);
     g.add(bow);
+    return g;
+  }
+  if (u.champ!.kit === 'hollis') {
+    // Hollis: a stooped old shepherd in an oat smock with a team-coloured scarf, a white beard, a flat cap and a crook.
+    const smockMat = new THREE.MeshStandardMaterial({ color: 0xbfae86, roughness: 0.9, flatShading: true });
+    const smock = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.5, 1.35, 9), smockMat);
+    smock.position.y = 0.72;
+    smock.rotation.z = -0.08; // a little stoop
+    const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.07, 6, 16), teamMat);
+    scarf.rotation.x = Math.PI / 2;
+    scarf.position.set(0.05, 1.42, 0);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe2b896 }));
+    head.position.set(0.08, 1.7, 0);
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.36, 8).rotateZ(Math.PI), new THREE.MeshStandardMaterial({ color: 0xf2efe8, flatShading: true }));
+    beard.position.set(0.24, 1.55, 0);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 14), new THREE.MeshStandardMaterial({ color: 0x5a6b4a }));
+    cap.position.set(0.1, 1.9, 0);
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.3), cap.material);
+    brim.position.set(0.32, 1.87, 0);
+    const wood = new THREE.MeshStandardMaterial({ color: 0x8a6038, roughness: 0.75 });
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 2.2, 6), wood);
+    staff.position.set(0.42, 1.1, 0.48);
+    const crook = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 6, 14, Math.PI * 1.3), wood);
+    crook.position.set(0.32, 2.2, 0.48);
+    g.add(smock, scarf, head, beard, cap, brim, staff, crook);
     return g;
   }
   if (u.champ!.kit === 'lumen') {

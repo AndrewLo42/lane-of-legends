@@ -33,7 +33,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen** and **Fennick** (below).
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen**, **Fennick** and **Hollis** (below).
 
 Each champion's **Bot vs bot** row is its bot's win rate against every other bot champion (both sides, several seeds, the run's duel rules): a balance guide, not a promise.
 
@@ -221,6 +221,21 @@ A ranged auto-attack carry with no dash. Placeholder archer.
 | **Bot** | Maxes Longshot and fires it fully drawn down the longest line of minions to clear the wave (catching the champion in it when it can), pokes with attacks and Volley when the trade is safe, and goes all in (Snare Shot, Overcharge, attacks) when they're low and he isn't, keeping the net for divers against melee champions. Kites melee champions throughout. |
 | **Bot vs bot** | About 44%. Strong into Pip, Aurelle and Arlo; weak into divers (Tock, Gormund, Lisha). |
 | **Code** | `src/sim/kits/fennick.ts` |
+
+### Hollis, the Shepherd (experimental)
+
+A melee wave controller: he wins on CS and towers rather than kills. Placeholder shepherd and sheepdog.
+
+| | |
+|---|---|
+| **Passive: The Flock** | Allied minions within 6 units move 15% faster and take 15% less damage, and so does Hollis while 2 or more are with him. Bramble, his sheepdog, follows at heel and bites what Hollis attacks (20 + 30% AD, once a second). Bramble is a pet that can never be targeted. |
+| **Q: Whistle** | Every allied minion within 7 units goes for the enemy nearest the cursor (champion or minion), attacking 30% faster and dealing 50% more damage to it for 3s. Whistled minions glow gold. Needs minions nearby. |
+| **W: Crook** | A hook (8 units) that catches the first enemy. A minion is pulled to Hollis and *herded*: it changes sides for 5s with at most half its health, then wanders off and dies. However it dies, it's Hollis's last hit (CS, gold, XP). A champion takes damage, is pulled 2.5 units toward him and slowed. |
+| **E: Bramble** | Bramble bounds to a spot (7 units): enemy minions there are herded 3 units back toward their tower, and an enemy champion is nipped and slowed. |
+| **R: Stampede** | Spectral sheep thunder 20 units down the lane in a band 6 wide: enemies take damage, are shoved aside and slowed, and his own minions they pass charge with them (40% faster, 30% less damage, 6s). |
+| **Bot** | A first pass: Bramble a wave that's about to reach his tower, crook minions he can't reach (and the champion when nothing blocks), whistle the wave onto a champion standing in it while he's healthy, and stampede for a kill or to carry a big wave into the tower. |
+| **Bot vs bot** | About 35%, every win on CS. Strong into Arlo and Sable; loses to the melee bruisers (Tock, Gormund). |
+| **Code** | `src/sim/kits/hollis.ts`; herding, whistled targets and intangible pets in `src/sim/world.ts` |
 
 Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
 

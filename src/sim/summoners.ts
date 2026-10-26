@@ -136,6 +136,7 @@ export const SIGNATURE_SUMMONERS: Record<KitId, [SummonerId, SummonerId]> = {
   gerrit: ['flash', 'ignite'],
   lumen: ['flash', 'barrier'],
   fennick: ['flash', 'barrier'],
+  hollis: ['flash', 'ghost'],
   tock: ['flash', 'ignite'],
   maren: ['flash', 'ignite'],
   lisha: ['flash', 'ghost'],

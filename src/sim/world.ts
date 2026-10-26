@@ -7,7 +7,7 @@ import { LANE, clampToLane, sideX, spawnPoint } from './lane';
 import { SANDBOX_RULES, type DuelRules, type WinReason } from './rules';
 import { DEFAULT_SUMMONERS, RAGE, SUMMONERS } from './summoners';
 import {
-  CALL_FOR_HELP, CHAMPION_BOUNTY, CHAMPION_REGEN, FOUNTAIN, MAX_LEVEL, MINION_AGGRO, MINION_XP, MINIONS, RESPAWN_SECONDS,
+  CALL_FOR_HELP, CHAMPION_BOUNTY, RALLY_DAMAGE, CHAMPION_REGEN, FOUNTAIN, MAX_LEVEL, MINION_AGGRO, MINION_XP, MINIONS, RESPAWN_SECONDS,
   STRUCTURES, WAVE, XP_BASE, XP_RANGE, XP_STEP, champKillXp, type BaseStats,
 } from './stats';
 import type {
@@ -123,7 +123,7 @@ export class World {
    */
   isTargetable(u: Unit) {
     if (u.dead) return false;
-    if (u.pet) return !u.pet.mounted && this.tick >= u.pet.panicUntil;
+    if (u.pet) return !u.pet.intangible && !u.pet.mounted && this.tick >= u.pet.panicUntil;
     const own = this.units.filter((o) => o.team === u.team && o.kind === 'tower' && !o.dead);
     if (u.kind === 'nexus') return own.length === 0;
     if (u.kind === 'tower') return !own.some((o) => Math.abs(o.pos.x) < Math.abs(u.pos.x));
@@ -494,8 +494,9 @@ export class World {
       bonus += 0.1 * (this.status(u, 'momentum')?.value ?? 0);
       bonus += u.champ.mods.attackSpeed;
       if (this.status(u, 'rage')) bonus += RAGE.attackSpeed;
-      bonus += u.statuses.reduce((m, s) => (s.kind === 'frenzy' && s.until > this.tick ? Math.max(m, s.value) : m), 0);
     }
+    // Frenzy also speeds minions (Hollis's Whistle).
+    bonus += u.statuses.reduce((m, s) => (s.kind === 'frenzy' && s.until > this.tick ? Math.max(m, s.value) : m), 0);
     return ticks(u.attackInterval / (1 + bonus));
   }
 
@@ -606,10 +607,10 @@ export class World {
     return m;
   }
 
-  /** A champion's companion unit (Pip's Thistle). It has no brain of its own: the owner's kit moves it. */
-  spawnPet(owner: Unit, s: BaseStats, mounted: boolean): Unit {
+  /** A champion's companion unit (Pip's Thistle, Hollis's Bramble). It has no brain of its own: the owner's kit moves it. */
+  spawnPet(owner: Unit, s: BaseStats, mounted: boolean, extra: Pick<NonNullable<Unit['pet']>, 'species' | 'intangible'> = {}): Unit {
     const p = this.spawn('pet', owner.team, owner.pos, s);
-    p.pet = { ownerId: owner.id, mounted, panicUntil: 0 };
+    p.pet = { ownerId: owner.id, mounted, panicUntil: 0, ...extra };
     p.facing = owner.facing;
     return p;
   }
@@ -627,8 +628,44 @@ export class World {
     return best;
   }
 
-  /** Keep the current target while it stays valid and close; otherwise minion > structure > pet > champion. */
+  /**
+   * Hollis's Crook: `m` (an enemy minion) changes sides for `seconds`, then wanders off and dies. Whatever
+   * finishes it (or the time running out), the last hit is `owner`'s: gold, CS and XP.
+   */
+  herdMinion(m: Unit, owner: Unit, seconds: number) {
+    if (m.kind !== 'minion' || m.dead || m.team === owner.team) return;
+    m.team = owner.team;
+    m.attackTarget = null;
+    m.windup = 0;
+    m.statuses = m.statuses.filter((s) => s.kind !== 'rally');
+    m.statuses.push({ kind: 'herded', value: this.tick + ticks(seconds), sourceId: owner.id, until: this.tick + ticks(seconds) + 1 });
+  }
+
+  /** The minion is fighting for Hollis (crooked onto his side). */
+  herdedBy(m: Unit) {
+    return m.statuses.find((s) => s.kind === 'herded');
+  }
+
+  /**
+   * Keep the current target while it stays valid and close; otherwise minion > structure > pet > champion.
+   * A whistled minion (rally) goes for its target first; a herded one dies when its time is up.
+   */
   private minionBrain(m: Unit) {
+    const herd = this.herdedBy(m);
+    if (herd && this.tick >= herd.value) {
+      this.kill(m, this.get(herd.sourceId) ?? null);
+      return;
+    }
+    const rally = this.status(m, 'rally');
+    const called = rally ? this.get(rally.value) : undefined;
+    if (called && this.canAttack(m, called) && gap(m, called) <= MINION_AGGRO + 6) {
+      if (m.attackTarget !== called.id) {
+        m.attackTarget = called.id;
+        m.windup = 0;
+      }
+      m.moveTarget = null;
+      return;
+    }
     const cur = this.get(m.attackTarget);
     if (!this.canAttack(m, cur) || gap(m, cur) > MINION_AGGRO + 2) {
       const t =
@@ -814,7 +851,12 @@ export class World {
   dealDamage(src: Unit | null, target: Unit, amount: number, from: DamageSource = {}): number {
     if (target.dead || amount <= 0) return 0;
     if (target.pet && !target.pet.mounted && !this.isTargetable(target)) return 0; // a broken pet is out of the fight
-    if (src?.kind === 'minion') amount *= hiveMinionMult(this, src);
+    if (src?.kind === 'minion') {
+      amount *= hiveMinionMult(this, src);
+      // Whistled (Hollis's Q): harder on the target they were sent at.
+      const rally = this.status(src, 'rally');
+      if (rally?.value === target.id) amount *= 1 + RALLY_DAMAGE;
+    }
     if (src?.champ) {
       amount *= 1 + src.champ.mods.dmgAmp;
       for (const a of perksOf(src)) amount *= a.damageMult?.(this, src, target) ?? 1;
@@ -907,6 +949,9 @@ export class World {
       if (owner?.champ) kitOf(owner).onPetDown?.(this, owner, u);
       return;
     }
+    // A herded minion (Hollis's Crook) is his last hit however it dies; its XP goes to his side.
+    const herd = u.kind === 'minion' ? this.herdedBy(u) : undefined;
+    const side = herd ? enemyOf(u.team) : u.team;
     u.hp = 0;
     u.dead = true;
     u.attackTarget = null;
@@ -914,8 +959,8 @@ export class World {
     u.windup = 0;
     const { xpMult, goldMult } = this.rules;
     // A pet's kills are its owner's (gold, CS, XP).
-    const credited = killer?.pet ? this.get(killer.pet.ownerId) ?? null : killer;
-    let byChampion = credited?.champ && credited.team !== u.team ? credited : null;
+    const credited = herd ? this.get(herd.sourceId) ?? null : killer?.pet ? this.get(killer.pet.ownerId) ?? null : killer;
+    let byChampion = credited?.champ && credited.team !== side ? credited : null;
     // A minion no champion finished off can still be claimed (Mabel's Pollinated: stung or honeyed).
     if (!byChampion && u.kind === 'minion') {
       byChampion = this.champions().find((c) => !c.dead && c.team !== u.team && kitOf(c).claimsMinion?.(this, c, u)) ?? null;
@@ -931,7 +976,7 @@ export class World {
     }
     if (u.kind === 'minion') {
       for (const c of this.champions()) {
-        if (!c.dead && c.team !== u.team && dist(c.pos, u.pos) <= XP_RANGE) this.grantXp(c, MINION_XP[u.role!] * xpMult);
+        if (!c.dead && c.team !== side && dist(c.pos, u.pos) <= XP_RANGE) this.grantXp(c, MINION_XP[u.role!] * xpMult);
       }
     }
     if (u.kind === 'champion') {
@@ -1033,7 +1078,7 @@ export class World {
    */
   private steer(u: Unit, dir: Vec2): Vec2 {
     for (const s of this.units) {
-      if (s === u || s.dead || s.pet?.mounted || (s.speed > 0 && s.moveTarget && s.windup === 0 && !this.isBusy(s))) continue;
+      if (s === u || s.dead || s.pet?.mounted || s.pet?.intangible || (s.speed > 0 && s.moveTarget && s.windup === 0 && !this.isBusy(s))) continue;
       const ox = s.pos.x - u.pos.x;
       const oy = s.pos.y - u.pos.y;
       const d = Math.hypot(ox, oy);
@@ -1066,7 +1111,7 @@ export class World {
 
   /** Soft circle separation between mobile units so waves spread out instead of stacking. Dashing units pass through. */
   private separate() {
-    const mobile = this.units.filter((u) => !u.dead && u.speed > 0 && !u.champ?.dash && !u.pet?.mounted);
+    const mobile = this.units.filter((u) => !u.dead && u.speed > 0 && !u.champ?.dash && !u.pet?.mounted && !u.pet?.intangible);
     for (let i = 0; i < mobile.length; i++) {
       for (let j = i + 1; j < mobile.length; j++) {
         const a = mobile[i];

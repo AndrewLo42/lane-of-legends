@@ -490,6 +490,33 @@ export class EffectsView {
         }
         break;
       }
+      // ---- Hollis ----
+      case 'whistle': {
+        // Whistle: soft green notes rising round him, and a ring sweeping out over the flock it calls.
+        const r = ringShape(fx.radius ?? 7, 0.12, basic(0xd8f0b0, 0.7));
+        add(r, 0.5, (k) => {
+          fade(r, 0.7)(k);
+          r.scale.setScalar(0.15 + k * 0.85);
+        });
+        for (let i = 0; i < 3; i++) {
+          const note = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), basic(0xeaffc8, 0.95));
+          const a = (i / 3) * Math.PI * 2;
+          add(note, 0.7, (k) => {
+            fade(note, 0.95)(k);
+            note.position.set(Math.cos(a + k * 2) * 0.7, 1.8 + k * 1.4, Math.sin(a + k * 2) * 0.7);
+          });
+        }
+        break;
+      }
+      case 'herd': {
+        // Crook and Bramble: a ring of dust where the flock is turned.
+        const r = ringShape(fx.radius ?? 1, 0.2, basic(0xc8b48a, 0.85));
+        add(r, 0.45, (k) => {
+          fade(r, 0.85)(k);
+          r.scale.setScalar(0.4 + k * 0.8);
+        });
+        break;
+      }
       case 'bind': {
         // Sable's Bind: a gold chain ring that cinches in around the target.
         const r = ringShape((fx.radius ?? 1) + 0.6, 0.12, basic(0xe6c86b, 0.95));
