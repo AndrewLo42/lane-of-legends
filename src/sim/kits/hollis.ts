@@ -14,7 +14,8 @@ import type { Kit } from './types';
  */
 
 /** The Flock: allied minions near Hollis. */
-const FLOCK = { radius: 6, haste: 0.15, guard: 0.15, selfGuard: 0.15, selfMinions: 2 };
+/** Minions only get the speed: making them tougher would change how the wave is last-hit. */
+const FLOCK = { radius: 6, haste: 0.15, selfGuard: 0.15, selfMinions: 2 };
 /** Bramble bites what Hollis attacks. */
 const BITE = { base: 20, ad: 0.3, every: 1.0 };
 const DOG = { speed: 9, radius: 0.4, follow: 1.2, run: 18, trot: 12 };
@@ -128,8 +129,8 @@ export const HOLLIS: Kit = {
     name: 'The Flock',
     icon: '🐑',
     describe: (self) =>
-      `Allied minions within ${FLOCK.radius} units of Hollis move ${FLOCK.haste * 100}% faster and take ${FLOCK.guard * 100}% less damage, ` +
-      `and while ${FLOCK.selfMinions} or more are with him, so does he (${FLOCK.selfGuard * 100}% less). ` +
+      `Allied minions within ${FLOCK.radius} units of Hollis move ${FLOCK.haste * 100}% faster, and while ${FLOCK.selfMinions} or more ` +
+      `are with him he takes ${FLOCK.selfGuard * 100}% less damage. ` +
       `Bramble, his sheepdog, follows him and bites whatever Hollis attacks for ${Math.round(BITE.base + BITE.ad * self.damage)} damage ` +
       `(at most once every ${BITE.every}s). Bramble can't be targeted.`,
   },
@@ -274,11 +275,10 @@ export const HOLLIS: Kit = {
       d.brambleId = dog.id;
     }
     moveBramble(world, self, dog);
-    // The Flock (and Hollis is safer among it).
+    // The Flock: his minions hurry, and Hollis is safer among them.
     const flock = flockNear(world, self, FLOCK.radius);
     for (const m of flock) {
       keep(world, m, 'haste', FLOCK.haste, self.id);
-      keep(world, m, 'guard', FLOCK.guard, self.id);
     }
     if (flock.length >= FLOCK.selfMinions) keep(world, self, 'guard', FLOCK.selfGuard, self.id);
     // The stampede's front: allied minions it has passed charge with it.

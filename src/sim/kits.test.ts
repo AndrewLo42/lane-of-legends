@@ -1589,14 +1589,18 @@ describe('Hollis', () => {
     near(bites[0].amount, BITE.base + BITE.ad * me.damage, 1);
   });
 
-  it('The Flock: nearby allied minions are faster and tougher', () => {
+  it('The Flock: nearby allied minions are faster (not tougher), and Hollis is tougher among them', () => {
     const { w, me } = setup('hollis');
     const close = post(w, 'blue', 3);
     const far = post(w, 'blue', FLOCK.radius + 3);
     run(w, 0.2);
     expect(w.status(close, 'haste')?.value).toBe(FLOCK.haste);
-    expect(w.status(close, 'guard')?.value).toBe(FLOCK.guard);
+    expect(w.status(close, 'guard')).toBeUndefined();
     expect(w.status(far, 'haste')).toBeUndefined();
+    expect(w.status(me, 'guard')).toBeUndefined(); // only one minion with him
+    post(w, 'blue', -2);
+    run(w, 0.2);
+    expect(w.status(me, 'guard')?.value).toBe(FLOCK.selfGuard);
     expect(me.hp).toBe(me.maxHp);
   });
 

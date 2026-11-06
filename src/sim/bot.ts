@@ -1080,9 +1080,10 @@ export class BotController implements Controller {
   // ---------- Hollis ----------
 
   /**
-   * A first pass at the shepherd: Bramble a wave about to reach his tower back down the lane, crook a
-   * minion he'd otherwise lose (or the champion when it's a clean shot), whistle his wave onto a champion
-   * standing in it while he's healthy, and stampede when his wave can carry it into their tower.
+   * The shepherd: Bramble a wave about to reach his tower back down the lane, crook a minion he'd
+   * otherwise lose, whistle his wave onto a champion standing near it, and stampede when his wave can
+   * carry it into their tower. Between waves he trades: a clean crook or a nip whenever he's no worse off
+   * on health, then steps in to swing while they're slowed.
    */
   private hollis(ctx: Ctx): Command | null {
     const { world, self, foe, near, unsafe, ready, aim } = ctx;
@@ -1104,18 +1105,25 @@ export class BotController implements Controller {
     if (foe) {
       const foeHp = foe.hp / foe.maxHp;
       const winning = foeHp < 0.5 || hp > foeHp;
+      // Between waves both sides sit at full health: trade whenever he's no worse off, keeping mana for the next wave.
+      const even = hp >= foeHp - 0.1 && hp > 0.4;
+      const spare = (cost: number) => mana > cost + Q.cost;
       // Stampede: a kill, or a wave that will crash into their tower behind it.
       if (ready(3) && near(R.length * 0.6) && (foe.hp < ctx.dmg(3) * 1.1 || (winning && flock.length >= 3)) && !unsafe(foe.pos)) return cast(3, foe.pos);
-      // Whistle the flock onto them while they stand in it.
-      const inWave = flock.some((m) => dist(m.pos, foe.pos) < 5);
-      if (ready(0) && inWave && hp > 0.5 && gap(self, foe) <= Q.range) return cast(0, foe.pos);
+      // Whistle the flock onto them while they stand in or near it.
+      const inWave = flock.some((m) => dist(m.pos, foe.pos) < 6);
+      if (ready(0) && inWave && hp > 0.4 && gap(self, foe) <= Q.range) return cast(0, foe.pos);
       // A clean crook: nothing of theirs in the way.
       const lineTo = aim(foe, W.speed);
       const blocked = enemyMinions.some((m) => segmentDistance(m.pos, self.pos, lineTo).d <= W.width / 2 + m.radius && dist(m.pos, self.pos) < dist(lineTo, self.pos));
-      if (ready(1) && !blocked && near(W.length - 0.5) && winning && mana > W.cost + E.cost && !unsafe(foe.pos)) return cast(1, lineTo);
-      // Bramble's nip as a chase or a trade opener.
-      if (ready(2) && near(E.range - 0.5) && winning && !unsafe(foe.pos)) return cast(2, ctx.aimAfter(foe, 0.3));
-      if (near(2.5) && winning && !unsafe(foe.pos)) return { type: 'attack', target: foe.id };
+      if (ready(1) && !blocked && near(W.length - 0.5) && even && spare(W.cost) && !unsafe(foe.pos)) return cast(1, lineTo);
+      // Bramble's nip: a poke between waves, or the follow-up to a crook.
+      if (ready(2) && near(E.range - 0.5) && (even || winning) && spare(E.cost) && !unsafe(foe.pos)) return cast(2, ctx.aimAfter(foe, 0.3));
+      // A crook or nip just slowed them: step in and swing while they can't get away.
+      const slowed = !!world.status(foe, 'slow', self.id);
+      if ((slowed && near(4) && even) || (near(2.5) && (winning || even))) {
+        if (!unsafe(foe.pos)) return { type: 'attack', target: foe.id };
+      }
     }
     // Crook a minion he can't reach for the last hit (it's his CS either way).
     if (ready(1) && mana > W.cost + Q.cost) {

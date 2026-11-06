@@ -228,13 +228,13 @@ A melee wave controller: he wins on CS and towers rather than kills. Placeholder
 
 | | |
 |---|---|
-| **Passive: The Flock** | Allied minions within 6 units move 15% faster and take 15% less damage, and so does Hollis while 2 or more are with him. Bramble, his sheepdog, follows at heel and bites what Hollis attacks (20 + 30% AD, once a second). Bramble is a pet that can never be targeted. |
+| **Passive: The Flock** | Allied minions within 6 units move 15% faster (only faster: they take normal damage, so last-hitting isn't changed), and Hollis takes 15% less damage while 2 or more are with him. Bramble, his sheepdog, follows at heel and bites what Hollis attacks (20 + 30% AD, once a second). Bramble is a pet that can never be targeted. |
 | **Q: Whistle** | Every allied minion within 7 units goes for the enemy nearest the cursor (champion or minion), attacking 30% faster and dealing 50% more damage to it for 3s. Whistled minions glow gold. Needs minions nearby. |
 | **W: Crook** | A hook (8 units) that catches the first enemy. A minion is pulled to Hollis and *herded*: it changes sides for 5s with at most half its health, then wanders off and dies. However it dies, it's Hollis's last hit (CS, gold, XP). A champion takes damage, is pulled 2.5 units toward him and slowed. |
 | **E: Bramble** | Bramble bounds to a spot (7 units): enemy minions there are herded 3 units back toward their tower, and an enemy champion is nipped and slowed. |
 | **R: Stampede** | Spectral sheep thunder 20 units down the lane in a band 6 wide: enemies take damage, are shoved aside and slowed, and his own minions they pass charge with them (40% faster, 30% less damage, 6s). |
-| **Bot** | A first pass: Bramble a wave that's about to reach his tower, crook minions he can't reach (and the champion when nothing blocks), whistle the wave onto a champion standing in it while he's healthy, and stampede for a kill or to carry a big wave into the tower. |
-| **Bot vs bot** | About 35%, every win on CS. Strong into Arlo and Sable; loses to the melee bruisers (Tock, Gormund). |
+| **Bot** | Bramble a wave that's about to reach his tower, crook minions he can't reach, whistle the wave onto a champion standing near it while he's healthy, and stampede for a kill or to carry a big wave into the tower. Between waves he trades: a clean crook or a nip whenever he's no worse off on health (keeping mana for the next wave), then steps in to swing while they're slowed, so his abilities are spread through the wave cycle rather than bunched when the waves meet. |
+| **Bot vs bot** | About 23%, nearly every win on CS. Strong into Arlo and Aurelle; loses to the bruisers and divers (Tock, Gormund, Gerrit, Lisha) and to Maren. |
 | **Code** | `src/sim/kits/hollis.ts`; herding, whistled targets and intangible pets in `src/sim/world.ts` |
 
 Marked units (Lisha's marks, Arlo's Rune Flare) wear a pulsing ring and a floating petal in the marker's colour.
