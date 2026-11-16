@@ -1,0 +1,45 @@
+{
+  "out": "public/assets/meshy/Fennick.glb",
+  "rigged": "assets-src/meshy/fennick/rigged_8f296efa.glb",
+  "anims": [
+    "assets-src/meshy/fennick/anims_batch1.glb",
+    "assets-src/meshy/fennick/anims_batch2.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "reweight": [
+    {
+      "min": [-1, 0.075, 0.12],
+      "max": [1, 1, 0.66],
+      "bone": "Hips",
+      "pivot": [0, 0.06, 0.6],
+      "rot": [28, 0, 0]
+    }
+  ],
+  "clips": {
+    "Idle": { "src": "Idle" },
+    "Run": { "src": "Run_02" },
+    "Attack": { "src": "Archery_Shot", "start": 3.7, "end": 4.9 },
+    "Attack2": { "src": "Archery_Shot_3", "start": 0.15, "end": 0.67 },
+    "CastQ": { "src": "Archery_Shot", "start": 3.0, "end": 5.0 },
+    "CastW": { "src": "Archery_Shot_3", "start": 0.0, "end": 0.67 },
+    "CastE": { "src": "Draw_and_Shoot_Left", "start": 1.5, "end": 3.5 },
+    "CastR": { "src": "Archery_Aim_with_Lateral_Scan", "start": 0.5, "end": 3.0 },
+    "Death": { "src": "dying_backwards", "start": 0.0, "end": 2.2 },
+    "Hit": { "src": "Hit_Reaction_with_Bow", "start": 0.1, "end": 1.5 },
+    "Select": { "src": "Formal_Bow", "start": 0.0, "end": 7.6 }
+  },
+  "fists": {
+    "LeftHand": { "palm": [1, 0, 0], "knuckle": 0.155, "radius": 0.03, "wrap": 230 }
+  },
+  "props": {
+    "items": {
+      "Bow": { "file": "assets-src/meshy/fennick/bow_hand.glb", "hand": "LeftHand", "length": 1.064, "at": "fist", "offset": [0, 0, 0], "tex": 256 },
+      "arrowtip": { "file": "assets-src/meshy/fennick/arrowtip_hand.glb", "hand": "LeftHand", "length": 0.0525, "at": "fist", "offset": [0, 0, 0] }
+    }
+  },
+  "preview_clips": [["Idle", 0.3], ["Attack", 0.1], ["CastE", 0.4], ["Run", 0.3]]
+}

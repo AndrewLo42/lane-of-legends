@@ -1,0 +1,122 @@
+[
+  {
+    "at": "2026-11-06T21:01:12.202Z",
+    "cmd": "concept",
+    "taskId": "01a1b2a9-e87d-76d6-8082-754d034ea134",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a nimble young fennec-fox-folk tinker-archer, a humanoid fox with very large upright fennec ears, sandy cream fur, a short bushy cream-tipped tail, bright amber eyes, a brass scope-monocle with a small glowing lens over his right eye, a rust-orange padded tinker's vest with brass rivets over a slate-grey shirt with rolled sleeves, a leather tool belt with small pouches and a tiny wrench, a leather bracer on his left forearm, a cylindrical leather quiver on his back holding arrows with pale icy-cyan, ember-orange and sun-yellow fletchings, dark brown trousers tucked into wrapped boots. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized ears, hands and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no bow, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/fennick/concepts/034ea134_0.png",
+      "assets-src/meshy/fennick/concepts/034ea134_1.png",
+      "assets-src/meshy/fennick/concepts/034ea134_2.png"
+    ]
+  },
+  {
+    "at": "2026-11-06T21:01:12.548Z",
+    "cmd": "concept",
+    "taskId": "01a1b2a9-ec04-7238-bedc-bf7dba8a80bc",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a nimble young fennec-fox-folk tinker-archer, a humanoid fox with very large upright fennec ears, sandy cream fur, a short bushy cream-tipped tail, bright amber eyes, a brass scope-monocle with a small glowing lens over his right eye, a rust-orange padded tinker's vest with brass rivets over a slate-grey shirt with rolled sleeves, a leather tool belt with small pouches and a tiny wrench, a leather bracer on his left forearm, a cylindrical leather quiver on his back holding arrows with pale icy-cyan, ember-orange and sun-yellow fletchings, dark brown trousers tucked into wrapped boots. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized ears, hands and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no weapons, no bow, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/fennick/concepts/ba8a80bc_0.png",
+      "assets-src/meshy/fennick/concepts/ba8a80bc_1.png",
+      "assets-src/meshy/fennick/concepts/ba8a80bc_2.png"
+    ]
+  },
+  {
+    "at": "2026-11-06T21:06:49.055Z",
+    "cmd": "model",
+    "taskId": "01a1b2ad-d10f-7786-877e-91333a216d58",
+    "request": {
+      "image_urls": [
+        "ba8a80bc_1.png",
+        "ba8a80bc_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "pose_mode": "a-pose",
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/fennick/model_3a216d58.glb"
+    ]
+  },
+  {
+    "at": "2026-11-06T21:12:09.422Z",
+    "cmd": "rig",
+    "taskId": "01a1b2b4-2897-73c7-92e4-8ded8f296efa",
+    "request": {
+      "input_task_id": "01a1b2ad-d10f-7786-877e-91333a216d58",
+      "animation_type": "biped",
+      "height_meters": 1.8
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/fennick/rigged_8f296efa.glb"
+    ]
+  },
+  {
+    "at": "2026-11-06T21:12:48.857Z",
+    "cmd": "animate",
+    "taskId": "01a1b2b4-7dde-746c-9781-d60f9dfdc413",
+    "request": {
+      "rig_task_id": "01a1b2b4-2897-73c7-92e4-8ded8f296efa",
+      "action_ids": [
+        0,
+        14,
+        224,
+        226,
+        514,
+        227,
+        236,
+        231,
+        189,
+        150
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/fennick/anims_batch1.glb"
+    ]
+  },
+  {
+    "at": "2026-11-06T21:12:58.472Z",
+    "cmd": "animate",
+    "taskId": "01a1b2b5-0274-7137-af1f-0dd273cf7137",
+    "request": {
+      "rig_task_id": "01a1b2b4-2897-73c7-92e4-8ded8f296efa",
+      "action_ids": [
+        41
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 3,
+    "files": [
+      "assets-src/meshy/fennick/anims_batch2.glb"
+    ]
+  }
+]

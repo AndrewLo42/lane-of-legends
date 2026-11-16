@@ -33,7 +33,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen**, **Fennick** and **Hollis** (below).
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen** and **Hollis** (below).
 
 Each champion's **Bot vs bot** row is its bot's win rate against every other bot champion (both sides, several seeds, the run's duel rules): a balance guide, not a promise.
 
@@ -207,9 +207,9 @@ A ranged sustain caster whose light heals and whose heat burns. Placeholder cand
 | **Bot vs bot** | About 46%. Strong into Gormund, Maren and Arlo; weak into Aurelle, Mabel and Tock. |
 | **Code** | `src/sim/kits/lumen.ts` |
 
-### Fennick, the Tinker-Archer (experimental)
+### Fennick, the Tinker-Archer
 
-A ranged auto-attack carry with no dash. Placeholder archer.
+A ranged auto-attack carry with no dash. A fennec-fox tinker with a brass-geared bow (Meshy model; the bow is built in Blender by `tools/blender/build_fennick_bow.py`).
 
 | | |
 |---|---|

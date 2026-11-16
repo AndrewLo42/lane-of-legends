@@ -121,7 +121,6 @@ export const FENNICK: Kit = {
     'A gadgeteer archer whose quiver turns through frost, fire and spark arrows. No dash: he wins on spacing, a bow drawn ' +
     'as far as he dares, and a net for anyone who dives him. Weak early, deadly in a long fight. Catch him out of position.',
   color: '#6fc3a0',
-  experimental: true,
   stats: {
     hp: 570, hpPerLevel: 88, mana: 340, manaPerLevel: 45, manaRegen: 2.4, damage: 54, damagePerLevel: 3.8,
     attackInterval: 0.75, attackSpeedPerLevel: 0.032, windup: 0.17, range: 5.5, projectileSpeed: 28, speed: 6.3, radius: 0.5,

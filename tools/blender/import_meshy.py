@@ -17,6 +17,9 @@ The JSON config (see assets-src/meshy/<name>/import.json) lists:
             metres; optional per-item `rot` (deg, bone space) and `offset` (m, bone space), and
             `at: "fist"` to offset from the hand's curled-fist grip centre instead of the bone origin
   fists     per hand bone {palm, knuckle, radius, wrap?}: curl the fingers around a grip (see below)
+  reweight  [{min, max, bone, pivot?, rot?}]: bind loose mesh pieces inside a rest-pose box rigidly to one
+            bone (a tail the rig has no bones for), optionally rotated about pivot (see below)
+  preview_clips  [[clip, fraction], ...] posed in the --preview renders
 Everything is exported with one animation per canonical clip; non-canonical actions are dropped.
 """
 import bpy, sys, json, math, os, re
@@ -207,6 +210,46 @@ for pb in arm.pose.bones:
 bpy.context.view_layer.update()
 
 
+# ---------------- reweight ----------------
+# Meshy's biped rig has no tail (or other extra) bones, so a tail gets weighted to whatever is nearest,
+# usually the legs, and tears when they move. Each entry takes the mesh's loose pieces (Meshy meshes are
+# many unwelded islands) whose centre lies inside a rest-pose world box (metres, +Y = his back) and binds
+# them rigidly to one bone, optionally rotated `rot` degrees about `pivot` first (lift a tail clear of the legs).
+for spec in cfg.get('reweight') or []:
+    import bmesh
+    Mw, Mwi = mesh.matrix_world, mesh.matrix_world.inverted()
+    lo, hi = Vector(spec['min']), Vector(spec['max'])
+    bm = bmesh.new(); bm.from_mesh(mesh.data); bm.verts.ensure_lookup_table()
+    seen, picked = set(), []
+    for v0 in bm.verts:
+        if v0.index in seen:
+            continue
+        stack, comp = [v0], []
+        seen.add(v0.index)
+        while stack:
+            a = stack.pop(); comp.append(a.index)
+            for e in a.link_edges:
+                b = e.other_vert(a)
+                if b.index not in seen:
+                    seen.add(b.index); stack.append(b)
+        c = sum((Mw @ bm.verts[i].co for i in comp), Vector()) / len(comp)
+        if all(lo[k] < c[k] < hi[k] for k in range(3)):
+            picked += comp
+    bm.free()
+    group = mesh.vertex_groups[spec['bone']]
+    pivot = Vector(spec.get('pivot', (0, 0, 0)))
+    R = (Matrix.Translation(pivot) @ Euler([math.radians(x) for x in spec.get('rot', (0, 0, 0))]).to_matrix().to_4x4()
+         @ Matrix.Translation(-pivot))
+    for i in picked:
+        v = mesh.data.vertices[i]
+        for g in v.groups:
+            g.weight = 0.0
+        group.add([i], 1.0, 'REPLACE')
+        v.co = Mwi @ (R @ (Mw @ v.co))
+    mesh.data.update()
+    print(f'REWEIGHT {len(picked)} verts -> {spec["bone"]}')
+
+
 def hand_frame(name):
     """World transform of a hand bone at rest, without the rig's centimetre scale (metres, bone axes)."""
     t, r, _ = (arm.matrix_world @ arm.data.bones[name].matrix_local).decompose()
@@ -379,7 +422,8 @@ if preview:
         for p in props:
             p.hide_render = p.name != pname
         hand_name = next(s['hand'] for n, s in cfg['props']['items'].items() if n == pname)
-        for clip, t in [('Idle', 0.3), ('2H_Melee_Attack_Slice', 0.5), ('Block', 0.5)]:
+        # `preview_clips` in the config: [[clip, fraction], ...] (default: a melee weapon's clips).
+        for clip, t in cfg.get('preview_clips') or [('Idle', 0.3), ('2H_Melee_Attack_Slice', 0.5), ('Block', 0.5)]:
             act = bpy.data.actions[clip]
             assign(arm, act)
             sc.frame_set(int(act.frame_range[0] + (act.frame_range[1] - act.frame_range[0]) * t))
