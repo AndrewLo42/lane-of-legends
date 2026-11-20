@@ -33,7 +33,7 @@ npm test           # sim tests
 
 **Champions** (kits in `src/sim/kits/`):
 
-Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Lumen** and **Hollis** (below).
+Champions without a Meshy model yet are **experimental** (`experimental: true` on the kit; a test keeps the flag in step with `public/assets/meshy/`). They play as placeholders, appear on the select screen only with the 🧪 *Experimental champions* toggle, and bots never play them (run opponents, free-play enemies, bot vs bot). Right now: **Hollis** (below).
 
 Each champion's **Bot vs bot** row is its bot's win rate against every other bot champion (both sides, several seeds, the run's duel rules): a balance guide, not a promise.
 
@@ -192,9 +192,9 @@ An old knight of a fallen order who plants standards and thrusts himself into th
 | **Bot vs bot** | About 34%. Strong into Gormund and Pip; weak into ranged poke (Arlo, Maren) and Sable. |
 | **Code** | `src/sim/kits/gerrit.ts` |
 
-### Lumen, the Kindly (experimental)
+### Lumen, the Kindly
 
-A ranged sustain caster whose light heals and whose heat burns. Placeholder candle-saint.
+A ranged sustain caster whose light heals and whose heat burns. A candle-saint with a crown of lit candles (Meshy model; the flames are a Blender prop on her head bone that flickers and blazes while she's Radiant, and her select-screen prayer is keyed in Blender).
 
 | | |
 |---|---|

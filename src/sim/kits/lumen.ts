@@ -81,7 +81,6 @@ export const LUMEN: Kit = {
     'A gentle candle-saint whose light heals and whose heat burns. Every hit heals her, healing builds Devotion, and a ' +
     'full meter makes her Radiant, or becomes a burning sun. Burst her down, or bring Scorch.',
   color: '#f2c86b',
-  experimental: true,
   stats: {
     hp: 640, hpPerLevel: 95, mana: 380, manaPerLevel: 50, manaRegen: 2.8, damage: 63, damagePerLevel: 3.5,
     attackInterval: 0.75, attackSpeedPerLevel: 0.022, windup: 0.18, range: 5, projectileSpeed: 26, speed: 6.4, radius: 0.55,

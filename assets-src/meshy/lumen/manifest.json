@@ -1,0 +1,102 @@
+[
+  {
+    "at": "2026-11-17T00:03:52.912Z",
+    "cmd": "concept",
+    "taskId": "01a1e6d0-ce63-77a0-a7f8-8f76c36c7649",
+    "variation": 1,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a gentle young candle-saint woman, a kind serene face with warm olive skin and soft freckles, a warm closed-lip smile, warm amber eyes, long wavy auburn hair in a loose braid over one shoulder, a halo-like crown of short ivory wax candles with dripping wax and small warm flames, layered flowing robes of honey-amber and dusty plum over a cream underdress, a long dusty-plum stole embroidered with small golden sun motifs, a wide sash belt with a round brass sun clasp, a short honey-amber capelet, wax-sealed prayer ribbons hanging from her belt, soft brown cloth slippers. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no lantern, no staff, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, no white and gold armor, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/lumen/concepts/c36c7649_0.png",
+      "assets-src/meshy/lumen/concepts/c36c7649_1.png",
+      "assets-src/meshy/lumen/concepts/c36c7649_2.png"
+    ]
+  },
+  {
+    "at": "2026-11-17T00:03:53.359Z",
+    "cmd": "concept",
+    "taskId": "01a1e6d0-d185-7703-94da-107b5b2f3070",
+    "variation": 2,
+    "request": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "a gentle young candle-saint woman, a kind serene face with warm olive skin and soft freckles, a warm closed-lip smile, warm amber eyes, long wavy auburn hair in a loose braid over one shoulder, a halo-like crown of short ivory wax candles with dripping wax and small warm flames, layered flowing robes of honey-amber and dusty plum over a cream underdress, a long dusty-plum stole embroidered with small golden sun motifs, a wide sash belt with a round brass sun clasp, a short honey-amber capelet, wax-sealed prayer ribbons hanging from her belt, soft brown cloth slippers. stylized fantasy MOBA champion, hand-painted textures, chunky readable silhouette, slightly exaggerated heroic proportions about 6 heads tall, oversized hands and key accessories, bright but controlled colors, clean shapes, game-ready character concept. full-body character turnaround sheet, front view, side view and back view, standing in a relaxed A-pose, arms held well away from the body, empty open hands, no lantern, no staff, no weapons, plain light grey background, even soft studio lighting, no cast shadows, entire figure visible head to toe. no photorealism, no fine noisy detail, no pure red or pure blue as a main color, no white and gold armor, feet not cropped, no text, no logos",
+      "pose_mode": "a-pose",
+      "generate_multi_view": true
+    },
+    "credits": 9,
+    "files": [
+      "assets-src/meshy/lumen/concepts/5b2f3070_0.png",
+      "assets-src/meshy/lumen/concepts/5b2f3070_1.png",
+      "assets-src/meshy/lumen/concepts/5b2f3070_2.png"
+    ]
+  },
+  {
+    "at": "2026-11-17T00:14:33.371Z",
+    "cmd": "model",
+    "taskId": "01a1e6da-0382-72db-8c68-fca786d975ce",
+    "request": {
+      "image_urls": [
+        "c36c7649_1.png",
+        "c36c7649_2.png"
+      ],
+      "model_type": "standard",
+      "should_remesh": true,
+      "target_polycount": 12000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "origin_at": "bottom"
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/lumen/model_86d975ce.glb"
+    ]
+  },
+  {
+    "at": "2026-11-17T00:16:21.267Z",
+    "cmd": "rig",
+    "taskId": "01a1e6dc-5ad2-7292-ad79-26ae75ea55b9",
+    "request": {
+      "input_task_id": "01a1e6da-0382-72db-8c68-fca786d975ce",
+      "animation_type": "biped",
+      "height_meters": 1.75
+    },
+    "credits": 5,
+    "files": [
+      "assets-src/meshy/lumen/rigged_75ea55b9.glb"
+    ]
+  },
+  {
+    "at": "2026-11-17T00:20:22.856Z",
+    "cmd": "animate",
+    "taskId": "01a1e6dc-bd48-7097-8e9c-a084f5ad8704",
+    "request": {
+      "rig_task_id": "01a1e6dc-5ad2-7292-ad79-26ae75ea55b9",
+      "action_ids": [
+        244,
+        14,
+        134,
+        135,
+        136,
+        137,
+        133,
+        125,
+        185,
+        178
+      ],
+      "post_process": {
+        "operation_type": "change_fps",
+        "fps": 30
+      }
+    },
+    "credits": 30,
+    "files": [
+      "assets-src/meshy/lumen/anims_batch1.glb"
+    ]
+  }
+]

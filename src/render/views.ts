@@ -83,7 +83,8 @@ interface UnitView {
   lastCastSeen?: number;
   /** Seconds since a champion died (null while alive). */
   deadFor?: number | null;
-  /** Lumen: her halo (brighter while Radiant) and the burning sun of Sunrise. */
+  /** Lumen: her crown's candle flames (her model; null on the placeholder), or the placeholder's halo, and Sunrise's sun. */
+  flames?: THREE.Mesh | null;
   halo?: THREE.Mesh;
   sun?: THREE.Group;
   /** Fennick: the ring closing in as he draws Longshot, and Overcharge's three-colour aura. */
@@ -633,19 +634,37 @@ export class WorldView {
     }
   }
 
-  /** Lumen's halo over her head (it blazes while she's Radiant) and the burning sun around her during Sunrise. */
+  /**
+   * Lumen: her crown's candle flames flicker, and blaze taller and whiter while she's Radiant (the placeholder
+   * figure has a halo that does the same), and the burning sun around her during Sunrise.
+   */
   private lumenVisuals(u: Unit, v: UnitView) {
-    if (!v.halo) {
-      v.halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 8, 28), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.8 }));
-      v.halo.rotation.x = Math.PI / 2;
-      v.halo.position.y = (CHAMP_HEIGHT.lumen ?? 2.5) + 0.25;
-      v.obj.add(v.halo);
-    }
     const blaze = radiant(u);
-    const halo = v.halo.material as THREE.MeshBasicMaterial;
-    halo.color.set(blaze ? 0xffffff : 0xffe08a);
-    v.halo.scale.setScalar(blaze ? 1.25 + Math.sin(performance.now() / 150) * 0.08 : 1);
-    v.halo.visible = !u.dead;
+    const t = performance.now();
+    if (v.flames === undefined) {
+      v.flames = (v.obj.getObjectByName('CandleFlames') as THREE.Mesh | undefined) ?? null;
+      // Her own material, so one Lumen going Radiant doesn't light up the other's crown in a mirror match.
+      if (v.flames) v.flames.material = (v.flames.material as THREE.MeshStandardMaterial).clone();
+    }
+    if (v.flames) {
+      const mat = v.flames.material as THREE.MeshStandardMaterial;
+      // Brightness and colour only: the flames are one mesh on her head bone, so scaling would slide them off the candles.
+      const flicker = Math.sin(t / 70 + u.id) * 0.06 + Math.sin(t / 43 + u.id * 2) * 0.04;
+      mat.emissive.set(blaze ? 0xfff0c0 : 0xff9a2a);
+      mat.emissiveIntensity = (blaze ? 4.5 + Math.sin(t / 150) : 2.2) + flicker * 8;
+      v.flames.visible = !u.dead;
+    } else {
+      if (!v.halo) {
+        v.halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 8, 28), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.8 }));
+        v.halo.rotation.x = Math.PI / 2;
+        v.halo.position.y = (CHAMP_HEIGHT.lumen ?? 2.5) + 0.25;
+        v.obj.add(v.halo);
+      }
+      const halo = v.halo.material as THREE.MeshBasicMaterial;
+      halo.color.set(blaze ? 0xffffff : 0xffe08a);
+      v.halo.scale.setScalar(blaze ? 1.25 + Math.sin(t / 150) * 0.08 : 1);
+      v.halo.visible = !u.dead;
+    }
     const on = !u.dead && sunrise(this.world, u);
     if (on && !v.sun) {
       v.sun = new THREE.Group();

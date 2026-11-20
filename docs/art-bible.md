@@ -54,3 +54,15 @@ A **fennec-fox tinker-archer**, so he doesn't read as Arlo's twin (his placehold
 - **Tail:** Meshy weighted it to the legs (it tore in Run). `import.json`'s `reweight` binds the loose pieces behind the legs rigidly to Hips and lifts the tail 28° so the run's back kick clears it. It moves with the hips but doesn't sway.
 - **Bow:** `tools/blender/build_fennick_bow.py` builds it (wooden limbs, a dark riser with a leather grip, brass gears, scope and pulley cams, a string and a nocked arrow) in the left hand's bone frame and exports `bow_hand.glb` and `arrowtip_hand.glb`. The left hand is curled into a fist around the grip. The arrowhead is its own object named `arrowtip`, which `fennickVisuals` recolours with the next arrow's element.
 - **Clip trims:** attacks start just before the release (Archery Shot 3.7–4.9 s, release at about 4.0; Archery Shot 3 0.15–0.67 s). Casts centre their release (Longshot: Archery Shot 3.0–5.0 s; Snare Shot: Draw and Shoot Left 1.5–3.5 s, release at about 2.5).
+
+## Lumen (Meshy, with Blender flames and a keyed prayer)
+A candle-saint: concept A `c36c7649` (views 1 and 2, `--pose none`), model `model_86d975ce.glb` (12.2k tris), rig `rigged_75ea55b9.glb` (height 1.75), clips `anims_batch1.glb`.
+- **Crown flames:** Meshy turned them into pale wax points. `flames_head.glb` is five teardrop flames on the candle tips, built in the Head bone's frame and baked on as a prop on `Head`. `lumenVisuals` (views.ts) flickers their emissive and makes them blaze white-gold while she's Radiant (brightness only: scaling the mesh would slide it off the candles). The placeholder's halo is only used without the model.
+- **Select (custom prayer, keyed in Blender, `anims_select.glb` on an NLA track named `Lumen_Select`):** palms together under her chin with her head bowed, then opening out palms-up, back to idle (3.5 s). Lessons:
+  - **This rig's hands: palm = +Z, thumb = −X, fingers = +Y** (Fennick's fist code uses ±X palms for the curl; check with a side render before trusting either).
+  - Blend the hand's rotation **relative to the forearm**, not in world space, or the wrists spin on their own mid-move.
+  - Put most of the hand's roll into the **forearm** (about 85%), leaving a natural wrist bend; her idle palms face forward, so facing them together needs about 175°.
+  - Swing the hands out in front on the way up, or they pass through the sash; keep the prayer clear of the bowed chin and braid. Check by testing hand vertices against the torso's front surface each frame.
+  - Keep keyed quaternions sign-continuous.
+- **Clips:** Idle 4, Run 2, Soell casts 4/6 (attacks), 7 (Candleflame), 5 at 3.5–4.5 s (Sanctuary), Charged Spell Cast (Warm Embrace), Soell cast 8 with both arms to the sky (Sunrise), Shot and Slow Fall Backward, Hit Reaction.
+- **Cost:** 2 concept sheets 18, model 30, rig 5, 10 clips 30 = 83 credits (2026-11-16).

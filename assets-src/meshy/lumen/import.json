@@ -1,0 +1,32 @@
+{
+  "out": "public/assets/meshy/Lumen.glb",
+  "rigged": "assets-src/meshy/lumen/rigged_75ea55b9.glb",
+  "anims": [
+    "assets-src/meshy/lumen/anims_batch1.glb",
+    "assets-src/meshy/lumen/anims_select.glb"
+  ],
+  "textures": {
+    "baseColor": 1024,
+    "normal": 512,
+    "metallicRoughness": 256
+  },
+  "clips": {
+    "Idle": { "src": "Idle_4" },
+    "Run": { "src": "Run_02" },
+    "Attack": { "src": "mage_soell_cast_4", "start": 0.05, "end": 0.95 },
+    "Attack2": { "src": "mage_soell_cast_6", "start": 0.38, "end": 1.28 },
+    "CastQ": { "src": "mage_soell_cast_7", "start": 0.34, "end": 1.24 },
+    "CastW": { "src": "mage_soell_cast_5", "start": 3.5, "end": 4.5 },
+    "CastE": { "src": "Charged_Spell_Cast", "start": 0.15, "end": 1.05 },
+    "CastR": { "src": "mage_soell_cast_8", "start": 0.0, "end": 1.33 },
+    "Death": { "src": "Shot_and_Slow_Fall_Backward", "start": 1.7, "end": 3.4 },
+    "Hit": { "src": "Hit_Reaction", "start": 0.0, "end": 1.0 },
+    "Select": { "src": "Lumen_Select", "start": 0.0, "end": 3.5 }
+  },
+  "props": {
+    "items": {
+      "CandleFlames": { "file": "assets-src/meshy/lumen/flames_head.glb", "hand": "Head", "length": 0.2674, "offset": [0, 0, 0] }
+    }
+  },
+  "preview_clips": [["Idle", 0.3], ["Select", 0.35], ["Select", 0.75], ["CastR", 0.5]]
+}
